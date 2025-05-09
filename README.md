@@ -1,6 +1,5 @@
-# AI Code Generator
+# LocalSite AI
 
-![AI Code Generator](public/screenshot.png)
 
 A modern web application that uses AI to generate HTML, CSS, and JavaScript code based on natural language prompts. Simply describe what you want to build, and the AI will create a complete, self-contained web page for you.
 
@@ -28,14 +27,15 @@ A modern web application that uses AI to generate HTML, CSS, and JavaScript code
 
 - [Node.js](https://nodejs.org/) (version 18.17 or higher)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- An API key from one of the supported providers (see below)
+- [Ollama](https://ollama.com/download/) or [LM Studio](https://lmstudio.ai/) installed 
+- OR an API key from one of the supported providers (see below)
 
 ### Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/ai-code-generator.git
-   cd ai-code-generator
+   git clone https://github.com/weise25/LocalSite-ai.git
+   cd LocalSite-ai
    ```
 
 2. Install the dependencies:
@@ -45,7 +45,7 @@ A modern web application that uses AI to generate HTML, CSS, and JavaScript code
    yarn install
    ```
 
-3. Create a `.env.local` file in the root directory and add your API key:
+3. Rename the `.env.example` file in the root directory to `.env.local` and add your API key:
    ```
    # Choose one of the following providers:
 
@@ -155,8 +155,6 @@ The application can also be deployed on:
 - [x] Support for [LM Studio](https://lmstudio.ai) to use local models
 - [x] Predefined provider: DeepSeek
 - [x] Custom OpenAI-compatible API support
-- [ ] Offline mode for usage without internet connection
-- [ ] Saving custom provider configurations
 - [ ] Adding more predefined providers (Anthropic, Groq, etc.)
 
 ### Advanced Code Generation
