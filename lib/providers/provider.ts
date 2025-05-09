@@ -7,7 +7,7 @@ export const SYSTEM_PROMPT = "You are an expert web developer AI. Your task is t
 // Common interface for all providers
 export interface LLMProviderClient {
   getModels: () => Promise<{ id: string; name: string }[]>;
-  generateCode: (prompt: string, model: string) => Promise<ReadableStream<Uint8Array>>;
+  generateCode: (prompt: string, model: string, customSystemPrompt?: string | null) => Promise<ReadableStream<Uint8Array>>;
 }
 
 // Factory function to create a provider client
@@ -53,11 +53,14 @@ class OpenAICompatibleProvider implements LLMProviderClient {
     }));
   }
 
-  async generateCode(prompt: string, model: string) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+    // Use custom system prompt if provided, otherwise use default
+    const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
+
     const stream = await this.client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPromptToUse },
         { role: 'user', content: prompt }
       ],
       stream: true,
@@ -111,7 +114,10 @@ class OllamaProvider implements LLMProviderClient {
     }
   }
 
-  async generateCode(prompt: string, model: string) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+    // Use custom system prompt if provided, otherwise use default
+    const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
+
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -120,7 +126,7 @@ class OllamaProvider implements LLMProviderClient {
         },
         body: JSON.stringify({
           model,
-          prompt: `${SYSTEM_PROMPT}\n\nUser request: ${prompt}`,
+          prompt: `${systemPromptToUse}\n\nUser request: ${prompt}`,
           stream: true,
         }),
       });
@@ -209,11 +215,14 @@ class LMStudioProvider implements LLMProviderClient {
     }
   }
 
-  async generateCode(prompt: string, model: string) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+    // Use custom system prompt if provided, otherwise use default
+    const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
+
     const stream = await this.client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPromptToUse },
         { role: 'user', content: prompt }
       ],
       stream: true,

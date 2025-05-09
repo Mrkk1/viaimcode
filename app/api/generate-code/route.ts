@@ -5,7 +5,7 @@ import { createProviderClient } from '@/lib/providers/provider';
 export async function POST(request: NextRequest) {
   try {
     // Parse the JSON body
-    const { prompt, model, provider: providerParam } = await request.json();
+    const { prompt, model, provider: providerParam, customSystemPrompt } = await request.json();
 
     // Check if prompt and model are provided
     if (!prompt || !model) {
@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     // Create the provider client
     const providerClient = createProviderClient(provider);
 
-    // Generate code with the selected provider
-    const stream = await providerClient.generateCode(prompt, model);
+    // Generate code with the selected provider and custom system prompt if provided
+    const stream = await providerClient.generateCode(prompt, model, customSystemPrompt || null);
 
     // Return the stream as response
     return new Response(stream, {

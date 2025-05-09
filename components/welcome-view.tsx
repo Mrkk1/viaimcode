@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { ProviderSelector } from "@/components/provider-selector"
 
@@ -20,6 +20,8 @@ interface WelcomeViewProps {
   setSelectedModel: (value: string) => void
   selectedProvider: string
   setSelectedProvider: (value: string) => void
+  customSystemPrompt: string
+  setCustomSystemPrompt: (value: string) => void
   onGenerate: () => void
 }
 
@@ -30,6 +32,8 @@ export function WelcomeView({
   setSelectedModel,
   selectedProvider,
   setSelectedProvider,
+  customSystemPrompt,
+  setCustomSystemPrompt,
   onGenerate
 }: WelcomeViewProps) {
   const [titleClass, setTitleClass] = useState("")
@@ -110,7 +114,7 @@ export function WelcomeView({
           onProviderChange={() => {}}
         />
 
-        <div className="w-full mb-8">
+        <div className="w-full mb-4">
           <label className="block text-sm font-medium text-gray-300 mb-2">SELECT MODEL</label>
           <Select value={selectedModel} onValueChange={setSelectedModel} disabled={!selectedProvider || isLoadingModels}>
             <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
@@ -136,6 +140,19 @@ export function WelcomeView({
               )}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="w-full mb-8">
+          <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT (OPTIONAL)</label>
+          <Textarea
+            value={customSystemPrompt}
+            onChange={(e) => setCustomSystemPrompt(e.target.value)}
+            placeholder="Enter a custom system prompt to override the default..."
+            className="min-h-[100px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Leave empty to use the default system prompt. Your custom prompt will only be used for this generation.
+          </p>
         </div>
 
 

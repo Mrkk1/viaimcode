@@ -12,6 +12,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState("")
   const [selectedProvider, setSelectedProvider] = useState("")
   const [selectedModel, setSelectedModel] = useState("")
+  const [customSystemPrompt, setCustomSystemPrompt] = useState("")
   const [generatedCode, setGeneratedCode] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationComplete, setGenerationComplete] = useState(false)
@@ -46,6 +47,7 @@ export default function Home() {
           prompt,
           model: selectedModel,
           provider: selectedProvider,
+          customSystemPrompt: customSystemPrompt,
         }),
       })
 
@@ -124,6 +126,8 @@ export default function Home() {
         setSelectedModel={setSelectedModel}
         selectedProvider={selectedProvider}
         setSelectedProvider={setSelectedProvider}
+        customSystemPrompt={customSystemPrompt}
+        setCustomSystemPrompt={setCustomSystemPrompt}
         onGenerate={handleGenerate}
       />
     </>
