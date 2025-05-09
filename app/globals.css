@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --popover: 0 0% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
+  --secondary: 240 3.7% 15.9%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 14.9%;
+  --muted-foreground: 0 0% 63.9%;
+  --accent: 0 0% 100%;
+  --accent-foreground: 0 0% 9%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --ring: 0 0% 80%;
+  --radius: 0.5rem;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Tech Button Styles */
+.tech-button:hover {
+  box-shadow: 0 0 20px rgba(42, 87, 139, 0.6), inset 0 1px 2px rgba(135, 207, 255, 0.2), inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.tech-button:active {
+  transform: translateY(0);
+  box-shadow: 0 0 10px rgba(42, 87, 139, 0.4), inset 0 2px 3px rgba(0, 0, 0, 0.4), inset 0 -1px 1px rgba(135, 207, 255, 0.1);
+}
+
+.tech-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Import Roboto font for tech button */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500&display=swap');
