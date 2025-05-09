@@ -188,8 +188,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- [Shadcn UI](https://ui.shadcn.com/) for the beautiful UI components
-- [Monaco Editor](https://microsoft.github.io/monaco-editor/) for the code editor
-- All the AI providers that make this project possible
