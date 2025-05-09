@@ -1,6 +1,9 @@
 import OpenAI from 'openai';
 import { LLMProvider, getProviderApiKey, getProviderBaseUrl } from './config';
 
+// Shared system prompt for all providers
+export const SYSTEM_PROMPT = "You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt. This HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>. IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in ```html and ``` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file.";
+
 // Common interface for all providers
 export interface LLMProviderClient {
   getModels: () => Promise<{ id: string; name: string }[]>;
@@ -51,12 +54,10 @@ class OpenAICompatibleProvider implements LLMProviderClient {
   }
 
   async generateCode(prompt: string, model: string) {
-    const systemPrompt = "You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt. This HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>. IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in ```html and ``` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file.";
-
     const stream = await this.client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
       ],
       stream: true,
@@ -111,8 +112,6 @@ class OllamaProvider implements LLMProviderClient {
   }
 
   async generateCode(prompt: string, model: string) {
-    const systemPrompt = "You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt. This HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>. IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in ```html and ``` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file.";
-
     try {
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -121,7 +120,7 @@ class OllamaProvider implements LLMProviderClient {
         },
         body: JSON.stringify({
           model,
-          prompt: `${systemPrompt}\n\nUser request: ${prompt}`,
+          prompt: `${SYSTEM_PROMPT}\n\nUser request: ${prompt}`,
           stream: true,
         }),
       });
@@ -211,12 +210,10 @@ class LMStudioProvider implements LLMProviderClient {
   }
 
   async generateCode(prompt: string, model: string) {
-    const systemPrompt = "You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt. This HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>. IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in ```html and ``` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file.";
-
     const stream = await this.client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: prompt }
       ],
       stream: true,
