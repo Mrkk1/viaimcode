@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  localsite-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - HOST=0.0.0.0
+      # Choose the default provider (ollama or lm_studio)
+      - DEFAULT_PROVIDER=lm_studio
+    # volumes:
+    #   - ./:/app
+    extra_hosts:
+      # Important: Allows access to the host machine
+      - "host.docker.internal:host-gateway"
