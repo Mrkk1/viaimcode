@@ -56,7 +56,18 @@ export default function Home() {
         }),
       })
 
+      // Check if the response is not OK
       if (!response.ok) {
+        // Try to extract error message from the response
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.error) {
+            throw new Error(errorData.error)
+          }
+        } catch (jsonError) {
+          // If we can't parse the JSON, just use the status
+        }
+
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
@@ -144,7 +155,25 @@ export default function Home() {
       setGenerationComplete(true)
     } catch (error) {
       console.error('Error generating code:', error)
-      toast.error('Error generating code. Please try again later.')
+
+      // Display specific error messages based on the provider and error message
+      if (error instanceof Error) {
+        const errorMessage = error.message
+
+        if (errorMessage.includes('Ollama')) {
+          toast.error('Cannot connect to Ollama. Is the server running?')
+        } else if (errorMessage.includes('LM Studio')) {
+          toast.error('Cannot connect to LM Studio. Is the server running?')
+        } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible') {
+          // For cloud providers, show a message about API keys
+          toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.')
+        } else {
+          // Generic fallback message
+          toast.error('Error generating code. Please try again later.')
+        }
+      } else {
+        toast.error('Error generating code. Please try again later.')
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -179,7 +208,18 @@ export default function Home() {
         }),
       })
 
+      // Check if the response is not OK
       if (!response.ok) {
+        // Try to extract error message from the response
+        try {
+          const errorData = await response.json()
+          if (errorData && errorData.error) {
+            throw new Error(errorData.error)
+          }
+        } catch (jsonError) {
+          // If we can't parse the JSON, just use the status
+        }
+
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
@@ -267,7 +307,25 @@ export default function Home() {
       setGenerationComplete(true)
     } catch (error) {
       console.error('Error generating code:', error)
-      toast.error('Error generating code. Please try again later.')
+
+      // Display specific error messages based on the provider and error message
+      if (error instanceof Error) {
+        const errorMessage = error.message
+
+        if (errorMessage.includes('Ollama')) {
+          toast.error('Cannot connect to Ollama. Is the server running?')
+        } else if (errorMessage.includes('LM Studio')) {
+          toast.error('Cannot connect to LM Studio. Is the server running?')
+        } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible') {
+          // For cloud providers, show a message about API keys
+          toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.')
+        } else {
+          // Generic fallback message
+          toast.error('Error generating code. Please try again later.')
+        }
+      } else {
+        toast.error('Error generating code. Please try again later.')
+      }
     } finally {
       setIsGenerating(false)
     }

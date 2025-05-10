@@ -106,11 +106,7 @@ class OllamaProvider implements LLMProviderClient {
       })) : [];
     } catch (error) {
       console.error('Error fetching Ollama models:', error);
-      return [
-        { id: 'llama2', name: 'Llama 2' },
-        { id: 'mistral', name: 'Mistral' },
-        { id: 'codellama', name: 'Code Llama' },
-      ];
+      throw new Error('Cannot connect to Ollama. Is the server running?');
     }
   }
 
@@ -205,13 +201,7 @@ class LMStudioProvider implements LLMProviderClient {
       }));
     } catch (error) {
       console.error('Error fetching LM Studio models:', error);
-      // Fallback in case the model list cannot be retrieved
-      return [
-        { id: 'local-model', name: 'Local Model (LM Studio)' },
-        { id: 'mistral-7b', name: 'Mistral 7B' },
-        { id: 'llama-2-7b', name: 'Llama 2 7B' },
-        { id: 'codellama-7b', name: 'CodeLlama 7B' }
-      ];
+      throw new Error('Cannot connect to LM Studio. Is the server running?');
     }
   }
 

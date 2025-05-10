@@ -28,9 +28,11 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching models:', error);
 
-    // Return an error response
+    // Return a more specific error message if available
+    const errorMessage = error instanceof Error ? error.message : 'Error fetching models';
+
     return NextResponse.json(
-      { error: 'Error fetching models' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

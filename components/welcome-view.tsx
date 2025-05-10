@@ -55,13 +55,23 @@ export function WelcomeView({
 
       setIsLoadingModels(true)
       setSelectedModel("") // Reset the selected model when the provider changes
+      setModels([]) // Clear previous models when changing provider
 
       try {
         const response = await fetch(`/api/get-models?provider=${selectedProvider}`)
-        if (!response.ok) {
-          throw new Error('Error fetching models')
-        }
+
+        // Parse the JSON response first to get any error message
         const data = await response.json()
+
+        if (!response.ok) {
+          // If the response contains an error message, use it
+          if (data && data.error) {
+            throw new Error(data.error)
+          } else {
+            throw new Error('Error fetching models')
+          }
+        }
+
         setModels(data)
 
         // Automatically select the first model if available
@@ -70,7 +80,27 @@ export function WelcomeView({
         }
       } catch (error) {
         console.error('Error fetching models:', error)
-        toast.error('Models could not be loaded. Please try again later.')
+
+        // Ensure models are cleared when there's an error
+        setModels([])
+        setSelectedModel("")
+
+        // Display specific error messages based on the provider and error message
+        if (error instanceof Error) {
+          const errorMessage = error.message
+
+          if (errorMessage.includes('Ollama')) {
+            toast.error('Cannot connect to Ollama. Is the server running?')
+          } else if (errorMessage.includes('LM Studio')) {
+            toast.error('Cannot connect to LM Studio. Is the server running?')
+          } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible') {
+            toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.')
+          } else {
+            toast.error('Models could not be loaded. Please try again later.')
+          }
+        } else {
+          toast.error('Models could not be loaded. Please try again later.')
+        }
       } finally {
         setIsLoadingModels(false)
       }

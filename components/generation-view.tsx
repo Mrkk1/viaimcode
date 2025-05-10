@@ -206,7 +206,7 @@ export function GenerationView({
   const handleSendNewPrompt = () => {
     if (!newPrompt.trim() || isGenerating) return
     onRegenerateWithNewPrompt(newPrompt)
-    setNewPrompt("") // Eingabefeld zurücksetzen
+    setNewPrompt("") // Reset input field
   }
 
 

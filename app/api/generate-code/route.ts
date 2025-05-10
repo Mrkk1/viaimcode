@@ -41,9 +41,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error generating code:', error);
 
-    // Return an error response
+    // Return a more specific error message if available
+    const errorMessage = error instanceof Error ? error.message : 'Error generating code';
+
     return new Response(
-      JSON.stringify({ error: 'Error generating code' }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
