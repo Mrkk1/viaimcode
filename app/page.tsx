@@ -13,6 +13,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState("")
   const [selectedProvider, setSelectedProvider] = useState("")
   const [selectedModel, setSelectedModel] = useState("")
+  const [selectedSystemPrompt, setSelectedSystemPrompt] = useState("default") // New state for system prompt selection
   const [customSystemPrompt, setCustomSystemPrompt] = useState("")
   const [generatedCode, setGeneratedCode] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -52,7 +53,11 @@ export default function Home() {
           prompt,
           model: selectedModel,
           provider: selectedProvider,
-          customSystemPrompt: customSystemPrompt,
+          customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
+                             selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt.
+First, before generating any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover your interpretation of the user's core request and objectives; your planned HTML structure including key elements and semantic organization; your CSS styling strategy detailing the general approach, specific techniques, or frameworks considered (for example, if Tailwind CSS is requested or appropriate); and your JavaScript logic, outlining intended functionality, event handling, and DOM manipulation strategy. Furthermore, critically consider any external resources: if the request implies or mentions external libraries or frameworks such as React, Vue, Three.js, Tailwind CSS, Google Fonts, or icon sets, you must assess if using them via a CDN is appropriate for this specific request, providing a brief justification (e.g., ease of use, versioning, performance benefits/drawbacks for a single file). If a CDN is not chosen, or if the library is small, briefly explain the alternative, such as embedding or using vanilla JS/CSS for simpler tasks.
+Only after this complete <think> block, proceed to generate the code. The HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>.
+IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file, unless the CDN consideration in your <think> block justifies linking to an external CDN for a specific library/framework.` : null,
         }),
       })
 
@@ -204,7 +209,11 @@ export default function Home() {
           prompt: newPrompt,
           model: selectedModel,
           provider: selectedProvider,
-          customSystemPrompt: customSystemPrompt,
+          customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
+                             selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt.
+First, before generating any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover your interpretation of the user's core request and objectives; your planned HTML structure including key elements and semantic organization; your CSS styling strategy detailing the general approach, specific techniques, or frameworks considered (for example, if Tailwind CSS is requested or appropriate); and your JavaScript logic, outlining intended functionality, event handling, and DOM manipulation strategy. Furthermore, critically consider any external resources: if the request implies or mentions external libraries or frameworks such as React, Vue, Three.js, Tailwind CSS, Google Fonts, or icon sets, you must assess if using them via a CDN is appropriate for this specific request, providing a brief justification (e.g., ease of use, versioning, performance benefits/drawbacks for a single file). If a CDN is not chosen, or if the library is small, briefly explain the alternative, such as embedding or using vanilla JS/CSS for simpler tasks.
+Only after this complete <think> block, proceed to generate the code. The HTML file must include all necessary HTML structure, CSS styles within <style> tags in the <head>, and JavaScript code within <script> tags, preferably at the end of the <body>.
+IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file, unless the CDN consideration in your <think> block justifies linking to an external CDN for a specific library/framework.` : null,
         }),
       })
 
@@ -366,6 +375,8 @@ export default function Home() {
         setSelectedModel={setSelectedModel}
         selectedProvider={selectedProvider}
         setSelectedProvider={setSelectedProvider}
+        selectedSystemPrompt={selectedSystemPrompt}
+        setSelectedSystemPrompt={setSelectedSystemPrompt}
         customSystemPrompt={customSystemPrompt}
         setCustomSystemPrompt={setCustomSystemPrompt}
         onGenerate={handleGenerate}

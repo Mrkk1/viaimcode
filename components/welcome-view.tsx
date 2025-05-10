@@ -21,6 +21,8 @@ interface WelcomeViewProps {
   setSelectedModel: (value: string) => void
   selectedProvider: string
   setSelectedProvider: (value: string) => void
+  selectedSystemPrompt: string
+  setSelectedSystemPrompt: (value: string) => void
   customSystemPrompt: string
   setCustomSystemPrompt: (value: string) => void
   onGenerate: () => void
@@ -33,19 +35,23 @@ export function WelcomeView({
   setSelectedModel,
   selectedProvider,
   setSelectedProvider,
+  selectedSystemPrompt,
+  setSelectedSystemPrompt,
   customSystemPrompt,
   setCustomSystemPrompt,
   onGenerate
 }: WelcomeViewProps) {
-  const [titleClass, setTitleClass] = useState("")
+  const [titleClass, setTitleClass] = useState("pre-animation")
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
 
   useEffect(() => {
     // Add typing animation class after component mounts
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setTitleClass("typing-animation")
     }, 100)
+
+    return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
@@ -173,18 +179,49 @@ export function WelcomeView({
           </Select>
         </div>
 
-        <div className="w-full mb-8">
-          <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT (OPTIONAL)</label>
-          <Textarea
-            value={customSystemPrompt}
-            onChange={(e) => setCustomSystemPrompt(e.target.value)}
-            placeholder="Enter a custom system prompt to override the default..."
-            className="min-h-[100px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
-          />
-          <p className="mt-1 text-xs text-gray-400">
-            Leave empty to use the default system prompt. Your custom prompt will only be used for this generation.
-          </p>
+        <div className="w-full mb-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">SYSTEM PROMPTS</label>
+          <Select value={selectedSystemPrompt} onValueChange={setSelectedSystemPrompt}>
+            <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
+              <SelectValue placeholder="Choose a system prompt..." />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-900 border-gray-800 text-white">
+              <SelectItem value="default">
+                <div className="flex flex-col">
+                  <span>Default</span>
+                  <span className="text-xs text-gray-400">Standard code generation</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="thinking">
+                <div className="flex flex-col">
+                  <span>Thinking</span>
+                  <span className="text-xs text-gray-400">Makes non thinking models think</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="custom">
+                <div className="flex flex-col">
+                  <span>Custom System Prompt</span>
+                  <span className="text-xs text-gray-400">Specify a custom System Prompt</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+
+        {selectedSystemPrompt === 'custom' && (
+          <div className="w-full mb-8">
+            <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT</label>
+            <Textarea
+              value={customSystemPrompt}
+              onChange={(e) => setCustomSystemPrompt(e.target.value)}
+              placeholder="Enter a custom system prompt to override the default..."
+              className="min-h-[100px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Your custom prompt will be used for this generation and subsequent regenerations.
+            </p>
+          </div>
+        )}
 
 
       </div>
@@ -206,6 +243,13 @@ export function WelcomeView({
         @keyframes typing {
           from { width: 0 }
           to { width: 100% }
+        }
+
+        .pre-animation {
+          overflow: hidden;
+          white-space: nowrap;
+          width: 0;
+          border-right: 4px solid transparent;
         }
 
         .typing-animation {
