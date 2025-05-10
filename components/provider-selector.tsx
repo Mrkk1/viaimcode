@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+// Import only the icons that are actually used
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { LLMProvider } from "@/lib/providers/config"

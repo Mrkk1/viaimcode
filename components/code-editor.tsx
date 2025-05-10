@@ -17,13 +17,13 @@ export function CodeEditor({ code, isEditable = false, onChange }: CodeEditorPro
   const handleEditorDidMount = (editor: any) => {
     editorRef.current = editor;
 
-    // Nur beim ersten Laden zum Ende scrollen
+    // Only scroll to the end on initial load
     if (isInitialMount) {
       editor.revealLine(editor.getModel().getLineCount());
       setIsInitialMount(false);
     }
 
-    // Event-Listener für Benutzerinteraktionen hinzufügen
+    // Add event listener for user interactions
     editor.onDidChangeCursorPosition(() => {
       if (isEditable) {
         setIsUserEditing(true);
@@ -39,15 +39,15 @@ export function CodeEditor({ code, isEditable = false, onChange }: CodeEditorPro
 
   useEffect(() => {
     if (editorRef.current) {
-      // Nur zum Ende scrollen, wenn der Benutzer nicht aktiv bearbeitet
-      // oder wenn der Editor nicht im Bearbeitungsmodus ist
+      // Only scroll to the end if the user is not actively editing
+      // or if the editor is not in edit mode
       if (!isUserEditing && !isEditable) {
         editorRef.current.revealLine(editorRef.current.getModel().getLineCount());
       }
     }
   }, [code, isUserEditing, isEditable]);
 
-  // Zurücksetzen des isUserEditing-Status, wenn der Bearbeitungsmodus deaktiviert wird
+  // Reset the isUserEditing status when edit mode is disabled
   useEffect(() => {
     if (!isEditable) {
       setIsUserEditing(false);
@@ -67,7 +67,7 @@ export function CodeEditor({ code, isEditable = false, onChange }: CodeEditorPro
           scrollBeyondLastLine: false,
           fontSize: 14,
           wordWrap: "on",
-          automaticLayout: true, // Passt die Größe automatisch an
+          automaticLayout: true, // Automatically adjusts the size
         }}
         onMount={handleEditorDidMount}
         onChange={handleEditorChange}

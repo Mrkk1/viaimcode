@@ -1,4 +1,4 @@
-# LocalSite AI
+# LocalSite AI - now with Thinking Model Support!
 
 
 A modern web application that uses AI to generate HTML, CSS, and JavaScript code based on natural language prompts. Simply describe what you want to build, and the AI will create a complete, self-contained web page for you.
@@ -138,6 +138,8 @@ The application can also be deployed on:
 - [Cloudflare Pages](https://pages.cloudflare.com)
 - Any platform that supports Next.js applications
 
+**Keep in Mind that if you host it on a platform, (like Vercel, Netlify, etc.) you can not use local models through Ollama or LM Studio, unless using something like Tunneling via [ngrok](https://ngrok.com).**
+
 ## Usage
 
 1. Enter a prompt describing what kind of website you want to create.
@@ -155,13 +157,14 @@ The application can also be deployed on:
 - [x] Support for [LM Studio](https://lmstudio.ai) to use local models
 - [x] Predefined provider: DeepSeek
 - [x] Custom OpenAI-compatible API support
+- [x] Support thinking models (Qwen3,DeepCoder, etc.)
 - [ ] Adding more predefined providers (Anthropic, Groq, etc.)
 
 ### Advanced Code Generation
-- [ ] Generation of React components
-- [ ] TypeScript support
-- [ ] Backend code generation (Node.js, Express)
+- [ ] Choose between different Frameworks and Libraries (React, Vue, Angular, etc.)
+- [ ] File-based code generation (multiple files)
 - [ ] Save and load projects
+- [ ] Agentic diff-editing capabilities
 
 ### UI/UX Improvements
 - [ ] Dark/Light theme toggle
@@ -169,10 +172,13 @@ The application can also be deployed on:
 - [ ] Drag-and-drop interface for UI components
 - [ ] History of generated code
 
-### Collaboration
-- [ ] Real-time collaboration with other users
-- [ ] Sharing generated projects
-- [ ] Comments and feedback system
+### Accessibility
+- [ ] Transcription and voice input for prompts
+- [ ] Anything; feel free to make suggestions 
+
+### Desktop App
+- [ ] Turning into a cross-platform desktop app (Electron)
+
 
 ## Contributing
 

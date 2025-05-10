@@ -1,10 +1,13 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save } from "lucide-react"
+// Import only the icons that are actually used
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/code-editor"
@@ -25,20 +28,28 @@ import {
 
 interface GenerationViewProps {
   prompt: string
+  setPrompt: (value: string) => void
   model: string
   provider?: string
   generatedCode: string
   isGenerating: boolean
   generationComplete: boolean
+  onRegenerateWithNewPrompt: (newPrompt: string) => void
+  thinkingOutput?: string
+  isThinking?: boolean
 }
 
 export function GenerationView({
   prompt,
+  setPrompt,
   model,
   provider = 'deepseek',
   generatedCode,
   isGenerating,
-  generationComplete
+  generationComplete,
+  onRegenerateWithNewPrompt,
+  thinkingOutput = "",
+  isThinking = false
 }: GenerationViewProps) {
   const [viewportSize, setViewportSize] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const [copySuccess, setCopySuccess] = useState(false)
@@ -50,6 +61,7 @@ export function GenerationView({
   const [previewKey, setPreviewKey] = useState(0) // For manually refreshing the preview
   const [previewContent, setPreviewContent] = useState("") // For debounced preview content
   const [showSaveDialog, setShowSaveDialog] = useState(false) // For the save dialog
+  const [newPrompt, setNewPrompt] = useState("") // Für das neue Prompt-Eingabefeld
 
   // Previous preview content for transition effect
   const prevContentRef = useRef<string>("");
@@ -190,6 +202,15 @@ export function GenerationView({
     document.body.removeChild(element)
   }
 
+  // Function to handle sending a new prompt
+  const handleSendNewPrompt = () => {
+    if (!newPrompt.trim() || isGenerating) return
+    onRegenerateWithNewPrompt(newPrompt)
+    setNewPrompt("") // Eingabefeld zurücksetzen
+  }
+
+
+
   return (
     <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
@@ -205,6 +226,15 @@ export function GenerationView({
             <Badge variant="outline" className="bg-gray-900 text-white border-white">
               {model}
             </Badge>
+            {thinkingOutput && (
+              <div className="ml-2">
+                <ThinkingIndicator
+                  thinkingOutput={thinkingOutput}
+                  isThinking={isThinking}
+                  position="top-left"
+                />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -260,7 +290,7 @@ export function GenerationView({
               {/* Code-Editor-Bereich */}
               <div className="h-[65%] border-b border-gray-800 flex flex-col">
                 <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-2">
                     <h2 className="text-sm font-medium">GENERATED HTML</h2>
                     {generationComplete && (
                       <div className="ml-3 flex items-center space-x-2">
@@ -327,10 +357,39 @@ export function GenerationView({
               {/* Prompt und Work Steps Bereich */}
               <div className="h-[35%] p-3 flex flex-col overflow-hidden">
                 <div className="mb-2 flex-shrink-0">
-                  <h3 className="text-xs font-medium text-gray-400 mb-1">YOUR PROMPT</h3>
-                  <ScrollArea className="h-16 w-full rounded-md border border-gray-800 bg-gray-900/50 p-2">
-                    <p className="text-sm text-gray-300">{prompt}</p>
-                  </ScrollArea>
+                  <h3 className="text-xs font-medium text-gray-400 mb-1">NEW PROMPT</h3>
+                  <div className="relative">
+                    <Textarea
+                      value={newPrompt}
+                      onChange={(e) => setNewPrompt(e.target.value)}
+                      placeholder="Enter a new prompt..."
+                      className="min-h-[60px] w-full rounded-md border border-gray-800 bg-gray-900/50 p-2 pr-10 text-sm text-gray-300 focus:border-white focus:ring-white"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSendNewPrompt()
+                        }
+                      }}
+                      disabled={isGenerating}
+                    />
+                    <Button
+                      size="sm"
+                      className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                      onClick={handleSendNewPrompt}
+                      disabled={!newPrompt.trim() || isGenerating}
+                    >
+                      <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
+                      <span className="sr-only">Send</span>
+                    </Button>
+                  </div>
+                  {prompt && (
+                    <div className="mt-2">
+                      <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
+                      <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
+                        <p className="text-xs text-gray-400">{prompt}</p>
+                      </ScrollArea>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex-1 overflow-hidden">
@@ -452,7 +511,7 @@ export function GenerationView({
                 {/* Code-Editor-Bereich */}
                 <div className="h-[65%] border-b border-gray-800 flex flex-col">
                   <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                       <h2 className="text-sm font-medium">GENERATED HTML</h2>
                       {generationComplete && (
                         <div className="ml-3 flex items-center space-x-2">
@@ -519,10 +578,39 @@ export function GenerationView({
                 {/* Prompt und Work Steps Bereich */}
                 <div className="h-[35%] p-3 flex flex-col overflow-hidden">
                   <div className="mb-2 flex-shrink-0">
-                    <h3 className="text-xs font-medium text-gray-400 mb-1">YOUR PROMPT</h3>
-                    <ScrollArea className="h-16 w-full rounded-md border border-gray-800 bg-gray-900/50 p-2">
-                      <p className="text-sm text-gray-300">{prompt}</p>
-                    </ScrollArea>
+                    <h3 className="text-xs font-medium text-gray-400 mb-1">NEW PROMPT</h3>
+                    <div className="relative">
+                      <Textarea
+                        value={newPrompt}
+                        onChange={(e) => setNewPrompt(e.target.value)}
+                        placeholder="Enter a new prompt..."
+                        className="min-h-[60px] w-full rounded-md border border-gray-800 bg-gray-900/50 p-2 pr-10 text-sm text-gray-300 focus:border-white focus:ring-white"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSendNewPrompt()
+                          }
+                        }}
+                        disabled={isGenerating}
+                      />
+                      <Button
+                        size="sm"
+                        className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                        onClick={handleSendNewPrompt}
+                        disabled={!newPrompt.trim() || isGenerating}
+                      >
+                        <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
+                        <span className="sr-only">Send</span>
+                      </Button>
+                    </div>
+                    {prompt && (
+                      <div className="mt-2">
+                        <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
+                        <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
+                          <p className="text-xs text-gray-400">{prompt}</p>
+                        </ScrollArea>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex-1 overflow-hidden">

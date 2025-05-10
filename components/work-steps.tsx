@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+// Import only the icons that are actually used
 import { CheckCircle, Circle, Loader2 } from "lucide-react"
 
 interface WorkStepsProps {
