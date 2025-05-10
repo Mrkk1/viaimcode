@@ -58,7 +58,7 @@ A modern web application that uses AI to generate HTML, CSS, and JavaScript code
    # OPENAI_COMPATIBLE_API_BASE=https://api.openai.com/v1
 
    # Default Provider (deepseek, openai_compatible, ollama, lm_studio)
-   DEFAULT_PROVIDER=deepseek
+   DEFAULT_PROVIDER=lm_studio
    ```
 
 4. Start the development server:
@@ -71,28 +71,6 @@ A modern web application that uses AI to generate HTML, CSS, and JavaScript code
 5. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Supported AI Providers
-
-### DeepSeek
-
-1. Visit [DeepSeek](https://platform.deepseek.com) and create an account or sign in.
-2. Navigate to the API keys section.
-3. Create a new API key and copy it.
-4. Set in your `.env.local` file:
-   ```
-   DEEPSEEK_API_KEY=your_deepseek_api_key
-   DEEPSEEK_API_BASE=https://api.deepseek.com/v1
-   ```
-
-### Custom OpenAI-compatible API
-
-You can use any OpenAI-compatible API:
-
-1. Obtain an API key from your desired provider (OpenAI, Together AI, Groq, etc.).
-2. Set in your `.env.local` file:
-   ```
-   OPENAI_COMPATIBLE_API_KEY=your_api_key
-   OPENAI_COMPATIBLE_API_BASE=https://api.of.provider.com/v1
-   ```
 
 ### Local Models
 
@@ -115,6 +93,28 @@ You can use any OpenAI-compatible API:
    ```
    LM_STUDIO_API_BASE=http://localhost:1234/v1
    DEFAULT_PROVIDER=lm_studio
+   ```
+
+### DeepSeek
+
+1. Visit [DeepSeek](https://platform.deepseek.com) and create an account or sign in.
+2. Navigate to the API keys section.
+3. Create a new API key and copy it.
+4. Set in your `.env.local` file:
+   ```
+   DEEPSEEK_API_KEY=your_deepseek_api_key
+   DEEPSEEK_API_BASE=https://api.deepseek.com/v1
+   ```
+
+### Custom OpenAI-compatible API
+
+You can use any OpenAI-compatible API:
+
+1. Obtain an API key from your desired provider (OpenAI, Together AI, Groq, etc.).
+2. Set in your `.env.local` file:
+   ```
+   OPENAI_COMPATIBLE_API_KEY=your_api_key
+   OPENAI_COMPATIBLE_API_BASE=https://api.of.provider.com/v1
    ```
 
 ## Deployment
