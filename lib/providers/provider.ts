@@ -7,7 +7,7 @@ export const SYSTEM_PROMPT = "You are an expert web developer AI. Your task is t
 // Common interface for all providers
 export interface LLMProviderClient {
   getModels: () => Promise<{ id: string; name: string }[]>;
-  generateCode: (prompt: string, model: string, customSystemPrompt?: string | null) => Promise<ReadableStream<Uint8Array>>;
+  generateCode: (prompt: string, model: string, customSystemPrompt?: string | null, maxTokens?: number) => Promise<ReadableStream<Uint8Array>>;
 }
 
 // Factory function to create a provider client
@@ -53,7 +53,7 @@ class OpenAICompatibleProvider implements LLMProviderClient {
     }));
   }
 
-  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null, maxTokens?: number) {
     // Use custom system prompt if provided, otherwise use default
     const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
 
@@ -63,6 +63,7 @@ class OpenAICompatibleProvider implements LLMProviderClient {
         { role: 'system', content: systemPromptToUse },
         { role: 'user', content: prompt }
       ],
+      max_tokens: maxTokens || undefined, // Use maxTokens if provided, otherwise let the API decide
       stream: true,
     });
 
@@ -110,7 +111,7 @@ class OllamaProvider implements LLMProviderClient {
     }
   }
 
-  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null, maxTokens?: number) {
     // Use custom system prompt if provided, otherwise use default
     const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
 
@@ -124,6 +125,7 @@ class OllamaProvider implements LLMProviderClient {
           model,
           prompt: `${systemPromptToUse}\n\nUser request: ${prompt}`,
           stream: true,
+          options: maxTokens ? { num_predict: maxTokens } : undefined, // Ollama uses num_predict for max tokens
         }),
       });
 
@@ -205,7 +207,7 @@ class LMStudioProvider implements LLMProviderClient {
     }
   }
 
-  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null) {
+  async generateCode(prompt: string, model: string, customSystemPrompt?: string | null, maxTokens?: number) {
     // Use custom system prompt if provided, otherwise use default
     const systemPromptToUse = customSystemPrompt || SYSTEM_PROMPT;
 
@@ -215,6 +217,7 @@ class LMStudioProvider implements LLMProviderClient {
         { role: 'system', content: systemPromptToUse },
         { role: 'user', content: prompt }
       ],
+      max_tokens: maxTokens || undefined, // Use maxTokens if provided, otherwise let the API decide
       stream: true,
     });
 

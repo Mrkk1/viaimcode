@@ -5,7 +5,7 @@ import { createProviderClient } from '@/lib/providers/provider';
 export async function POST(request: NextRequest) {
   try {
     // Parse the JSON body
-    const { prompt, model, provider: providerParam, customSystemPrompt } = await request.json();
+    const { prompt, model, provider: providerParam, customSystemPrompt, maxTokens } = await request.json();
 
     // Check if prompt and model are provided
     if (!prompt || !model) {
@@ -14,6 +14,9 @@ export async function POST(request: NextRequest) {
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
+
+    // Parse maxTokens as a number if it's provided
+    const parsedMaxTokens = maxTokens ? parseInt(maxTokens.toString(), 10) : undefined;
 
     // Determine the provider to use
     let provider: LLMProvider;
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
     const providerClient = createProviderClient(provider);
 
     // Generate code with the selected provider and custom system prompt if provided
-    const stream = await providerClient.generateCode(prompt, model, customSystemPrompt || null);
+    const stream = await providerClient.generateCode(prompt, model, customSystemPrompt || null, parsedMaxTokens);
 
     // Return the stream as response
     return new Response(stream, {

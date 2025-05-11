@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 // Import only the icons that are actually used
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
@@ -25,6 +26,8 @@ interface WelcomeViewProps {
   setSelectedSystemPrompt: (value: string) => void
   customSystemPrompt: string
   setCustomSystemPrompt: (value: string) => void
+  maxTokens: number | undefined
+  setMaxTokens: (value: number | undefined) => void
   onGenerate: () => void
 }
 
@@ -39,6 +42,8 @@ export function WelcomeView({
   setSelectedSystemPrompt,
   customSystemPrompt,
   setCustomSystemPrompt,
+  maxTokens,
+  setMaxTokens,
   onGenerate
 }: WelcomeViewProps) {
   const [titleClass, setTitleClass] = useState("pre-animation")
@@ -209,7 +214,7 @@ export function WelcomeView({
         </div>
 
         {selectedSystemPrompt === 'custom' && (
-          <div className="w-full mb-8">
+          <div className="w-full mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT</label>
             <Textarea
               value={customSystemPrompt}
@@ -222,6 +227,34 @@ export function WelcomeView({
             </p>
           </div>
         )}
+
+        <div className="w-full mb-8">
+          <label className="block text-sm font-medium text-gray-300 mb-2">MAX OUTPUT TOKENS</label>
+          <div className="flex items-center gap-4">
+            <Input
+              type="number"
+              value={maxTokens || ''}
+              onChange={(e) => {
+                const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
+                setMaxTokens(value && !isNaN(value) && value > 0 ? value : undefined);
+              }}
+              placeholder="Default (model dependent)"
+              className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
+              min="100"
+              step="100"
+            />
+            <Button
+              variant="outline"
+              onClick={() => setMaxTokens(undefined)}
+              className="border-gray-800 hover:bg-gray-800 text-gray-300"
+            >
+              Reset
+            </Button>
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Set the maximum number of tokens for the model output. Higher values allow for longer code generation but may take more time. Leave empty to use the model's default.
+          </p>
+        </div>
 
 
       </div>

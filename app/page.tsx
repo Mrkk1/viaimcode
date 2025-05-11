@@ -15,6 +15,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState("")
   const [selectedSystemPrompt, setSelectedSystemPrompt] = useState("default") // New state for system prompt selection
   const [customSystemPrompt, setCustomSystemPrompt] = useState("")
+  const [maxTokens, setMaxTokens] = useState<number | undefined>(undefined) // New state for max tokens
   const [generatedCode, setGeneratedCode] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationComplete, setGenerationComplete] = useState(false)
@@ -53,6 +54,7 @@ export default function Home() {
           prompt,
           model: selectedModel,
           provider: selectedProvider,
+          maxTokens: maxTokens,
           customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
                              selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt.
 First, before generating any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover your interpretation of the user's core request and objectives; your planned HTML structure including key elements and semantic organization; your CSS styling strategy detailing the general approach, specific techniques, or frameworks considered (for example, if Tailwind CSS is requested or appropriate); and your JavaScript logic, outlining intended functionality, event handling, and DOM manipulation strategy. Furthermore, critically consider any external resources: if the request implies or mentions external libraries or frameworks such as React, Vue, Three.js, Tailwind CSS, Google Fonts, or icon sets, you must assess if using them via a CDN is appropriate for this specific request, providing a brief justification (e.g., ease of use, versioning, performance benefits/drawbacks for a single file). If a CDN is not chosen, or if the library is small, briefly explain the alternative, such as embedding or using vanilla JS/CSS for simpler tasks.
@@ -209,6 +211,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
           prompt: newPrompt,
           model: selectedModel,
           provider: selectedProvider,
+          maxTokens: maxTokens,
           customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
                              selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to generate a single, self-contained HTML file based on the user's prompt.
 First, before generating any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover your interpretation of the user's core request and objectives; your planned HTML structure including key elements and semantic organization; your CSS styling strategy detailing the general approach, specific techniques, or frameworks considered (for example, if Tailwind CSS is requested or appropriate); and your JavaScript logic, outlining intended functionality, event handling, and DOM manipulation strategy. Furthermore, critically consider any external resources: if the request implies or mentions external libraries or frameworks such as React, Vue, Three.js, Tailwind CSS, Google Fonts, or icon sets, you must assess if using them via a CDN is appropriate for this specific request, providing a brief justification (e.g., ease of use, versioning, performance benefits/drawbacks for a single file). If a CDN is not chosen, or if the library is small, briefly explain the alternative, such as embedding or using vanilla JS/CSS for simpler tasks.
@@ -379,6 +382,8 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
         setSelectedSystemPrompt={setSelectedSystemPrompt}
         customSystemPrompt={customSystemPrompt}
         setCustomSystemPrompt={setCustomSystemPrompt}
+        maxTokens={maxTokens}
+        setMaxTokens={setMaxTokens}
         onGenerate={handleGenerate}
       />
     </>
