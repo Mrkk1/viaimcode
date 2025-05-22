@@ -5,6 +5,11 @@ const nextConfig = {
     share: {
       inheritParentLayout: false
     }
+  },
+  // 启用流式响应
+  experimental: {
+    serverActions: true,
+    serverComponents: true,
   }
 }
 
