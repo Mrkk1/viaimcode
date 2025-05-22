@@ -1,24 +1,21 @@
-import { getWebsiteById } from '@/lib/storage';
 import { notFound } from 'next/navigation';
+import { getWebsiteById } from '@/lib/storage';
 
-interface SharePageProps {
-  params: {
-    id: string;
-  };
-}
+// 不使用 extends PageProps，直接定义参数类型
+export default async function SharePage(args: any) {
+  const { params } = args as any;
 
-export default async function SharePage({ params }: SharePageProps) {
-  const website = await getWebsiteById(params.id);
-  
+  const website = await getWebsiteById(params.id as string);
+
   if (!website) {
     notFound();
   }
 
   return (
-    <div 
+    <div
       dangerouslySetInnerHTML={{ __html: website.htmlContent }}
       suppressHydrationWarning
       className="min-h-screen w-full"
     />
   );
-} 
+}

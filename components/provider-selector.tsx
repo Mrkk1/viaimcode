@@ -12,6 +12,7 @@ interface Provider {
   name: string
   description: string
   isLocal: boolean
+  examples?: string[]
 }
 
 interface ProviderSelectorProps {
@@ -51,7 +52,7 @@ export function ProviderSelector({
               const { defaultProvider } = await defaultResponse.json()
 
               // Check if the default provider is in the list of available providers
-              const providerExists = data.some(p => p.id === defaultProvider)
+              const providerExists = data.some((p: Provider) => p.id === defaultProvider)
 
               if (providerExists) {
                 setSelectedProvider(defaultProvider)
@@ -106,7 +107,7 @@ export function ProviderSelector({
                   <span className="text-xs text-gray-400">{provider.description}</span>
                   {provider.examples && provider.examples.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {provider.examples.map((example, index) => (
+                      {provider.examples.map((example: string, index: number) => (
                         <span key={index} className="inline-flex items-center rounded-full bg-gray-800 px-2 py-0.5 text-xs text-gray-300">
                           {example}
                         </span>

@@ -4,7 +4,7 @@ import { deleteWebsite, getWebsiteById } from '@/lib/storage';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  args: any
 ) {
   try {
     const user = await getCurrentUser();
@@ -12,7 +12,7 @@ export async function DELETE(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const website = await getWebsiteById(params.id);
+    const website = await getWebsiteById(args.params.id);
     if (!website) {
       return new NextResponse('Not found', { status: 404 });
     }
@@ -22,7 +22,7 @@ export async function DELETE(
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    await deleteWebsite(params.id);
+    await deleteWebsite(args.params.id);
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error('删除网站失败:', error);

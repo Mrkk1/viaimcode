@@ -78,7 +78,7 @@ export async function verifyToken(token: string): Promise<{ userId: string; user
 
 // 从 cookie 获取当前用户
 export async function getCurrentUser(): Promise<{ userId: string; username: string } | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('token');
   
   if (!token) {
