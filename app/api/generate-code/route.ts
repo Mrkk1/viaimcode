@@ -1,9 +1,19 @@
 import { NextRequest } from 'next/server';
 import { LLMProvider } from '@/lib/providers/config';
 import { createProviderClient } from '@/lib/providers/provider';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
+    // 验证用户是否登录
+    const user = await getCurrentUser();
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: '请先登录' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Parse the JSON body
     const { prompt, model, provider: providerParam, customSystemPrompt, maxTokens } = await request.json();
 

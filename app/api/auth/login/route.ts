@@ -31,6 +31,8 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 24 小时
+      domain: process.env.NODE_ENV === 'production' ? '.weilai.ai' : undefined,
+      path: '/'
     });
 
     return response;

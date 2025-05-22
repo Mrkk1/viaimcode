@@ -29,12 +29,44 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
-  // 跳过静态资源和API路由
+  // 跳过静态资源
   if (
     pathname.startsWith('/_next') || 
-    pathname.startsWith('/api') ||
     pathname.startsWith('/static')
   ) {
+    return NextResponse.next();
+  }
+
+  // 允许访问的公开 API 路由
+  const publicApiRoutes = [
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/share'
+  ];
+
+  // 如果是 API 路由
+  if (pathname.startsWith('/api')) {
+    // 如果是公开 API 路由，直接放行
+    if (publicApiRoutes.some(route => pathname.startsWith(route))) {
+      return NextResponse.next();
+    }
+
+    // 其他 API 路由需要验证 token
+    if (!token) {
+      return new NextResponse(
+        JSON.stringify({ error: '请先登录' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const user = await verifyAuth(token);
+    if (!user) {
+      return new NextResponse(
+        JSON.stringify({ error: '登录已过期，请重新登录' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     return NextResponse.next();
   }
 
@@ -80,10 +112,12 @@ export const config = {
      * - `/websites` 和其子路由
      * - `/login`
      * - `/register`
+     * - `/api` 和其子路由
      */
     '/',
     '/websites/:path*',
     '/login',
     '/register',
+    '/api/:path*'
   ],
 }; 

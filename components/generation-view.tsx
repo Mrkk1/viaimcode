@@ -281,14 +281,14 @@ export function GenerationView({
       return;
     }
 
-    const fullUrl = `${window.location.origin}${shareUrl}`;
     try {
+      const url = shareUrl;
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(fullUrl);
+        await navigator.clipboard.writeText(url);
         toast.success('分享链接已复制');
       } else {
         const textArea = document.createElement('textarea');
-        textArea.value = fullUrl;
+        textArea.value = url;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         textArea.style.top = '-999999px';

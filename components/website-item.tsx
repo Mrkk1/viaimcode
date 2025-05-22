@@ -34,7 +34,7 @@ export function WebsiteItem({ website, onDelete }: WebsiteItemProps) {
   const [isCopying, setIsCopying] = useState(false);
 
   const handleCopyLink = async () => {
-    const url = `${window.location.origin}/share/${website.id}`;
+    const url = `/share/${website.id}`;
     setIsCopying(true);
     try {
       if (navigator.clipboard && window.isSecureContext) {
