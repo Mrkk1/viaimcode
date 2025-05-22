@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-// Import only the icons that are actually used
 import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
@@ -12,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/code-editor"
 import { WorkSteps } from "@/components/work-steps"
+import html2canvas from 'html2canvas'
 import {
   Dialog,
   DialogContent,
@@ -46,11 +46,35 @@ interface SaveDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (title: string, description: string) => void;
+  thumbnailUrl?: string;
 }
 
-const SaveDialog = ({ isOpen, onClose, onSave }: SaveDialogProps) => {
+const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const [imgSrc, setImgSrc] = useState("");
+  
+  // 修复：data:image类型不拼接query，http(s)图片才拼接防缓存参数
+  useEffect(() => {
+    if (thumbnailUrl) {
+      if (thumbnailUrl.startsWith('data:image')) {
+        setImgSrc(thumbnailUrl);
+      } else {
+        const hasParams = thumbnailUrl.includes('?');
+        const timestamp = new Date().getTime();
+        const newSrc = hasParams 
+          ? `${thumbnailUrl}&_t=${timestamp}` 
+          : `${thumbnailUrl}?_t=${timestamp}`;
+        setImgSrc(newSrc);
+      }
+      setImageLoaded(false);
+      setImageError(false);
+    } else {
+      setImgSrc("");
+    }
+  }, [thumbnailUrl, isOpen]);
 
   const handleSave = () => {
     onSave(title, description);
@@ -58,10 +82,18 @@ const SaveDialog = ({ isOpen, onClose, onSave }: SaveDialogProps) => {
     setDescription("");
     onClose();
   };
+  
+  // 重置图像加载状态
+  useEffect(() => {
+    if (isOpen) {
+      setImageLoaded(false);
+      setImageError(false);
+    }
+  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>保存网页</DialogTitle>
           <DialogDescription>
@@ -69,6 +101,35 @@ const SaveDialog = ({ isOpen, onClose, onSave }: SaveDialogProps) => {
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
+          <div className="w-full aspect-video rounded-lg overflow-hidden border border-gray-800 relative bg-gray-800">
+            {!imageLoaded && !imageError && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
+                <span className="ml-2 text-sm text-gray-300">生成预览图中...</span>
+              </div>
+            )}
+            {imageError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800">
+                <div className="text-red-400 mb-2">预览图生成失败</div>
+                <div className="text-xs text-gray-400">将使用默认预览图</div>
+              </div>
+            )}
+            {imgSrc && (
+              <img 
+                src={imgSrc} 
+                alt="网页预览" 
+                className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+                onLoad={() => {
+                  setImageLoaded(true);
+                }}
+                onError={(e) => {
+                  console.error('预览图加载失败:', e);
+                  setImageError(true);
+                  setImageLoaded(true); // 即使失败也要隐藏加载状态
+                }}
+              />
+            )}
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="title">标题</Label>
             <Input
@@ -114,13 +175,15 @@ export function GenerationView({
   const [activeTab, setActiveTab] = useState<"code" | "preview">("code")
   const [isEditable, setIsEditable] = useState(false)
   const [editedCode, setEditedCode] = useState(generatedCode)
-  const [originalCode, setOriginalCode] = useState(generatedCode) // Stores the original code
-  const [hasChanges, setHasChanges] = useState(false) // Tracks if changes have been made
-  const [previewKey, setPreviewKey] = useState(0) // For manually refreshing the preview
-  const [previewContent, setPreviewContent] = useState("") // For debounced preview content
-  const [showSaveDialog, setShowSaveDialog] = useState(false) // For the save dialog
-  const [newPrompt, setNewPrompt] = useState("") // Für das neue Prompt-Eingabefeld
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [originalCode, setOriginalCode] = useState(generatedCode)
+  const [hasChanges, setHasChanges] = useState(false)
+  const [previewKey, setPreviewKey] = useState(0)
+  const [previewContent, setPreviewContent] = useState("")
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [newPrompt, setNewPrompt] = useState("")
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>("")
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Previous preview content for transition effect
   const prevContentRef = useRef<string>("");
@@ -130,6 +193,7 @@ export function GenerationView({
     // Add a dark mode default style and viewport meta tag
     const headContent = `
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: *; img-src 'self' data: blob: *;">
       <style>
         :root {
           color-scheme: dark;
@@ -146,6 +210,10 @@ export function GenerationView({
         /* Smooth transition for body background */
         body {
           transition: background-color 0.2s ease;
+        }
+        /* Ensure all images can be accessed by html2canvas */
+        img {
+          crossorigin: anonymous;
         }
       </style>
     `;
@@ -277,18 +345,24 @@ export function GenerationView({
 
     if (shouldResave) {
       // 如果需要重新保存，打开保存对话框
-      setShowSaveDialog(true);
+      await handleShowSaveDialog();
       return;
     }
 
     try {
-      const url = shareUrl;
+      // 确保URL包含域名
+      const fullUrl = shareUrl.startsWith('http') 
+        ? shareUrl 
+        : `${window.location.origin}${shareUrl}`;
+      
+      console.log('复制的完整URL:', fullUrl);
+      
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(fullUrl);
         toast.success('分享链接已复制');
       } else {
         const textArea = document.createElement('textarea');
-        textArea.value = url;
+        textArea.value = fullUrl;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         textArea.style.top = '-999999px';
@@ -315,66 +389,328 @@ export function GenerationView({
   const [lastSavedPrompt, setLastSavedPrompt] = useState(prompt);
   const [lastSavedContent, setLastSavedContent] = useState('');
 
-  // 修改保存函数，更新最后保存的内容
-  const handleSaveWebsite = async (title: string, description: string) => {
+  // 在显示保存对话框之前先生成预览图
+  const handleShowSaveDialog = async () => {
     try {
-      const currentContent = editedCode || generatedCode;
-      const response = await fetch('/api/share', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title,
-          description,
-          htmlContent: currentContent,
-          prompt,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('保存失败');
-      }
-
-      const data = await response.json();
-      setShareUrl(data.shareUrl);
-      // 更新最后保存的内容状态
-      setLastSavedPrompt(prompt);
-      setLastSavedContent(currentContent);
-      toast.success('保存成功！');
+      // 创建一个临时预览图
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('无法创建canvas上下文');
       
-      // 自动执行分享操作
-      const fullUrl = `${window.location.origin}${data.shareUrl}`;
+      // 设置画布大小为标准Open Graph图片尺寸
+      canvas.width = 1200;
+      canvas.height = 630;
+      
+      // 简单背景
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 添加标识文本
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = 'bold 32px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('网页预览图生成中...', canvas.width / 2, canvas.height / 2);
+      ctx.font = '16px sans-serif';
+      ctx.fillText(`准备中...`, canvas.width / 2, canvas.height / 2 + 40);
+      
+      // 转换为base64图片格式
+      const tempImageData = canvas.toDataURL('image/jpeg', 0.8);
+      
+      // 设置临时预览图并显示对话框
+      setThumbnailUrl(tempImageData);
+      setShowSaveDialog(true);
+      
+      // 异步生成真正的预览图
+      generateThumbnail().then(imageData => {
+        if (imageData && imageData.length > 1000) {
+          setThumbnailUrl(imageData);
+        }
+      }).catch(error => {
+        console.error('生成预览图失败:', error);
+      });
+      
+    } catch (error) {
+      console.error('准备显示对话框失败:', error);
+      // 即使生成预览图失败，也显示对话框
+      setShowSaveDialog(true);
+    }
+  };
+
+  // 新增函数：生成缩略图
+  const generateThumbnail = async (): Promise<string> => {
+    try {
+      // 1. 重置页面滚动位置 - 解决一些截图空白问题
+      window.scrollTo(0, 0);
+      
+      // 2. 当前的HTML内容
+      const htmlContent = editedCode || generatedCode;
+      
+      // 3. 创建临时容器
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '0';
+      container.style.width = '1200px';
+      container.style.height = '630px';
+      container.style.background = '#fff';
+      container.style.overflow = 'hidden';
+      container.style.zIndex = '-1';
+      
+      // 4. 创建内部内容容器
+      const contentDiv = document.createElement('div');
+      contentDiv.style.width = '100%';
+      contentDiv.style.height = '100%';
+      contentDiv.style.overflow = 'hidden';
+      contentDiv.style.background = '#fff';
+      
+      // 5. 准备HTML内容
+      const preparedHtml = prepareHtmlContent(htmlContent);
+      contentDiv.innerHTML = preparedHtml;
+      
+      // 6. 添加到DOM中
+      container.appendChild(contentDiv);
+      document.body.appendChild(container);
+      
+      // 7. 等待内容加载
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      let imageData = '';
+      
+      // 8. 尝试使用html2canvas进行截图
       try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(fullUrl);
+        const canvas = await html2canvas(contentDiv, {
+          allowTaint: true,
+          useCORS: true,
+          logging: false,
+          background: '#FFFFFF'
+        });
+        
+        imageData = canvas.toDataURL('image/jpeg', 0.9);
+        console.log('成功生成预览图，大小:', imageData.length);
+      } catch (error) {
+        console.error('截图失败:', error);
+        
+        // 9. 如果截图失败，创建一个模拟预览图
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('无法创建Canvas上下文');
+        
+        // 设置尺寸
+        canvas.width = 1200;
+        canvas.height = 630;
+        
+        // 创建渐变背景
+        const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+        gradient.addColorStop(0, '#0f172a');
+        gradient.addColorStop(1, '#1e293b');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 添加文本
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 48px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('LocalSite AI', canvas.width / 2, canvas.height / 2 - 40);
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.font = '24px system-ui, -apple-system, sans-serif';
+        ctx.fillText(new Date().toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
+        
+        imageData = canvas.toDataURL('image/jpeg', 0.9);
+      }
+      
+      // 10. 清理临时DOM元素
+      try {
+        document.body.removeChild(container);
+      } catch (e) {
+        console.error('清理临时DOM元素失败:', e);
+      }
+      
+      return imageData;
+    } catch (error) {
+      console.error('生成缩略图过程出错:', error);
+      
+      // 创建一个基础预览图作为备选
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 630;
+      const ctx = canvas.getContext('2d');
+      
+      if (ctx) {
+        // 简单渐变背景
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradient.addColorStop(0, '#0f172a');
+        gradient.addColorStop(1, '#334155');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 标题
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 64px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('LocalSite AI', canvas.width / 2, canvas.height / 2);
+        
+        return canvas.toDataURL('image/jpeg', 0.9);
+      }
+      
+      // 如果连Canvas都创建失败，返回静态图片的base64
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAFAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
+  }
+};
+
+// 修改handleSaveWebsite函数以使用新的预览图生成逻辑
+const handleSaveWebsite = async (title: string, description: string) => {
+  try {
+    // 创建预览图的时间戳，确保唯一性
+    const timestamp = new Date().getTime();
+    
+    // 显示加载状态
+    toast.loading('正在保存网页...');
+    
+    // 使用之前生成的缩略图，如果没有则重新生成
+    let imageData = thumbnailUrl;
+    if (!imageData || imageData.includes('生成中')) {
+      try {
+        imageData = await generateThumbnail();
+      } catch (error) {
+        console.error('保存前生成预览图失败:', error);
+      }
+    }
+    
+    // 保存到服务器
+    const currentContent = editedCode || generatedCode;
+    const response = await fetch('/api/share', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title,
+        description,
+        htmlContent: currentContent,
+        prompt,
+        imageData,
+        timestamp,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('保存失败');
+    }
+
+    const data = await response.json();
+    setShareUrl(data.shareUrl);
+    setLastSavedPrompt(prompt);
+    setLastSavedContent(currentContent);
+    
+    // 确保使用服务器返回的thumbnailUrl
+    if (data.thumbnailUrl) {
+      // 使用完整URL
+      const fullThumbnailUrl = data.thumbnailUrl.startsWith('http') 
+        ? data.thumbnailUrl 
+        : `${window.location.origin}${data.thumbnailUrl}`;
+      console.log('服务器返回的预览图URL:', fullThumbnailUrl);
+      // 更新缩略图URL，确保使用最新的服务器版本
+      setThumbnailUrl(fullThumbnailUrl);
+    }
+    
+    // 关闭加载提示
+    toast.dismiss();
+    toast.success('保存成功！');
+    
+    // 使用更安全的方式复制到剪贴板
+    const fullUrl = `${window.location.origin}${data.shareUrl}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('分享链接已复制到剪贴板');
+      } else {
+        // 回退到传统方法
+        const textArea = document.createElement('textarea');
+        textArea.value = fullUrl;
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
           toast.success('分享链接已复制到剪贴板');
         } else {
-          const textArea = document.createElement('textarea');
-          textArea.value = fullUrl;
-          textArea.style.position = 'fixed';
-          textArea.style.left = '-999999px';
-          textArea.style.top = '-999999px';
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          
-          try {
-            document.execCommand('copy');
-            textArea.remove();
-            toast.success('分享链接已复制到剪贴板');
-          } catch (err) {
-            console.error('复制失败:', err);
-            toast.error('复制失败，请手动复制链接');
-          }
+          toast.info(`分享链接: ${fullUrl}`);
         }
-      } catch (err) {
-        console.error('复制失败:', err);
-        toast.error('复制失败，请手动复制链接');
       }
+    } catch (clipboardError) {
+      console.error('复制到剪贴板失败:', clipboardError);
+      toast.info(`分享链接: ${fullUrl}`);
+    }
+  } catch (error) {
+    // 关闭任何正在显示的加载提示
+    toast.dismiss();
+    console.error('保存失败:', error);
+    toast.error('保存失败，请重试');
+  }
+};
+
+  // 使用 getDisplayMedia API 尝试截取屏幕内容
+  const captureDisplayMedia = async (): Promise<string> => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      console.log('浏览器不支持getDisplayMedia API');
+      return '';
+    }
+    
+    try {
+      toast.info('请在弹出窗口中选择要截图的内容', {
+        duration: 5000,
+      });
+      
+      // 请求用户选择要分享的内容
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      
+      // 创建视频元素
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.autoplay = true;
+      
+      // 等待视频准备好
+      await new Promise((resolve) => {
+        video.onloadedmetadata = () => {
+          video.play();
+          resolve(null);
+        };
+      });
+      
+      // 等待一帧
+      await new Promise(requestAnimationFrame);
+      
+      // 创建canvas和截图
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('无法创建canvas上下文');
+      }
+      
+      // 绘制视频帧
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // 停止所有轨道
+      stream.getTracks().forEach(track => track.stop());
+      
+      // 转换为图片数据
+      const imageData = canvas.toDataURL('image/jpeg', 0.95);
+      console.log('使用getDisplayMedia捕获成功，大小:', imageData.length);
+      
+      return imageData;
     } catch (error) {
-      console.error('保存失败:', error);
-      toast.error('保存失败，请重试');
+      console.error('使用getDisplayMedia捕获失败:', error);
+      return '';
     }
   };
 
@@ -478,7 +814,7 @@ export function GenerationView({
                           checked={isEditable}
                           onCheckedChange={(checked) => {
                             if (!checked && hasChanges) {
-                              setShowSaveDialog(true);
+                              handleShowSaveDialog();
                             } else {
                               setIsEditable(checked);
                             }
@@ -628,7 +964,7 @@ export function GenerationView({
 
               <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
                 <div
-                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center ${
+                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
                     viewportSize === "desktop"
                       ? "w-full h-full"
                       : viewportSize === "tablet"
@@ -653,6 +989,7 @@ export function GenerationView({
                   ) : (
                     <div className="w-full h-full relative bg-white">
                       <iframe
+                        ref={iframeRef}
                         key={previewKey}
                         srcDoc={previewContent}
                         className="w-full h-full absolute inset-0 z-10"
@@ -706,7 +1043,7 @@ export function GenerationView({
                             checked={isEditable}
                             onCheckedChange={(checked) => {
                               if (!checked && hasChanges) {
-                                setShowSaveDialog(true);
+                                handleShowSaveDialog();
                               } else {
                                 setIsEditable(checked);
                               }
@@ -861,7 +1198,7 @@ export function GenerationView({
 
                 <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
                   <div
-                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center ${
+                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
                       viewportSize === "desktop"
                         ? "w-full h-full"
                         : viewportSize === "tablet"
@@ -886,6 +1223,7 @@ export function GenerationView({
                     ) : (
                       <div className="w-full h-full relative bg-white">
                         <iframe
+                          ref={iframeRef}
                           key={previewKey}
                           srcDoc={previewContent}
                           className="w-full h-full absolute inset-0 z-10"
@@ -922,6 +1260,7 @@ export function GenerationView({
         isOpen={showSaveDialog}
         onClose={() => setShowSaveDialog(false)}
         onSave={handleSaveWebsite}
+        thumbnailUrl={thumbnailUrl}
       />
     </div>
   )

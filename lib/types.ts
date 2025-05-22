@@ -7,6 +7,7 @@ export interface SharedWebsite {
   htmlContent: string; // 完整的 HTML 内容
   prompt: string;    // 生成网站时使用的提示
   createdAt: Date;   // 创建时间
+  thumbnailUrl: string; // 网页预览图URL
 }
 
 // 定义用户模型

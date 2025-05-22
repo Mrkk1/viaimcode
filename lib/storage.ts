@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { SharedWebsite } from './types';
 import { getPool } from './db';
+import { deleteImage } from './image-utils';
 
 // 获取所有保存的网站
 export async function getAllWebsites(userId: string): Promise<SharedWebsite[]> {
@@ -39,11 +40,11 @@ export async function saveWebsite(
   const id = uuidv4();
   
   try {
-    const { title, description, htmlContent, prompt } = websiteData;
+    const { title, description, htmlContent, prompt, thumbnailUrl } = websiteData;
     
     await pool.execute(
-      'INSERT INTO websites (id, userId, title, description, htmlContent, prompt) VALUES (?, ?, ?, ?, ?, ?)',
-      [id, userId, title, description, htmlContent, prompt]
+      'INSERT INTO websites (id, userId, title, description, htmlContent, prompt, thumbnailUrl) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, userId, title, description, htmlContent, prompt, thumbnailUrl || null]
     );
     
     const savedWebsite = await getWebsiteById(id);
@@ -62,6 +63,12 @@ export async function saveWebsite(
 export async function deleteWebsite(id: string): Promise<boolean> {
   const pool = getPool();
   try {
+    // 先获取网站信息，以便删除图片
+    const website = await getWebsiteById(id);
+    if (website?.thumbnailUrl) {
+      await deleteImage(website.thumbnailUrl);
+    }
+
     const [result] = await pool.execute('DELETE FROM websites WHERE id = ?', [id]);
     return (result as any).affectedRows > 0;
   } catch (error) {

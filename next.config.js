@@ -10,6 +10,10 @@ const nextConfig = {
   experimental: {
     serverActions: true,
     serverComponents: true,
+  },
+  // 配置图片处理
+  images: {
+    unoptimized: true, // 禁用图片优化，支持所有域名
   }
 }
 
