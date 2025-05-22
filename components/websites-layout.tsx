@@ -8,7 +8,7 @@ interface WebsitesLayoutProps {
 
 export function WebsitesLayout({ children }: WebsitesLayoutProps) {
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8" style={{ marginTop: '61px' }}>
       <Toaster />
       {children}
     </div>

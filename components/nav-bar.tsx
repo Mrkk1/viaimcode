@@ -16,6 +16,7 @@ export function NavBar({ user }: NavBarProps) {
     try {
       const response = await fetch("/api/auth/logout", {
         method: "POST",
+        credentials: 'include',
       });
 
       if (!response.ok) {
@@ -23,8 +24,8 @@ export function NavBar({ user }: NavBarProps) {
       }
 
       toast.success("已登出");
-      router.push("/login");
-      router.refresh();
+      
+      window.location.href = '/login';
     } catch (error) {
       toast.error("登出失败");
     }
