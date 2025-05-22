@@ -89,61 +89,60 @@ export function WelcomeView({
     const fetchModels = async () => {
       if (!selectedProvider) return;
 
-      setIsLoadingModels(true)
-      setSelectedModel("") // Reset the selected model when the provider changes
-      setModels([]) // Clear previous models when changing provider
+      setIsLoadingModels(true);
 
       try {
-        const response = await fetch(`/api/get-models?provider=${selectedProvider}`)
-
-        // Parse the JSON response first to get any error message
-        const data = await response.json()
+        const response = await fetch(`/api/get-models?provider=${selectedProvider}`);
+        const data = await response.json();
 
         if (!response.ok) {
-          // If the response contains an error message, use it
           if (data && data.error) {
-            throw new Error(data.error)
+            throw new Error(data.error);
           } else {
-            throw new Error('Error fetching models')
+            throw new Error('Error fetching models');
           }
         }
 
-        setModels(data)
+        // 批量更新状态
+        const updates = () => {
+          setModels(data);
+          setSelectedModel(data.length > 0 ? data[0].id : "");
+        };
+        updates();
 
-        // Automatically select the first model if available
-        if (data.length > 0) {
-          setSelectedModel(data[0].id)
-        }
       } catch (error) {
-        console.error('Error fetching models:', error)
-
-        // Ensure models are cleared when there's an error
-        setModels([])
-        setSelectedModel("")
+        console.error('Error fetching models:', error);
+        
+        // 批量更新状态
+        const updates = () => {
+          setModels([]);
+          setSelectedModel("");
+        };
+        updates();
 
         // Display specific error messages based on the provider and error message
         if (error instanceof Error) {
-          const errorMessage = error.message
+          const errorMessage = error.message;
 
           if (errorMessage.includes('Ollama')) {
-            toast.error('Cannot connect to Ollama. Is the server running?')
+            toast.error('Cannot connect to Ollama. Is the server running?');
           } else if (errorMessage.includes('LM Studio')) {
-            toast.error('Cannot connect to LM Studio. Is the server running?')
+            toast.error('Cannot connect to LM Studio. Is the server running?');
           } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible') {
-            toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.')
+            toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.');
           } else {
-            toast.error('Models could not be loaded. Please try again later.')
+            toast.error('Models could not be loaded. Please try again later.');
           }
         } else {
-          toast.error('Models could not be loaded. Please try again later.')
+          toast.error('Models could not be loaded. Please try again later.');
         }
       } finally {
-        setIsLoadingModels(false)
+        setIsLoadingModels(false);
       }
-    }
+    };
 
-    fetchModels()
-  }, [selectedProvider, setSelectedModel, isLoggedIn])
+    fetchModels();
+  }, [selectedProvider, setSelectedModel, isLoggedIn]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
@@ -261,8 +260,15 @@ export function WelcomeView({
                   type="number"
                   value={maxTokens || ''}
                   onChange={(e) => {
-                    const value = e.target.value ? parseInt(e.target.value, 10) : undefined;
-                    setMaxTokens(value && !isNaN(value) && value > 0 ? value : undefined);
+                    const newValue = e.target.value;
+                    if (newValue === '') {
+                      setMaxTokens(undefined);
+                    } else {
+                      const parsed = parseInt(newValue, 10);
+                      if (!isNaN(parsed) && parsed > 0) {
+                        setMaxTokens(parsed);
+                      }
+                    }
                   }}
                   placeholder="Default (model dependent)"
                   className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"

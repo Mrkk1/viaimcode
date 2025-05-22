@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,20 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [redirectTo, setRedirectTo] = useState("");
+
+  // 处理登录成功后的操作
+  useEffect(() => {
+    if (loginSuccess && redirectTo) {
+      const handleSuccess = async () => {
+        await router.refresh();
+        toast.success("登录成功");
+        router.push(redirectTo);
+      };
+      handleSuccess();
+    }
+  }, [loginSuccess, redirectTo, router]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -33,14 +47,13 @@ export default function LoginForm() {
         throw new Error(error.message || "登录失败");
       }
 
-      toast.success("登录成功");
-      
-      // 获取来源页面，如果没有则跳转到首页
+      // 设置登录成功状态和重定向地址
       const from = searchParams.get("from") || "/";
-      router.push(from);
-      router.refresh();
+      setRedirectTo(from);
+      setLoginSuccess(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "登录失败");
+      setLoginSuccess(false);
     } finally {
       setIsLoading(false);
     }

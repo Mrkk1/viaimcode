@@ -1,6 +1,5 @@
 import { NavBar } from "@/components/nav-bar"
 import { getCurrentUser } from "@/lib/auth"
-import { Toaster } from "@/components/ui/sonner"
 
 export default async function MainLayout({
   children,
@@ -15,7 +14,6 @@ export default async function MainLayout({
       <main className=" " style={{ marginTop: '-61px' }}>
         {children}
       </main>
-      <Toaster />
     </>
   )
 } 

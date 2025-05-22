@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { Toaster } from "@/components/ui/sonner"
+import { ThemeProvider } from "@/components/theme-provider"
 import { NavBar } from "@/components/nav-bar"
 import { getCurrentUser } from "@/lib/auth"
 
@@ -17,18 +18,26 @@ function isShareRoute(pathname: string) {
   return pathname.startsWith('/share/');
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // 获取当前用户
-  const user = await getCurrentUser();
-
   return (
-    <html lang="zh-CN" className={inter.className}>
-      <body>
-        {children}
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="dark" />
+      </head>
+      <body className={inter.className} suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   )

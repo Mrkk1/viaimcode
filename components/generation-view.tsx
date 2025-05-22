@@ -381,7 +381,7 @@ export function GenerationView({
   return (
     <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
-      <header className="border-b border-gray-800 py-2 px-4">
+      <header className="border-b border-gray-800 py-2 px-4"  style={{ marginTop: '61px' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold text-white">
@@ -459,7 +459,7 @@ export function GenerationView({
       </div>
 
       {/* Hauptinhalt - Flexibler und responsiver mit Resizable Panels */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden " style={{ marginTop: '11px' }}>
         {/* Mobile View - Entweder Code oder Preview basierend auf activeTab */}
         <div className="md:hidden w-full flex flex-col">
           {activeTab === "code" ? (
