@@ -28,8 +28,33 @@ export function ProviderSelector({
 }: ProviderSelectorProps) {
   const [providers, setProviders] = useState<Provider[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  // 检查用户登录状态
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          setIsLoggedIn(true)
+        } else {
+          setIsLoggedIn(false)
+        }
+      } catch (error) {
+        console.error('Error checking login status:', error)
+        setIsLoggedIn(false)
+      }
+    }
+
+    checkLoginStatus()
+  }, [])
 
   useEffect(() => {
+    // 如果未登录，不加载提供商列表
+    if (!isLoggedIn) {
+      return;
+    }
+
     const fetchProviders = async () => {
       setIsLoading(true)
       try {
@@ -79,11 +104,16 @@ export function ProviderSelector({
     }
 
     fetchProviders()
-  }, [selectedProvider, setSelectedProvider])
+  }, [selectedProvider, setSelectedProvider, isLoggedIn])
 
   const handleProviderChange = (value: string) => {
     setSelectedProvider(value)
     onProviderChange()
+  }
+
+  // 如果未登录，不显示选择器
+  if (!isLoggedIn) {
+    return null;
   }
 
   return (

@@ -12,7 +12,7 @@ export default async function MainLayout({
   return (
     <>
       <NavBar user={user} />
-      <main className="container mx-auto px-4 py-8">
+      <main className=" " style={{ marginTop: '-61px' }}>
         {children}
       </main>
       <Toaster />
