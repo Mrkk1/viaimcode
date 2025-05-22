@@ -18,7 +18,6 @@ interface Website {
   title: string;
   description: string;
   createdAt: Date;
-  thumbnailUrl?: string;
 }
 
 export default function WebsitesPage() {
@@ -82,7 +81,7 @@ export default function WebsitesPage() {
   return (
     <WebsitesLayout>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <h1 className="text-3xl font-bold">我的网站</h1>
+        <h1 className="text-3xl font-bold">Projects</h1>
         <Button asChild className="w-full sm:w-auto">
           <Link href="/" className="flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" />
@@ -91,34 +90,34 @@ export default function WebsitesPage() {
         </Button>
       </div>
       
-      {isLoading ? (
-        <div className="text-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">加载中...</p>
-        </div>
-      ) : websites.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {websites.map((website) => (
+      <div className="grid gap-6">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+            <p className="text-gray-500 dark:text-gray-400">加载中...</p>
+          </div>
+        ) : websites.length > 0 ? (
+          websites.map((website) => (
             <WebsiteItem 
               key={website.id} 
               website={website} 
               onDelete={handleDelete}
             />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
-            还没有保存的网页
-          </p>
-          <Button asChild>
-            <Link href="/" className="flex items-center justify-center gap-2">
-              <Plus className="w-4 h-4" />
-              立即创建
-            </Link>
-          </Button>
-        </div>
-      )}
+          ))
+        ) : (
+          <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg">
+            <p className="text-gray-500 dark:text-gray-400 mb-4">
+              还没有保存的网页
+            </p>
+            <Button asChild>
+              <Link href="/" className="flex items-center justify-center gap-2">
+                <Plus className="w-4 h-4" />
+                立即创建
+              </Link>
+            </Button>
+          </div>
+        )}
+      </div>
     </WebsitesLayout>
   );
 } 

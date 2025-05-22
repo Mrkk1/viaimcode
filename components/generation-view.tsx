@@ -206,6 +206,10 @@ export function GenerationView({
           padding: 0;
           width: 100%;
           overflow-x: hidden;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
         }
         /* Smooth transition for body background */
         body {
@@ -214,6 +218,21 @@ export function GenerationView({
         /* Ensure all images can be accessed by html2canvas */
         img {
           crossorigin: anonymous;
+        }
+        /* 优化内容居中显示 */
+        body > * {
+          max-width: 100%;
+          margin-left: auto;
+          margin-right: auto;
+        }
+        /* 确保内容至少占据一定比例的空间 */
+        main, div, section {
+          min-width: 80%;
+        }
+        /* 为容器添加一些内边距 */
+        .container, main, section, article {
+          padding: 20px;
+          box-sizing: border-box;
         }
       </style>
     `;
@@ -236,7 +255,9 @@ export function GenerationView({
             ${headContent}
           </head>
           <body>
-            ${code}
+            <div style="width: 90%; max-width: 1200px; margin: 0 auto; padding: 20px;">
+              ${code}
+            </div>
           </body>
         </html>
       `;
@@ -350,19 +371,13 @@ export function GenerationView({
     }
 
     try {
-      // 确保URL包含域名
-      const fullUrl = shareUrl.startsWith('http') 
-        ? shareUrl 
-        : `${window.location.origin}${shareUrl}`;
-      
-      console.log('复制的完整URL:', fullUrl);
-      
+      const url = shareUrl;
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(fullUrl);
+        await navigator.clipboard.writeText(url);
         toast.success('分享链接已复制');
       } else {
         const textArea = document.createElement('textarea');
-        textArea.value = fullUrl;
+        textArea.value = url;
         textArea.style.position = 'fixed';
         textArea.style.left = '-999999px';
         textArea.style.top = '-999999px';
@@ -450,54 +465,83 @@ export function GenerationView({
       container.style.position = 'absolute';
       container.style.left = '-9999px';
       container.style.top = '0';
-      container.style.width = '1200px';
-      container.style.height = '630px';
-      container.style.background = '#fff';
+      container.style.width = '1000px';  // 较小的宽度，更接近实际网页比例
+      container.style.height = '800px';  // 增加高度，减少空白区域
+      container.style.background = '#121212'; // 深色背景
       container.style.overflow = 'hidden';
       container.style.zIndex = '-1';
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'center';
       
-      // 4. 创建内部内容容器
-      const contentDiv = document.createElement('div');
-      contentDiv.style.width = '100%';
-      contentDiv.style.height = '100%';
-      contentDiv.style.overflow = 'hidden';
-      contentDiv.style.background = '#fff';
-      
-      // 5. 准备HTML内容
+      // 4. 准备完整的HTML文档
       const preparedHtml = prepareHtmlContent(htmlContent);
-      contentDiv.innerHTML = preparedHtml;
       
-      // 6. 添加到DOM中
-      container.appendChild(contentDiv);
+      // 5. 使用iframe而不是直接注入DIV，确保HTML文档结构完整
+      const iframe = document.createElement('iframe');
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.backgroundColor = '#121212';
+      
+      // 添加到DOM中
+      container.appendChild(iframe);
       document.body.appendChild(container);
       
-      // 7. 等待内容加载
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 等待iframe加载
+      await new Promise<void>((resolve) => {
+        iframe.onload = () => resolve();
+        iframe.srcdoc = preparedHtml;
+        
+        // 设置超时，防止无限等待
+        setTimeout(() => resolve(), 1000);
+      });
+      
+      // 额外等待时间，确保内容完全渲染
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       let imageData = '';
       
-      // 8. 尝试使用html2canvas进行截图
+      // 6. 尝试使用html2canvas进行截图
       try {
-        const canvas = await html2canvas(contentDiv, {
-          allowTaint: true,
-          useCORS: true,
-          logging: false,
-          background: '#FFFFFF'
-        });
-        
-        imageData = canvas.toDataURL('image/jpeg', 0.9);
-        console.log('成功生成预览图，大小:', imageData.length);
+        // 确保iframe内容已完全加载
+        if (iframe.contentDocument && iframe.contentDocument.body) {
+          // 在截图前确保内容居中且填满可视区域
+          if (iframe.contentDocument.body.firstElementChild) {
+            const content = iframe.contentDocument.body.firstElementChild as HTMLElement;
+            if (content) {
+              content.style.width = '100%';
+              content.style.margin = '0 auto';
+              content.style.padding = '20px';
+              content.style.boxSizing = 'border-box';
+            }
+          }
+          
+          const canvas = await html2canvas(iframe.contentDocument.body, {
+            allowTaint: true,
+            useCORS: true,
+            logging: false,
+            background: '#121212',
+            width: container.clientWidth,
+            height: container.clientHeight
+          });
+          
+          imageData = canvas.toDataURL('image/jpeg', 0.95);
+          console.log('成功生成预览图，大小:', imageData.length);
+        } else {
+          throw new Error('iframe内容未加载完成');
+        }
       } catch (error) {
         console.error('截图失败:', error);
         
-        // 9. 如果截图失败，创建一个模拟预览图
+        // 7. 如果截图失败，创建一个模拟预览图 - 使用更贴近网页比例的布局
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('无法创建Canvas上下文');
         
-        // 设置尺寸
-        canvas.width = 1200;
-        canvas.height = 630;
+        // 设置尺寸为更符合网页比例的尺寸
+        canvas.width = 1000;
+        canvas.height = 800;
         
         // 创建渐变背景
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -506,20 +550,41 @@ export function GenerationView({
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
+        // 创建一个模拟的网页内容区域
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        const contentWidth = canvas.width * 0.9;
+        const contentHeight = canvas.height * 0.7;
+        const contentX = (canvas.width - contentWidth) / 2;
+        const contentY = (canvas.height - contentHeight) / 2;
+        ctx.fillRect(contentX, contentY, contentWidth, contentHeight);
+        
+        // 添加一个标题栏
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillRect(contentX, contentY, contentWidth, 50);
+        
         // 添加文本
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 48px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('LocalSite AI', canvas.width / 2, canvas.height / 2 - 40);
+        ctx.fillText('网页预览', canvas.width / 2, contentY + 100);
         
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.font = '24px system-ui, -apple-system, sans-serif';
-        ctx.fillText(new Date().toLocaleString(), canvas.width / 2, canvas.height / 2 + 20);
+        ctx.fillText('由 LocalSite AI 生成', canvas.width / 2, contentY + 150);
         
-        imageData = canvas.toDataURL('image/jpeg', 0.9);
+        // 添加模拟内容块
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+        // 标题或导航
+        ctx.fillRect(contentX + 40, contentY + 200, contentWidth - 80, 40);
+        // 内容区块
+        ctx.fillRect(contentX + 40, contentY + 260, (contentWidth - 80) * 0.7, 30);
+        ctx.fillRect(contentX + 40, contentY + 310, (contentWidth - 80) * 0.5, 30);
+        ctx.fillRect(contentX + 40, contentY + 360, (contentWidth - 80) * 0.6, 100);
+        
+        imageData = canvas.toDataURL('image/jpeg', 0.95);
       }
       
-      // 10. 清理临时DOM元素
+      // 8. 清理临时DOM元素
       try {
         document.body.removeChild(container);
       } catch (e) {
@@ -532,8 +597,8 @@ export function GenerationView({
       
       // 创建一个基础预览图作为备选
       const canvas = document.createElement('canvas');
-      canvas.width = 1200;
-      canvas.height = 630;
+      canvas.width = 1000;  // 调整为更合适的宽高比
+      canvas.height = 800;
       const ctx = canvas.getContext('2d');
       
       if (ctx) {
@@ -555,7 +620,7 @@ export function GenerationView({
       }
       
       // 如果连Canvas都创建失败，返回静态图片的base64
-      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAFAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAFAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
   }
 };
 
