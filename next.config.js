@@ -10,6 +10,9 @@ const nextConfig = {
   experimental: {
     serverActions: true,
     serverComponents: true,
+    typedRoutes: true,
+    // 启用新的 params 行为
+    serverComponentsExternalPackages: ['@prisma/client']
   },
   // 配置图片处理
   images: {
