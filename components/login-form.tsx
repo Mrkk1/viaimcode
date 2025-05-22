@@ -21,7 +21,7 @@ export default function LoginForm() {
       const handleSuccess = async () => {
         await router.refresh();
         toast.success("登录成功");
-        router.push(redirectTo);
+        (router as any).push(redirectTo);
       };
       handleSuccess();
     }
