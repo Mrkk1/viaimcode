@@ -3,6 +3,7 @@ import { saveWebsite } from '@/lib/storage';
 import { saveBase64Image } from '@/lib/image-utils';
 import { getCurrentUser } from '@/lib/auth';
 import { SharedWebsite } from '@/lib/types';
+import { uploadImage } from '@/lib/image-upload';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +34,12 @@ export async function POST(request: NextRequest) {
       // 确保我们总是使用新传入的图片数据，而不是重用旧的
       if (imageData && imageData.length > 1000) {
         // 使用时间戳作为文件名的一部分，确保唯一性
-        thumbnailUrl = await saveBase64Image(imageData, timestamp);
-        console.log('新图片已保存到:', thumbnailUrl);
+        const filename = `image-${timestamp || Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
+        
+        // 直接使用uploadImage，并强制指定使用OSS (第三个参数为true)
+        // 在生产环境中这会上传到OSS，在开发环境也强制使用OSS
+        thumbnailUrl = await uploadImage(imageData, filename, true);
+        console.log('图片已上传到OSS:', thumbnailUrl);
       } else {
         console.error('无效的图片数据');
       }
