@@ -1,32 +1,34 @@
-import type React from "react"
-import "@/app/globals.css"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { ThemeProvider } from "@/components/theme-provider"
+import "./globals.css"
+import { Toaster } from "@/components/ui/sonner"
+import { NavBar } from "@/components/nav-bar"
+import { getCurrentUser } from "@/lib/auth"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: "AI Code Generator",
-  description: "Modern AI-powered code generation web app",
-    generator: 'v0.dev'
+export const metadata: Metadata = {
+  title: "ViaimCode",
+  description: "使用 AI 生成网页 | AI Website Generator",
 }
 
-export default function RootLayout({
+// 检查是否是share路由
+function isShareRoute(pathname: string) {
+  return pathname.startsWith('/share/');
+}
+
+export default async function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
+  // 获取当前用户
+  const user = await getCurrentUser();
+
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
-          {children}
-        </ThemeProvider>
+    <html lang="zh-CN" className={inter.className}>
+      <body>
+        {children}
       </body>
     </html>
   )

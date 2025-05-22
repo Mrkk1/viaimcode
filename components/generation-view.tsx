@@ -5,7 +5,7 @@ import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 // Import only the icons that are actually used
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,9 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from "@/components/ui/resizable"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 
 interface GenerationViewProps {
   prompt: string
@@ -38,6 +41,61 @@ interface GenerationViewProps {
   thinkingOutput?: string
   isThinking?: boolean
 }
+
+interface SaveDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (title: string, description: string) => void;
+}
+
+const SaveDialog = ({ isOpen, onClose, onSave }: SaveDialogProps) => {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  const handleSave = () => {
+    onSave(title, description);
+    setTitle("");
+    setDescription("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>保存网页</DialogTitle>
+          <DialogDescription>
+            输入网页的标题和描述以保存
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="title">标题</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="输入网页标题"
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="description">描述</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="输入网页描述"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button onClick={handleSave}>保存</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 export function GenerationView({
   prompt,
@@ -62,14 +120,16 @@ export function GenerationView({
   const [previewContent, setPreviewContent] = useState("") // For debounced preview content
   const [showSaveDialog, setShowSaveDialog] = useState(false) // For the save dialog
   const [newPrompt, setNewPrompt] = useState("") // Für das neue Prompt-Eingabefeld
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   // Previous preview content for transition effect
   const prevContentRef = useRef<string>("");
 
   // Function to prepare HTML content with dark mode styles
   const prepareHtmlContent = (code: string): string => {
-    // Add a dark mode default style to the preview content
-    const darkModeStyle = `
+    // Add a dark mode default style and viewport meta tag
+    const headContent = `
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
       <style>
         :root {
           color-scheme: dark;
@@ -78,10 +138,10 @@ export function GenerationView({
           background-color: #121212;
           color: #ffffff;
           min-height: 100%;
-        }
-        body {
           margin: 0;
           padding: 0;
+          width: 100%;
+          overflow-x: hidden;
         }
         /* Smooth transition for body background */
         body {
@@ -94,18 +154,18 @@ export function GenerationView({
 
     // Check if the code already has a <head> tag
     if (code.includes('<head>')) {
-      // Insert the dark mode style into the head
-      result = code.replace('<head>', `<head>${darkModeStyle}`);
+      // Insert the head content
+      result = code.replace('<head>', `<head>${headContent}`);
     } else if (code.includes('<html>')) {
       // Create a head tag if there's an html tag but no head
-      result = code.replace('<html>', `<html><head>${darkModeStyle}</head>`);
+      result = code.replace('<html>', `<html><head>${headContent}</head>`);
     } else {
       // Wrap the entire content with proper HTML structure
       result = `
         <!DOCTYPE html>
         <html>
           <head>
-            ${darkModeStyle}
+            ${headContent}
           </head>
           <body>
             ${code}
@@ -209,7 +269,114 @@ export function GenerationView({
     setNewPrompt("") // Reset input field
   }
 
+  // 复制分享链接
+  const copyShareUrl = async () => {
+    // 检查是否需要重新保存
+    const currentContent = editedCode || generatedCode;
+    const shouldResave = !shareUrl || prompt !== lastSavedPrompt || currentContent !== lastSavedContent;
 
+    if (shouldResave) {
+      // 如果需要重新保存，打开保存对话框
+      setShowSaveDialog(true);
+      return;
+    }
+
+    const fullUrl = `${window.location.origin}${shareUrl}`;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('分享链接已复制');
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = fullUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+          document.execCommand('copy');
+          textArea.remove();
+          toast.success('分享链接已复制');
+        } catch (err) {
+          console.error('复制失败:', err);
+          toast.error('复制失败，请手动复制链接');
+        }
+      }
+    } catch (err) {
+      console.error('复制失败:', err);
+      toast.error('复制失败，请手动复制链接');
+    }
+  };
+
+  // 添加状态来跟踪最后保存的内容
+  const [lastSavedPrompt, setLastSavedPrompt] = useState(prompt);
+  const [lastSavedContent, setLastSavedContent] = useState('');
+
+  // 修改保存函数，更新最后保存的内容
+  const handleSaveWebsite = async (title: string, description: string) => {
+    try {
+      const currentContent = editedCode || generatedCode;
+      const response = await fetch('/api/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          htmlContent: currentContent,
+          prompt,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('保存失败');
+      }
+
+      const data = await response.json();
+      setShareUrl(data.shareUrl);
+      // 更新最后保存的内容状态
+      setLastSavedPrompt(prompt);
+      setLastSavedContent(currentContent);
+      toast.success('保存成功！');
+      
+      // 自动执行分享操作
+      const fullUrl = `${window.location.origin}${data.shareUrl}`;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(fullUrl);
+          toast.success('分享链接已复制到剪贴板');
+        } else {
+          const textArea = document.createElement('textarea');
+          textArea.value = fullUrl;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          
+          try {
+            document.execCommand('copy');
+            textArea.remove();
+            toast.success('分享链接已复制到剪贴板');
+          } catch (err) {
+            console.error('复制失败:', err);
+            toast.error('复制失败，请手动复制链接');
+          }
+        }
+      } catch (err) {
+        console.error('复制失败:', err);
+        toast.error('复制失败，请手动复制链接');
+      }
+    } catch (error) {
+      console.error('保存失败:', error);
+      toast.error('保存失败，请重试');
+    }
+  };
 
   return (
     <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
@@ -256,6 +423,16 @@ export function GenerationView({
             >
               <Download className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Export</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
+              disabled={!generatedCode || isGenerating}
+              onClick={copyShareUrl}
+            >
+              <Share2 className="w-4 h-4 mr-1" />
+              <span className="hidden sm:inline">分享</span>
             </Button>
           </div>
         </div>
@@ -451,13 +628,16 @@ export function GenerationView({
 
               <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
                 <div
-                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 ${
+                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center ${
                     viewportSize === "desktop"
                       ? "w-full h-full"
                       : viewportSize === "tablet"
-                        ? "w-[768px] max-h-full"
-                        : "w-[375px] max-h-full"
+                        ? "w-[768px] h-[1024px] max-h-[90%]"
+                        : "w-[375px] h-[667px] max-h-[90%]"
                   }`}
+                  style={{
+                    transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                  }}
                 >
                   {!originalCode && !editedCode ? (
                     <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
@@ -471,7 +651,7 @@ export function GenerationView({
                       )}
                     </div>
                   ) : (
-                    <div className="w-full h-full relative">
+                    <div className="w-full h-full relative bg-white">
                       <iframe
                         key={previewKey}
                         srcDoc={previewContent}
@@ -481,7 +661,11 @@ export function GenerationView({
                         style={{
                           backgroundColor: '#121212',
                           opacity: 1,
-                          transition: 'opacity 0.15s ease-in-out'
+                          transition: 'opacity 0.15s ease-in-out',
+                          width: '100%',
+                          height: '100%',
+                          border: 'none',
+                          overflow: 'hidden',
                         }}
                       />
                       {/* Loading indicator that shows only during generation */}
@@ -677,13 +861,16 @@ export function GenerationView({
 
                 <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
                   <div
-                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 ${
+                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center ${
                       viewportSize === "desktop"
                         ? "w-full h-full"
                         : viewportSize === "tablet"
-                          ? "w-[768px] max-h-full"
-                          : "w-[375px] max-h-full"
+                          ? "w-[768px] h-[1024px] max-h-[90%]"
+                          : "w-[375px] h-[667px] max-h-[90%]"
                     }`}
+                    style={{
+                      transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                    }}
                   >
                     {!originalCode && !editedCode ? (
                       <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
@@ -697,7 +884,7 @@ export function GenerationView({
                         )}
                       </div>
                     ) : (
-                      <div className="w-full h-full relative">
+                      <div className="w-full h-full relative bg-white">
                         <iframe
                           key={previewKey}
                           srcDoc={previewContent}
@@ -707,7 +894,11 @@ export function GenerationView({
                           style={{
                             backgroundColor: '#121212',
                             opacity: 1,
-                            transition: 'opacity 0.15s ease-in-out'
+                            transition: 'opacity 0.15s ease-in-out',
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                            overflow: 'hidden',
                           }}
                         />
                         {/* Loading indicator that shows only during generation */}
@@ -727,42 +918,11 @@ export function GenerationView({
         </div>
       </div>
 
-      {/* Speichern-Dialog */}
-      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-        <DialogContent className="bg-gray-900 border-gray-800 text-white">
-          <DialogHeader>
-            <DialogTitle>Save changes?</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Do you want to save your changes before switching to read-only mode?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                // If not saving, reset the edited code to the original code
-                setEditedCode(originalCode);
-                setIsEditable(false);
-                setShowSaveDialog(false);
-              }}
-              className="border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white"
-            >
-              Don't save
-            </Button>
-            <Button
-              onClick={() => {
-                // Save the changes
-                saveChanges();
-                setIsEditable(false);
-                setShowSaveDialog(false);
-              }}
-              className="bg-blue-600 text-white hover:bg-blue-700"
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SaveDialog
+        isOpen={showSaveDialog}
+        onClose={() => setShowSaveDialog(false)}
+        onSave={handleSaveWebsite}
+      />
     </div>
   )
 }
