@@ -90,22 +90,23 @@ export default function WebsitesPage() {
         </Button>
       </div>
       
-      <div className="grid gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3  gap-6">
         {isLoading ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12 col-span-full">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
             <p className="text-gray-500 dark:text-gray-400">加载中...</p>
           </div>
         ) : websites.length > 0 ? (
           websites.map((website) => (
-            <WebsiteItem 
-              key={website.id} 
-              website={website} 
-              onDelete={handleDelete}
-            />
+            <div key={website.id} className="flex justify-center" style={{width: '100%'}}>
+              <WebsiteItem 
+                website={website} 
+                onDelete={handleDelete}
+              />
+            </div>
           ))
         ) : (
-          <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg">
+          <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg col-span-full">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
               还没有保存的网页
             </p>
