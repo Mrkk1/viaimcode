@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2 } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch"
 import { CodeEditor } from "@/components/code-editor"
 import { WorkSteps } from "@/components/work-steps"
 import html2canvas from 'html2canvas'
+import { v4 as uuidv4 } from 'uuid'
+import { EditHistory } from "@/components/edit-history"
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,9 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import Image from "next/image"
+import { formatDistanceToNow } from "date-fns"
+import { zhCN } from "date-fns/locale"
 
 interface GenerationViewProps {
   prompt: string
@@ -47,6 +52,23 @@ interface SaveDialogProps {
   onClose: () => void;
   onSave: (title: string, description: string) => void;
   thumbnailUrl?: string;
+}
+
+export interface HistoryVersion {
+  id: string
+  timestamp: Date
+  thumbnail: string
+  code: string
+  title?: string
+  isPublished?: boolean
+  shareUrl?: string
+  type?: 'ai' | 'manual'  // 添加版本类型标识
+}
+
+// 扩展历史版本接口，添加发布状态跟踪
+interface ExtendedHistoryVersion extends HistoryVersion {
+  isPublished?: boolean;
+  shareUrl?: string;
 }
 
 const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) => {
@@ -183,10 +205,13 @@ export function GenerationView({
   const [newPrompt, setNewPrompt] = useState("")
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("")
+  const [showHistory, setShowHistory] = useState(false)
+  const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>([])
+  const [currentVersionId, setCurrentVersionId] = useState<string>("")
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Previous preview content for transition effect
-  const prevContentRef = useRef<string>("");
+  const prevContentRef = useRef<string>("")
 
   // Function to prepare HTML content with dark mode styles
   const prepareHtmlContent = (code: string): string => {
@@ -286,8 +311,16 @@ export function GenerationView({
     // Update preview content with debounce
     if (generatedCode) {
       debouncedUpdatePreview(generatedCode);
+      
+      // 重新生成代码时创建新的历史版本
+      if (!isGenerating && generationComplete) {
+        // 使用setTimeout避免初始化时的循环依赖问题
+        setTimeout(() => {
+          createNewVersion(generatedCode, "AI生成版本", 'ai');
+        }, 100);
+      }
     }
-  }, [generatedCode, debouncedUpdatePreview])
+  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete])
 
   // Check if changes have been made and update preview content
   useEffect(() => {
@@ -303,10 +336,126 @@ export function GenerationView({
     }
   }, [editedCode, originalCode, debouncedUpdatePreview])
 
+  // 更新预览内容的函数
+  const updatePreviewAfterVersionChange = useCallback((code: string) => {
+    // 强制立即更新预览内容，不使用防抖
+    if (debouncedUpdatePreview && typeof debouncedUpdatePreview.flush === 'function') {
+      debouncedUpdatePreview.flush();
+    }
+    
+    // 直接准备HTML并设置内容
+    const preparedHtml = prepareHtmlContent(code);
+    setPreviewContent(preparedHtml);
+    
+    // 更新key以彻底重新渲染iframe
+    setPreviewKey(prev => prev + 1);
+    
+    // 额外添加一个延迟更新，确保内容被正确加载
+    setTimeout(() => {
+      const preparedHtmlAgain = prepareHtmlContent(code);
+      setPreviewContent(preparedHtmlAgain);
+      setPreviewKey(prev => prev + 1);
+    }, 100);
+  }, [debouncedUpdatePreview]);
+
+  // 处理从历史版本中选择一个版本
+  const handleSelectVersion = useCallback((version: HistoryVersion) => {
+    // 如果当前有未保存的更改，先提示用户是否保存
+    if (hasChanges) {
+      if (window.confirm('当前有未保存的更改，切换版本后将丢失这些更改。是否继续？')) {
+        setEditedCode(version.code);
+        setOriginalCode(version.code);
+        setCurrentVersionId(version.id);
+        setHasChanges(false);
+        
+        // 如果版本已发布，更新共享URL
+        if (version.isPublished && version.shareUrl) {
+          setShareUrl(version.shareUrl);
+          setLastSavedPrompt(prompt);  // 假设当前prompt与该版本一致
+          setLastSavedContent(version.code);
+          console.log('切换到已发布版本，更新分享链接:', version.shareUrl);
+        }
+        
+        // 更新预览内容
+        updatePreviewAfterVersionChange(version.code);
+        
+        // 如果编辑功能未启用，自动启用
+        if (!isEditable) {
+          setIsEditable(true);
+        }
+      }
+    } else {
+      // 没有未保存的更改，直接切换
+      setEditedCode(version.code);
+      setOriginalCode(version.code);
+      setCurrentVersionId(version.id);
+      
+      // 如果版本已发布，更新共享URL
+      if (version.isPublished && version.shareUrl) {
+        setShareUrl(version.shareUrl);
+        setLastSavedPrompt(prompt);  // 假设当前prompt与该版本一致
+        setLastSavedContent(version.code);
+        console.log('切换到已发布版本，更新分享链接:', version.shareUrl);
+      }
+      
+      // 更新预览内容
+      updatePreviewAfterVersionChange(version.code);
+      
+      // 如果编辑功能未启用，自动启用
+      if (!isEditable) {
+        setIsEditable(true);
+      }
+    }
+  }, [hasChanges, isEditable, prompt, updatePreviewAfterVersionChange]);
+  
+  // 创建新的历史版本
+  const createNewVersion = useCallback(async (code: string, title?: string, type: string = 'manual') => {
+    try {
+      // 生成缩略图
+      let thumbnail = thumbnailUrl;
+      
+      // 如果没有缩略图或者使用的是之前的缩略图，重新生成
+      if (!thumbnail || versionHistory.some(v => v.thumbnail === thumbnail)) {
+        // 直接使用generateThumbnail函数
+        thumbnail = await generateThumbnail();
+      }
+      
+      // 创建新版本对象
+      const newVersion: HistoryVersion = {
+        id: uuidv4(),
+        timestamp: new Date(),
+        thumbnail,
+        code,
+        title: title || `版本 ${versionHistory.length + 1}`,
+        isPublished: false,  // 初始状态为未发布
+        shareUrl: "",  // 初始无分享链接
+        type: type as 'ai' | 'manual'
+      };
+      
+      // 添加到历史版本列表
+      setVersionHistory(prev => {
+        // 保证版本不重复（根据代码内容去重）
+        const filtered = prev.filter(v => v.code !== code);
+        return [...filtered, newVersion];
+      });
+      
+      // 设置当前版本ID
+      setCurrentVersionId(newVersion.id);
+      
+      return newVersion;
+    } catch (error) {
+      console.error('创建历史版本失败:', error);
+      return null;
+    }
+  }, [thumbnailUrl, versionHistory]);
+
   // Function to save changes
   const saveChanges = () => {
     setOriginalCode(editedCode)
     setHasChanges(false)
+    
+    // 保存时创建新版本，标记为手动保存类型
+    createNewVersion(editedCode, `手动保存版本 ${versionHistory.length + 1}`, 'manual');
   }
 
   // Function to copy the generated code to clipboard
@@ -360,43 +509,155 @@ export function GenerationView({
 
   // 复制分享链接
   const copyShareUrl = async () => {
-    // 检查是否需要重新保存
-    const currentContent = editedCode || generatedCode;
+    // 检查当前选择的版本是否已发布
+    const currentVersion = versionHistory.find(v => v.id === currentVersionId);
+    
+    // 如果当前版本已发布且有分享链接，则直接使用
+    if (currentVersion?.isPublished && currentVersion?.shareUrl) {
+      try {
+        console.log('当前版本已发布，直接复制分享链接:', currentVersion.shareUrl);
+        
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(currentVersion.shareUrl);
+          toast.success('分享链接已复制到剪贴板');
+        } else {
+          // 回退到传统方法
+          const textArea = document.createElement('textarea');
+          textArea.value = currentVersion.shareUrl;
+          // 确保文本框可见，这对一些浏览器很重要
+          textArea.style.position = 'fixed';
+          textArea.style.left = '0';
+          textArea.style.top = '0';
+          textArea.style.width = '2em';
+          textArea.style.height = '2em';
+          textArea.style.padding = '0';
+          textArea.style.border = 'none';
+          textArea.style.outline = 'none';
+          textArea.style.boxShadow = 'none';
+          textArea.style.background = 'transparent';
+          document.body.appendChild(textArea);
+          
+          // 选择文本并复制
+          textArea.focus();
+          textArea.select();
+          
+          try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+              toast.success('分享链接已复制到剪贴板');
+            } else {
+              toast.info(`分享链接: ${currentVersion.shareUrl}`);
+              // 显示一个能点击的链接
+              toast.info(
+                <div onClick={() => window.open(currentVersion.shareUrl, '_blank')} className="cursor-pointer text-blue-500 hover:underline">
+                  点击打开链接
+                </div>
+              );
+            }
+          } catch (err) {
+            document.body.removeChild(textArea);
+            console.error('复制失败:', err);
+            toast.error('复制失败，请手动复制链接');
+            // 显示可以手动复制的链接
+            toast.info(
+              <div className="break-all">
+                {currentVersion.shareUrl}
+              </div>
+            );
+          }
+        }
+        return;
+      } catch (err) {
+        console.error('使用已发布版本链接失败:', err);
+        // 如果出错，继续尝试常规方法
+      }
+    }
+    
+    // 检查是否需要重新保存（当前版本未发布或没有分享链接）
+    const currentContent = isEditable ? editedCode : originalCode;
     const shouldResave = !shareUrl || prompt !== lastSavedPrompt || currentContent !== lastSavedContent;
 
     if (shouldResave) {
       // 如果需要重新保存，打开保存对话框
+      toast.info('内容已更改，需要先保存才能分享');
       await handleShowSaveDialog();
       return;
     }
 
     try {
-      const url = shareUrl;
+      // 构建完整的URL，确保包含域名
+      const fullUrl = shareUrl?.startsWith('http') 
+        ? shareUrl 
+        : `${window.location.origin}${shareUrl}`;
+      
+      console.log('准备复制分享链接:', fullUrl);
+      
       if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(url);
-        toast.success('分享链接已复制');
+        await navigator.clipboard.writeText(fullUrl);
+        toast.success('分享链接已复制到剪贴板');
       } else {
+        // 回退到传统方法
         const textArea = document.createElement('textarea');
-        textArea.value = url;
+        textArea.value = fullUrl;
+        // 确保文本框可见，这对一些浏览器很重要
         textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
+        textArea.style.left = '0';
+        textArea.style.top = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
         document.body.appendChild(textArea);
+        
+        // 选择文本并复制
         textArea.focus();
         textArea.select();
         
         try {
-          document.execCommand('copy');
-          textArea.remove();
-          toast.success('分享链接已复制');
+          const successful = document.execCommand('copy');
+          document.body.removeChild(textArea);
+          
+          if (successful) {
+            toast.success('分享链接已复制到剪贴板');
+          } else {
+            toast.info(`分享链接: ${fullUrl}`);
+            // 显示一个能点击的链接
+            toast.info(
+              <div onClick={() => window.open(fullUrl, '_blank')} className="cursor-pointer text-blue-500 hover:underline">
+                点击打开链接
+              </div>
+            );
+          }
         } catch (err) {
+          document.body.removeChild(textArea);
           console.error('复制失败:', err);
           toast.error('复制失败，请手动复制链接');
+          // 显示可以手动复制的链接
+          toast.info(
+            <div className="break-all">
+              {fullUrl}
+            </div>
+          );
         }
       }
     } catch (err) {
       console.error('复制失败:', err);
       toast.error('复制失败，请手动复制链接');
+      if (shareUrl) {
+        const fullUrl = shareUrl.startsWith('http') 
+          ? shareUrl 
+          : `${window.location.origin}${shareUrl}`;
+        toast.info(
+          <div className="break-all">
+            {fullUrl}
+          </div>
+        );
+      }
     }
   };
 
@@ -404,9 +665,31 @@ export function GenerationView({
   const [lastSavedPrompt, setLastSavedPrompt] = useState(prompt);
   const [lastSavedContent, setLastSavedContent] = useState('');
 
+  // 修改按钮函数逻辑，确保点击分享按钮时也会打开保存对话框
+  const handleDownloadOrShare = (action: 'download' | 'share') => {
+    if (action === 'download') {
+      downloadCode();
+    } else {
+      // 分享操作
+      copyShareUrl();
+    }
+  };
+
   // 在显示保存对话框之前先生成预览图
   const handleShowSaveDialog = async () => {
     try {
+      console.log('准备显示保存对话框...');
+      
+      // 同步预览内容与当前编辑的代码
+      const currentCode = isEditable ? editedCode : originalCode;
+      
+      // 强制更新预览内容
+      if (debouncedUpdatePreview && typeof debouncedUpdatePreview.flush === 'function') {
+        debouncedUpdatePreview.flush();
+      }
+      const preparedHtml = prepareHtmlContent(currentCode);
+      setPreviewContent(preparedHtml);
+      
       // 创建一个临时预览图
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -433,11 +716,13 @@ export function GenerationView({
       
       // 设置临时预览图并显示对话框
       setThumbnailUrl(tempImageData);
+      console.log('设置临时预览图，显示保存对话框');
       setShowSaveDialog(true);
       
       // 异步生成真正的预览图
       generateThumbnail().then(imageData => {
         if (imageData && imageData.length > 1000) {
+          console.log('已生成真实预览图，更新UI');
           setThumbnailUrl(imageData);
         }
       }).catch(error => {
@@ -458,7 +743,7 @@ export function GenerationView({
       window.scrollTo(0, 0);
       
       // 2. 当前的HTML内容
-      const htmlContent = editedCode || generatedCode;
+      const htmlContent = isEditable ? editedCode : originalCode;
       
       // 3. 创建临时容器
       const container = document.createElement('div');
@@ -488,17 +773,55 @@ export function GenerationView({
       container.appendChild(iframe);
       document.body.appendChild(container);
       
-      // 等待iframe加载
+      // 设置一个更长的超时时间
+      const IFRAME_LOAD_TIMEOUT = 3000; // 3秒
+      
+      // 等待iframe加载，添加更可靠的加载检测
       await new Promise<void>((resolve) => {
-        iframe.onload = () => resolve();
+        let hasResolved = false;
+        
+        // 主加载事件
+        iframe.onload = () => {
+          if (!hasResolved) {
+            hasResolved = true;
+            resolve();
+          }
+        };
+        
+        // 确保srcdoc设置后立即开始监听加载
         iframe.srcdoc = preparedHtml;
         
+        // 如果iframe有contentDocument，监听它的DOMContentLoaded和load事件
+        const checkContentLoaded = () => {
+          if (iframe.contentDocument) {
+            if (iframe.contentDocument.readyState === 'complete' || 
+                iframe.contentDocument.readyState === 'interactive') {
+              if (!hasResolved) {
+                hasResolved = true;
+                resolve();
+              }
+            }
+          }
+        };
+        
+        // 定期检查iframe是否已加载
+        const checkInterval = setInterval(() => {
+          checkContentLoaded();
+        }, 100);
+        
         // 设置超时，防止无限等待
-        setTimeout(() => resolve(), 1000);
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          if (!hasResolved) {
+            hasResolved = true;
+            console.log('Iframe加载超时，继续处理');
+            resolve();
+          }
+        }, IFRAME_LOAD_TIMEOUT);
       });
       
-      // 额外等待时间，确保内容完全渲染
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // 额外等待时间，确保内容完全渲染，增加到1.5秒
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       let imageData = '';
       
@@ -517,6 +840,7 @@ export function GenerationView({
             }
           }
           
+          // 设置更长的超时时间和更好的配置
           const canvas = await html2canvas(iframe.contentDocument.body, {
             allowTaint: true,
             useCORS: true,
@@ -620,103 +944,188 @@ export function GenerationView({
       }
       
       // 如果连Canvas都创建失败，返回静态图片的base64
-      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAFAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
-  }
-};
-
-// 修改handleSaveWebsite函数以使用新的预览图生成逻辑
-const handleSaveWebsite = async (title: string, description: string) => {
-  try {
-    // 创建预览图的时间戳，确保唯一性
-    const timestamp = new Date().getTime();
-    
-    // 显示加载状态
-    toast.loading('正在保存网页...');
-    
-    // 使用之前生成的缩略图，如果没有则重新生成
-    let imageData = thumbnailUrl;
-    if (!imageData || imageData.includes('生成中')) {
-      try {
-        imageData = await generateThumbnail();
-      } catch (error) {
-        console.error('保存前生成预览图失败:', error);
-      }
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
     }
-    
-    // 保存到服务器
-    const currentContent = editedCode || generatedCode;
-    const response = await fetch('/api/share', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title,
-        description,
-        htmlContent: currentContent,
-        prompt,
-        imageData,
-        timestamp,
-      }),
-    });
+  };
 
-    if (!response.ok) {
-      throw new Error('保存失败');
-    }
-
-    const data = await response.json();
-    setShareUrl(data.shareUrl);
-    setLastSavedPrompt(prompt);
-    setLastSavedContent(currentContent);
-    
-    // 确保使用服务器返回的thumbnailUrl
-    if (data.thumbnailUrl) {
-      // 使用完整URL
-      const fullThumbnailUrl = data.thumbnailUrl.startsWith('http') 
-        ? data.thumbnailUrl 
-        : `${window.location.origin}${data.thumbnailUrl}`;
-      console.log('服务器返回的预览图URL:', fullThumbnailUrl);
-      // 更新缩略图URL，确保使用最新的服务器版本
-      setThumbnailUrl(fullThumbnailUrl);
-    }
-    
-    // 关闭加载提示
-    toast.dismiss();
-    toast.success('保存成功！');
-    
-    // 使用更安全的方式复制到剪贴板
-    const fullUrl = `${window.location.origin}${data.shareUrl}`;
+  // 修改handleSaveWebsite函数以使用新的预览图生成逻辑
+  const handleSaveWebsite = async (title: string, description: string) => {
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(fullUrl);
-        toast.success('分享链接已复制到剪贴板');
-      } else {
-        // 回退到传统方法
-        const textArea = document.createElement('textarea');
-        textArea.value = fullUrl;
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        if (successful) {
-          toast.success('分享链接已复制到剪贴板');
-        } else {
-          toast.info(`分享链接: ${fullUrl}`);
+      // 创建预览图的时间戳，确保唯一性
+      const timestamp = new Date().getTime();
+      
+      // 显示加载状态
+      toast.loading('正在保存网页...');
+      
+      // 使用之前生成的缩略图，如果没有则重新生成
+      let imageData = thumbnailUrl;
+      if (!imageData || imageData.includes('生成中')) {
+        try {
+          imageData = await generateThumbnail();
+        } catch (error) {
+          console.error('保存前生成预览图失败:', error);
         }
       }
-    } catch (clipboardError) {
-      console.error('复制到剪贴板失败:', clipboardError);
-      toast.info(`分享链接: ${fullUrl}`);
+      
+      // 确保使用当前显示的代码（优先使用编辑后的代码，如果没有编辑则使用原始生成的代码）
+      // 注意：明确使用当前正在编辑的代码，而不是使用其他变量
+      const currentContent = isEditable ? editedCode : originalCode;
+      console.log('保存网页中，使用代码长度:', currentContent.length, '编辑模式:', isEditable);
+      
+      // 保存到服务器
+      const response = await fetch('/api/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          htmlContent: currentContent,
+          prompt,
+          imageData,
+          timestamp,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('保存失败');
+      }
+
+      const data = await response.json();
+      setShareUrl(data.shareUrl);
+      setLastSavedPrompt(prompt);
+      setLastSavedContent(currentContent);
+      
+      // 构建完整的分享URL
+      const fullShareUrl = data.shareUrl?.startsWith('http') 
+        ? data.shareUrl 
+        : `${window.location.origin}${data.shareUrl}`;
+      
+      // 打印调试信息
+      console.log('保存成功，获得分享链接:', fullShareUrl);
+      
+      // 确保使用服务器返回的thumbnailUrl
+      if (data.thumbnailUrl) {
+        // 使用完整URL
+        const fullThumbnailUrl = data.thumbnailUrl.startsWith('http') 
+          ? data.thumbnailUrl 
+          : `${window.location.origin}${data.thumbnailUrl}`;
+        console.log('服务器返回的预览图URL:', fullThumbnailUrl);
+        // 更新缩略图URL，确保使用最新的服务器版本
+        setThumbnailUrl(fullThumbnailUrl);
+        
+        // 为此保存创建新的历史版本，使用服务器返回的预览图
+        const savedVersion = await createNewVersion(currentContent, title || '保存的网页', 'manual');
+        if (savedVersion) {
+          // 如果版本创建成功且有预览图，更新版本的预览图并标记为已发布
+          setVersionHistory(prev => 
+            prev.map(v => v.id === savedVersion.id 
+              ? {
+                  ...v, 
+                  thumbnail: fullThumbnailUrl, 
+                  title: title || '保存的网页',
+                  isPublished: true,
+                  shareUrl: fullShareUrl
+                } 
+              : v
+            )
+          );
+          
+          // 同时更新当前版本的ID
+          setCurrentVersionId(savedVersion.id);
+        } else {
+          // 如果没有创建新版本，则尝试更新当前版本
+          setVersionHistory(prev => 
+            prev.map(v => v.id === currentVersionId 
+              ? {
+                  ...v,
+                  isPublished: true,
+                  shareUrl: fullShareUrl
+                }
+              : v
+            )
+          );
+        }
+      }
+      
+      // 关闭加载提示
+      toast.dismiss();
+      toast.success('保存成功！');
+      
+      // 构建完整URL
+      const fullUrl = data.shareUrl?.startsWith('http') 
+        ? data.shareUrl 
+        : `${window.location.origin}${data.shareUrl}`;
+      
+      // 使用更安全的方式复制到剪贴板
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(fullUrl);
+          toast.success('分享链接已复制到剪贴板');
+          console.log('成功复制到剪贴板:', fullUrl);
+        } else {
+          // 回退到传统方法
+          const textArea = document.createElement('textarea');
+          textArea.value = fullUrl;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '0';
+          textArea.style.top = '0';
+          textArea.style.width = '2em';
+          textArea.style.height = '2em';
+          textArea.style.padding = '0';
+          textArea.style.border = 'none';
+          textArea.style.outline = 'none';
+          textArea.style.boxShadow = 'none';
+          textArea.style.background = 'transparent';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          
+          try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (successful) {
+              toast.success('分享链接已复制到剪贴板');
+              console.log('成功通过execCommand复制:', fullUrl);
+            } else {
+              toast.info(`分享链接: ${fullUrl}`);
+              console.log('无法复制，显示链接:', fullUrl);
+            }
+          } catch (clipboardError) {
+            document.body.removeChild(textArea);
+            console.error('复制到剪贴板失败:', clipboardError);
+            toast.info(`分享链接: ${fullUrl}`);
+            // 显示可点击的链接
+            toast.info(
+              <div onClick={() => window.open(fullUrl, '_blank')} className="cursor-pointer text-blue-500 hover:underline">
+                点击打开链接
+              </div>
+            );
+          }
+        }
+      } catch (err) {
+        console.error('复制到剪贴板失败:', err);
+        toast.error('复制失败，请手动复制链接');
+        if (data.shareUrl) {
+          const fullUrl = data.shareUrl.startsWith('http') 
+            ? data.shareUrl 
+            : `${window.location.origin}${data.shareUrl}`;
+          toast.info(
+            <div className="break-all">
+              {fullUrl}
+            </div>
+          );
+        }
+      }
+    } catch (error) {
+      // 关闭任何正在显示的加载提示
+      toast.dismiss();
+      console.error('保存失败:', error);
+      toast.error('保存失败，请重试');
     }
-  } catch (error) {
-    // 关闭任何正在显示的加载提示
-    toast.dismiss();
-    console.error('保存失败:', error);
-    toast.error('保存失败，请重试');
-  }
-};
+  };
 
   // 使用 getDisplayMedia API 尝试截取屏幕内容
   const captureDisplayMedia = async (): Promise<string> => {
@@ -779,6 +1188,18 @@ const handleSaveWebsite = async (title: string, description: string) => {
     }
   };
 
+  // 删除历史版本
+  const handleDeleteVersion = useCallback((versionId: string) => {
+    // 确保不删除当前正在使用的版本
+    if (versionId === currentVersionId) {
+      toast.error('无法删除当前正在使用的版本');
+      return;
+    }
+    
+    setVersionHistory(prev => prev.filter(v => v.id !== versionId));
+    toast.success('已删除历史版本');
+  }, [currentVersionId]);
+  
   return (
     <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
@@ -820,7 +1241,7 @@ const handleSaveWebsite = async (title: string, description: string) => {
               size="sm"
               className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
               disabled={!generatedCode || isGenerating}
-              onClick={downloadCode}
+              onClick={() => handleDownloadOrShare('download')}
             >
               <Download className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">Export</span>
@@ -830,7 +1251,7 @@ const handleSaveWebsite = async (title: string, description: string) => {
               size="sm"
               className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
               disabled={!generatedCode || isGenerating}
-              onClick={copyShareUrl}
+              onClick={() => handleDownloadOrShare('share')}
             >
               <Share2 className="w-4 h-4 mr-1" />
               <span className="hidden sm:inline">分享</span>
@@ -1024,14 +1445,27 @@ const handleSaveWebsite = async (title: string, description: string) => {
                   >
                     <Smartphone className="w-4 h-4" />
                   </Button>
+                  {/* 只在桌面版显示历史按钮 */}
+                  {versionHistory.length > 0 && (
+                    <Button
+                      variant={showHistory ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 ml-2 px-2 flex items-center gap-1"
+                      onClick={() => setShowHistory(!showHistory)}
+                      title={showHistory ? "隐藏历史版本" : "显示历史版本"}
+                    >
+                      <History className="w-4 h-4" />
+                      <span className="text-xs">{versionHistory.length}</span>
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
+              <div className={`flex-1 ${showHistory ? 'max-h-[calc(100%-160px)]' : ''} p-3 flex items-center justify-center overflow-hidden`}>
                 <div
                   className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
                     viewportSize === "desktop"
-                      ? "w-full h-full"
+                      ? "w-full h-[calc(100%-190px)]"
                       : viewportSize === "tablet"
                         ? "w-[768px] h-[1024px] max-h-[90%]"
                         : "w-[375px] h-[667px] max-h-[90%]"
@@ -1258,10 +1692,23 @@ const handleSaveWebsite = async (title: string, description: string) => {
                     >
                       <Smartphone className="w-4 h-4" />
                     </Button>
+                    {/* 只在桌面版显示历史按钮 */}
+                    {versionHistory.length > 0 && (
+                      <Button
+                        variant={showHistory ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 ml-2 px-2 flex items-center gap-1"
+                        onClick={() => setShowHistory(!showHistory)}
+                        title={showHistory ? "隐藏历史版本" : "显示历史版本"}
+                      >
+                        <History className="w-4 h-4" />
+                        <span className="text-xs">{versionHistory.length}</span>
+                      </Button>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex-1 p-3 flex items-center justify-center overflow-hidden">
+                <div className={`flex-1 ${showHistory ? 'max-h-[calc(100%-160px)]' : ''} p-3 flex items-center justify-center overflow-hidden`}>
                   <div
                     className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
                       viewportSize === "desktop"
@@ -1315,6 +1762,14 @@ const handleSaveWebsite = async (title: string, description: string) => {
                     )}
                   </div>
                 </div>
+                {/* 只在桌面视图显示历史编辑组件 */}
+                <EditHistory
+                  versions={versionHistory}
+                  onSelectVersion={handleSelectVersion}
+                  onDeleteVersion={handleDeleteVersion}
+                  currentVersionId={currentVersionId}
+                  isVisible={showHistory}
+                />
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
