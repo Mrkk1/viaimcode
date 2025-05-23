@@ -581,8 +581,7 @@ export function GenerationView({
     const shouldResave = !shareUrl || prompt !== lastSavedPrompt || currentContent !== lastSavedContent;
 
     if (shouldResave) {
-      // 如果需要重新保存，打开保存对话框
-      toast.info('内容已更改，需要先保存才能分享');
+      // 如果需要重新保存，直接打开保存对话框，不显示额外提示
       await handleShowSaveDialog();
       return;
     }
@@ -602,7 +601,6 @@ export function GenerationView({
         // 回退到传统方法
         const textArea = document.createElement('textarea');
         textArea.value = fullUrl;
-        // 确保文本框可见，这对一些浏览器很重要
         textArea.style.position = 'fixed';
         textArea.style.left = '0';
         textArea.style.top = '0';
@@ -614,8 +612,6 @@ export function GenerationView({
         textArea.style.boxShadow = 'none';
         textArea.style.background = 'transparent';
         document.body.appendChild(textArea);
-        
-        // 选择文本并复制
         textArea.focus();
         textArea.select();
         
@@ -626,8 +622,7 @@ export function GenerationView({
           if (successful) {
             toast.success('分享链接已复制到剪贴板');
           } else {
-            toast.info(`分享链接: ${fullUrl}`);
-            // 显示一个能点击的链接
+            // 只显示链接，不显示额外提示
             toast.info(
               <div onClick={() => window.open(fullUrl, '_blank')} className="cursor-pointer text-blue-500 hover:underline">
                 点击打开链接
@@ -637,8 +632,8 @@ export function GenerationView({
         } catch (err) {
           document.body.removeChild(textArea);
           console.error('复制失败:', err);
-          toast.error('复制失败，请手动复制链接');
-          // 显示可以手动复制的链接
+          // 只显示一次错误提示
+          toast.error('复制失败，请点击下方链接手动复制');
           toast.info(
             <div className="break-all">
               {fullUrl}
@@ -648,11 +643,12 @@ export function GenerationView({
       }
     } catch (err) {
       console.error('复制失败:', err);
-      toast.error('复制失败，请手动复制链接');
       if (shareUrl) {
         const fullUrl = shareUrl.startsWith('http') 
           ? shareUrl 
           : `${window.location.origin}${shareUrl}`;
+        // 只显示一次错误提示
+        toast.error('复制失败，请点击下方链接手动复制');
         toast.info(
           <div className="break-all">
             {fullUrl}
