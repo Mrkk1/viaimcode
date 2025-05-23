@@ -48,7 +48,7 @@ export default function LoginForm() {
       }
 
       // 设置登录成功状态和重定向地址
-      const from = searchParams.get("from") || "/";
+      const from = searchParams?.get("from") || "/";
       setRedirectTo(from);
       setLoginSuccess(true);
     } catch (error) {
