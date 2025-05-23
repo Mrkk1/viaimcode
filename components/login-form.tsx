@@ -18,12 +18,8 @@ export default function LoginForm() {
   // 处理登录成功后的操作
   useEffect(() => {
     if (loginSuccess && redirectTo) {
-      const handleSuccess = async () => {
-        await router.refresh();
-        toast.success("登录成功");
-        (router as any).push(redirectTo);
-      };
-      handleSuccess();
+      toast.success("登录成功");
+      window.location.href = redirectTo;
     }
   }, [loginSuccess, redirectTo, router]);
 
