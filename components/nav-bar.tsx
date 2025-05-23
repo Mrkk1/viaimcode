@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -11,6 +11,10 @@ interface NavBarProps {
 
 export function NavBar({ user }: NavBarProps) {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // 检查当前是否在登录或注册页面
+  const isAuthPage = pathname === '/login' || pathname === '/register';
 
   const handleLogout = async () => {
     try {
@@ -42,15 +46,13 @@ export function NavBar({ user }: NavBarProps) {
                 Beta
               </span>
             </Link>
-            {user && (
+            {user && !isAuthPage && (
               <Link
                 href="/websites"
                 className="relative px-4 py-2 text-sm font-medium text-gray-300 rounded-md transition-all duration-200 hover:text-white hover:bg-gray-800/50 group bg-gray-800/30"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  <span>Website Plaza
-                  </span>
-
+                  <span>Website Plaza</span>
                 </span>
                 <span className="absolute inset-0 transform scale-x-0 origin-left bg-gradient-to-r from-gray-700/50 to-transparent rounded-md transition-transform group-hover:scale-x-100 duration-200" />
               </Link>
@@ -58,31 +60,35 @@ export function NavBar({ user }: NavBarProps) {
           </div>
           <div className="flex items-center space-x-4">
             {user ? (
-              <>
-                <span className="text-gray-300">
-                  {user.username}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                >
-                  登出
-                </Button>
-              </>
+              !isAuthPage && (
+                <>
+                  <span className="text-gray-300">
+                    {user.username}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                  >
+                    登出
+                  </Button>
+                </>
+              )
             ) : (
-              <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    登录
-                  </Button>
-                </Link>
-                <Link href="/register">
-                  <Button variant="outline" size="sm">
-                    注册
-                  </Button>
-                </Link>
-              </>
+              !isAuthPage && (
+                <>
+                  <Link href="/login">
+                    <Button variant="ghost" size="sm">
+                      登录
+                    </Button>
+                  </Link>
+                  <Link href="/register">
+                    <Button variant="outline" size="sm">
+                      注册
+                    </Button>
+                  </Link>
+                </>
+              )
             )}
           </div>
         </div>

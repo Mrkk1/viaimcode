@@ -505,6 +505,7 @@ export function GenerationView({
     if (!newPrompt.trim() || isGenerating) return
     onRegenerateWithNewPrompt(newPrompt)
     setNewPrompt("") // Reset input field
+    setHasChanges(false)
   }
 
   // 复制分享链接
@@ -1229,7 +1230,7 @@ export function GenerationView({
             <Button
               variant="outline"
               size="sm"
-              className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
+              className="border-gray-800 text-gray-400 hover:text-gray-900 hover:bg-white h-8"
               disabled={isGenerating}
               onClick={() => window.location.reload()}
             >
@@ -1239,7 +1240,7 @@ export function GenerationView({
             <Button
               variant="outline"
               size="sm"
-              className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
+              className="border-gray-800 text-gray-400 hover:text-gray-900 hover:bg-white h-8"
               disabled={!generatedCode || isGenerating}
               onClick={() => handleDownloadOrShare('download')}
             >
@@ -1249,12 +1250,12 @@ export function GenerationView({
             <Button
               variant="outline"
               size="sm"
-              className="border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 h-8"
+              className="border-gray-800 text-gray-400 hover:text-gray-900 hover:bg-white h-8"
               disabled={!generatedCode || isGenerating}
               onClick={() => handleDownloadOrShare('share')}
             >
               <Share2 className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">分享</span>
+              <span className="hidden sm:inline">Share</span>
             </Button>
           </div>
         </div>
@@ -1326,7 +1327,7 @@ export function GenerationView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-gray-400 hover:text-white"
+                      className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
                       onClick={copyToClipboard}
                       disabled={!generatedCode || isGenerating}
                     >
@@ -1413,7 +1414,7 @@ export function GenerationView({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 mr-2 text-gray-400 hover:text-white"
+                      className="h-7 px-2 mr-2 text-gray-400 "
                       onClick={refreshPreview}
                       title="Refresh preview"
                     >
@@ -1568,7 +1569,7 @@ export function GenerationView({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 text-gray-400 hover:text-white"
+                        className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
                         onClick={copyToClipboard}
                         disabled={!generatedCode || isGenerating}
                       >
@@ -1660,7 +1661,7 @@ export function GenerationView({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 px-2 mr-2 text-gray-400 hover:text-white"
+                        className="h-7 px-2 mr-2 text-gray-400 hover:text-gray-900 hover:bg-white"
                         onClick={refreshPreview}
                         title="Refresh preview"
                       >

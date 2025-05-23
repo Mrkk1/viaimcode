@@ -33,7 +33,7 @@ export default function ClientGame({ htmlContent }: { htmlContent: string }) {
       if (prevBlobUrl.current) {
         URL.revokeObjectURL(prevBlobUrl.current);
         prevBlobUrl.current = null;
-      }
+    }
     };
   }, [htmlContent]);
 
@@ -110,7 +110,7 @@ export default function ClientGame({ htmlContent }: { htmlContent: string }) {
           style={{ width: '100vw', height: '100vh', border: 'none', background: 'black', display: 'block' }}
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
           title="Shared Game"
-        />
+    />
       )}
     </div>
   );
