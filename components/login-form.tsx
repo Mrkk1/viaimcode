@@ -18,7 +18,7 @@ export default function LoginForm() {
   // 处理登录成功后的操作
   useEffect(() => {
     if (loginSuccess && redirectTo) {
-      toast.success("登录成功");
+      toast.success("Login successful");
       window.location.href = redirectTo;
     }
   }, [loginSuccess, redirectTo, router]);
@@ -40,7 +40,7 @@ export default function LoginForm() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "登录失败");
+        throw new Error(error.message || "Login failed");
       }
 
       // 设置登录成功状态和重定向地址
@@ -48,7 +48,7 @@ export default function LoginForm() {
       setRedirectTo(from);
       setLoginSuccess(true);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "登录失败");
+      toast.error(error instanceof Error ? error.message : "Login failed");
       setLoginSuccess(false);
     } finally {
       setIsLoading(false);
@@ -58,23 +58,23 @@ export default function LoginForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="username">用户名</Label>
+        <Label htmlFor="username">Username</Label>
         <Input
           id="username"
           name="username"
           type="text"
-          placeholder="请输入用户名"
+          placeholder="Enter your username"
           required
           disabled={isLoading}
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">密码</Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           name="password"
           type="password"
-          placeholder="请输入密码"
+          placeholder="Enter your password"
           required
           disabled={isLoading}
         />
@@ -84,16 +84,16 @@ export default function LoginForm() {
         className="w-full"
         disabled={isLoading}
       >
-        {isLoading ? "登录中..." : "登录"}
+        {isLoading ? "Logging in..." : "Login"}
       </Button>
       <div className="text-center text-sm">
-        <span className="text-gray-400">还没有账号？</span>
+        <span className="text-gray-400">Don't have an account?</span>
         {" "}
         <Link
           href="/register"
           className="text-blue-500 hover:text-blue-400"
         >
-          立即注册
+          Register now
         </Link>
       </div>
     </form>

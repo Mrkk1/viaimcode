@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     // 验证密码
     if (data.password !== data.confirmPassword) {
       return NextResponse.json(
-        { message: '两次输入的密码不一致' },
+        { message: 'Passwords do not match' },
         { status: 400 }
       );
     }
@@ -18,16 +18,16 @@ export async function POST(request: NextRequest) {
     const user = await createUser(data);
 
     return NextResponse.json({
-      message: '注册成功',
+      message: 'Registration successful',
       user: {
         id: user.id,
         username: user.username,
       },
     });
   } catch (error) {
-    console.error('注册失败:', error);
+    console.error('Registration failed:', error);
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : '注册失败' },
+      { message: error instanceof Error ? error.message : 'Registration failed' },
       { status: 500 }
     );
   }

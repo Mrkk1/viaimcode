@@ -26,7 +26,7 @@ export async function createUser(data: RegisterData): Promise<User> {
     };
   } catch (error: any) {
     if (error.code === 'ER_DUP_ENTRY') {
-      throw new Error('用户名已存在');
+      throw new Error('Username already exists');
     }
     throw error;
   }
@@ -45,12 +45,12 @@ export async function verifyUser(data: LoginData): Promise<User> {
   const user = users[0];
 
   if (!user || !user.password) {
-    throw new Error('用户名或密码错误');
+    throw new Error('Username or password incorrect');
   }
 
   const isValid = await verifyPassword(data.password, user.password);
   if (!isValid) {
-    throw new Error('用户名或密码错误');
+    throw new Error('Username or password incorrect');
   }
 
   // 不返回密码

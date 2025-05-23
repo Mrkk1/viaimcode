@@ -28,27 +28,27 @@ export default function WebsitesPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        // 获取用户信息
+        // Get user info
         const userResponse = await fetch('/api/user');
         if (!userResponse.ok) {
           if (userResponse.status === 401) {
             redirect('/login');
             return;
           }
-          throw new Error('获取用户信息失败');
+          throw new Error('Failed to get user info');
         }
         const userData = await userResponse.json();
         setUser(userData);
 
-        // 获取网站列表
+        // Get website list
         const websitesResponse = await fetch('/api/websites');
         if (!websitesResponse.ok) {
-          throw new Error('获取网站列表失败');
+          throw new Error('Failed to get website list');
         }
         const websitesData = await websitesResponse.json();
         setWebsites(websitesData);
       } catch (error) {
-        console.error('加载数据失败:', error);
+        console.error('Failed to load data:', error);
       } finally {
         setIsLoading(false);
       }
@@ -64,10 +64,10 @@ export default function WebsitesPage() {
       });
 
       if (!response.ok) {
-        throw new Error('删除失败');
+        throw new Error('Failed to delete');
       }
 
-      // 更新列表
+      // Update list
       setWebsites(websites.filter(website => website.id !== id));
     } catch (error) {
       throw error;
@@ -86,7 +86,8 @@ export default function WebsitesPage() {
         <Button asChild className="w-full sm:w-auto">
           <Link href="/" className="flex items-center justify-center gap-2">
             <Plus className="w-4 h-4" />
-            创建新网页
+            Create new website
+
           </Link>
         </Button>
       </div>

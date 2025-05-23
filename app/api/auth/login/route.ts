@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     // 创建响应
     const response = NextResponse.json({
-      message: '登录成功',
+      message: 'Login successful',
       user: {
         id: user.id,
         username: user.username,
@@ -30,16 +30,16 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 60 * 60 * 24, // 24 小时
+      maxAge: 60 * 60 * 24, // 24 hours
       domain: process.env.NODE_ENV === 'production' ? '.weilai.ai' : undefined,
       path: '/'
     });
 
     return response;
   } catch (error) {
-    console.error('登录失败:', error);
+    console.error('Login failed:', error);
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : '登录失败' },
+      { message: error instanceof Error ? error.message : 'Login failed' },
       { status: 401 }
     );
   }

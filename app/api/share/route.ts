@@ -7,59 +7,54 @@ import { uploadImage } from '@/lib/image-upload';
 
 export async function POST(request: NextRequest) {
   try {
-    // 获取当前用户
+    // Get current user
     const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
-        { error: '请先登录' },
+        { error: 'Please login first' },
         { status: 401 }
       );
     }
 
     const { title, description, htmlContent, prompt, imageData, timestamp } = await request.json();
     
-    // 验证必要字段
+    // Validate required fields
     if (!htmlContent) {
       return NextResponse.json(
-        { error: '网页内容不能为空' },
+        { error: 'Website content cannot be empty' },
         { status: 400 }
       );
     }
     
-    console.log('收到图片数据，时间戳:', timestamp, '长度:', imageData ? imageData.length : 0);
+    console.log('Received image data, timestamp:', timestamp, 'length:', imageData ? imageData.length : 0);
     
-    // 保存图片并获取相对路径
+    // Save image and get relative path
     let thumbnailUrl = '';
     try {
-      // 确保我们总是使用新传入的图片数据，而不是重用旧的
       if (imageData && imageData.length > 1000) {
-        // 使用时间戳作为文件名的一部分，确保唯一性
         const filename = `image-${timestamp || Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
         
-        // 直接使用uploadImage，并强制指定使用OSS (第三个参数为true)
-        // 在生产环境中这会上传到OSS，在开发环境也强制使用OSS
         thumbnailUrl = await uploadImage(imageData, filename, true);
-        console.log('图片已上传到OSS:', thumbnailUrl);
+        console.log('Image uploaded to OSS:', thumbnailUrl);
       } else {
-        console.error('无效的图片数据');
+        console.error('Invalid image data');
       }
     } catch (imageError) {
-      console.error('保存图片失败:', imageError);
+      console.error('Failed to save image:', imageError);
     }
     
-    // 保存网站数据
+    // Save website data
     const savedWebsite = await saveWebsite({
       userId: user.userId,
-      title: title || '未命名网站',
-      description: description || '无描述',
+      title: title || 'Untitled Website',
+      description: description || 'No description',
       htmlContent,
       prompt: prompt || '',
       thumbnailUrl,
     }, user.userId);
     
-    console.log('网站已保存，ID:', savedWebsite.id, '预览图URL:', thumbnailUrl);
+    console.log('Website saved, ID:', savedWebsite.id, 'Preview URL:', thumbnailUrl);
     
-    // 返回保存结果，包含用于分享的 ID 和图片 URL
     return NextResponse.json({
       success: true,
       id: savedWebsite.id,
@@ -68,9 +63,9 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('保存网页时出错:', error);
+    console.error('Error saving website:', error);
     return NextResponse.json(
-      { error: '保存网页失败' },
+      { error: 'Failed to save website' },
       { status: 500 }
     );
   }

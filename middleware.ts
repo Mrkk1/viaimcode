@@ -54,7 +54,7 @@ export async function middleware(request: NextRequest) {
     // 其他 API 路由需要验证 token
     if (!token) {
       return new NextResponse(
-        JSON.stringify({ error: '请先登录' }),
+        JSON.stringify({ error: 'Please login first' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
     const user = await verifyAuth(token);
     if (!user) {
       return new NextResponse(
-        JSON.stringify({ error: '登录已过期，请重新登录' }),
+        JSON.stringify({ error: 'Session expired, please login again' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }

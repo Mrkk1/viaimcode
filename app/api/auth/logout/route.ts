@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 
 export async function POST() {
-  const response = NextResponse.json({ message: '登出成功' });
+  const response = NextResponse.json({ message: 'Logout successful' });
   
-  // 使用与登录时相同的 cookie 配置
+  // Clear cookie with same settings as login
   response.cookies.delete({
     name: 'token',
     httpOnly: true,

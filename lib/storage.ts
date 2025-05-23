@@ -49,12 +49,12 @@ export async function saveWebsite(
     
     const savedWebsite = await getWebsiteById(id);
     if (!savedWebsite) {
-      throw new Error('保存网页失败');
+      throw new Error('Failed to save website');
     }
     
     return savedWebsite;
   } catch (error) {
-    console.error('保存网页失败:', error);
+    console.error('Failed to save website:', error);
     throw error;
   }
 }

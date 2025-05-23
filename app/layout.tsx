@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "ViaimCode",
-  description: "使用 AI 生成网页 | AI Website Generator",
+  description: "AI Website Generator",
 }
 
 // 检查是否是share路由

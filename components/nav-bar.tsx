@@ -24,14 +24,14 @@ export function NavBar({ user }: NavBarProps) {
       });
 
       if (!response.ok) {
-        throw new Error("登出失败");
+        throw new Error("Logout failed");
       }
 
-      toast.success("已登出");
+      toast.success("Logged out successfully");
       
       window.location.href = '/login';
     } catch (error) {
-      toast.error("登出失败");
+      toast.error("Logout failed");
     }
   };
 
@@ -70,7 +70,7 @@ export function NavBar({ user }: NavBarProps) {
                     size="sm"
                     onClick={handleLogout}
                   >
-                    登出
+                    Logout
                   </Button>
                 </>
               )
@@ -79,12 +79,12 @@ export function NavBar({ user }: NavBarProps) {
                 <>
                   <Link href="/login">
                     <Button variant="ghost" size="sm">
-                      登录
+                      Login
                     </Button>
                   </Link>
                   <Link href="/register">
                     <Button variant="outline" size="sm">
-                      注册
+                      Register
                     </Button>
                   </Link>
                 </>

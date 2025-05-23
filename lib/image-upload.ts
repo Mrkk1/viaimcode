@@ -7,91 +7,91 @@ const writeFileAsync = promisify(fs.writeFile);
 const readFileAsync = promisify(fs.readFile);
 const mkdirAsync = promisify(fs.mkdir);
 
-// 本地临时保存目录，用于开发环境
+// Local temporary save directory for development environment
 const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 
-// 确保上传目录存在
+// Ensure upload directory exists
 const ensureUploadDir = async () => {
   try {
     await mkdirAsync(UPLOAD_DIR, { recursive: true });
   } catch (error) {
-    // 目录已存在或创建失败
-    console.error('创建上传目录失败:', error);
+    // Directory already exists or failed to create
+    console.error('Failed to create upload directory:', error);
   }
 };
 
-// 上传图片到OSS或本地（开发环境）
+// Upload image to OSS or local (for development environment)
 export const uploadImage = async (
   imageData: Buffer | string, 
   originalName: string = 'image.png',
   useOss: boolean = process.env.NODE_ENV === 'production'
 ): Promise<string> => {
   try {
-    console.log(`开始处理图片上传: 文件名=${originalName}, 使用OSS=${useOss}, 环境=${process.env.NODE_ENV}`);
+    console.log(`Start processing image upload: file name=${originalName}, use OSS=${useOss}, environment=${process.env.NODE_ENV}`);
     
     let buffer: Buffer;
 
-    // 如果输入是Base64字符串，转换为Buffer
+    // If input is a Base64 string, convert to Buffer
     if (typeof imageData === 'string') {
-      console.log('转换Base64字符串为Buffer...');
+      console.log('Converting Base64 string to Buffer...');
       if (imageData.startsWith('data:image')) {
         const base64Data = imageData.split(',')[1];
         buffer = Buffer.from(base64Data, 'base64');
       } else {
         buffer = Buffer.from(imageData, 'base64');
       }
-      console.log(`Base64转换完成，图片大小: ${buffer.length}字节`);
+      console.log(`Base64 conversion completed, image size: ${buffer.length} bytes`);
     } else {
       buffer = imageData;
-      console.log(`直接使用Buffer，图片大小: ${buffer.length}字节`);
+      console.log(`Using Buffer directly, image size: ${buffer.length} bytes`);
     }
 
-    // 生成文件名
+    // Generate file name
     const fileName = generateUniqueFileName(originalName);
-    console.log(`生成唯一文件名: ${fileName}`);
+    console.log(`Generated unique file name: ${fileName}`);
 
-    // 生产环境或强制指定: 使用阿里云OSS
+    // Production environment or forced: Use Aliyun OSS
     if (useOss) {
-      console.log('使用阿里云OSS存储图片...');
+      console.log('Using Aliyun OSS to store image...');
       const ossUrl = await uploadToOss(buffer, fileName);
-      console.log(`图片已上传到OSS: ${ossUrl}`);
+      console.log(`Image uploaded to OSS: ${ossUrl}`);
       return ossUrl;
     } 
-    // 开发环境: 保存到本地
+    // Development environment: Save to local
     else {
-      console.log('使用本地文件系统存储图片...');
+      console.log('Using local file system to store image...');
       await ensureUploadDir();
       const filePath = path.join(UPLOAD_DIR, path.basename(fileName));
       await writeFileAsync(filePath, buffer);
       const relativePath = `/uploads/${path.basename(fileName)}`;
-      console.log(`图片已保存到本地: ${relativePath}`);
+      console.log(`Image saved to local: ${relativePath}`);
       
-      // 返回相对URL路径
+      // Return relative URL path
       return relativePath;
     }
   } catch (error) {
-    console.error('图片上传失败:', error);
-    throw new Error(`图片上传失败: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('Image upload failed:', error);
+    throw new Error(`Image upload failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
 
-// 获取图片（用于从本地读取或远程获取）
+// Get image (for reading from local or remote)
 export const getImage = async (imagePath: string): Promise<Buffer | null> => {
   try {
-    // 如果是完整的URL，直接返回null（客户端会直接访问URL）
+    // If it's a complete URL, return null (client will directly access URL)
     if (imagePath.startsWith('http')) {
-      console.log(`图片路径是URL，客户端将直接访问: ${imagePath}`);
+      console.log(`Image path is URL, client will directly access: ${imagePath}`);
       return null;
     }
 
-    // 从本地读取文件
-    console.log(`从本地读取图片: ${imagePath}`);
+    // Read from local file
+    console.log(`Reading image from local: ${imagePath}`);
     const fullPath = path.join(process.cwd(), 'public', imagePath);
     const buffer = await readFileAsync(fullPath);
-    console.log(`成功读取本地图片，大小: ${buffer.length}字节`);
+    console.log(`Successfully read local image, size: ${buffer.length} bytes`);
     return buffer;
   } catch (error) {
-    console.error('获取图片失败:', error);
+    console.error('Failed to get image:', error);
     return null;
   }
 }; 

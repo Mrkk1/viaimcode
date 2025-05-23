@@ -117,9 +117,9 @@ const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>保存网页</DialogTitle>
+          <DialogTitle>Save Website</DialogTitle>
           <DialogDescription>
-            输入网页的标题和描述以保存
+            Enter the title and description to save the website
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -127,53 +127,53 @@ const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) 
             {!imageLoaded && !imageError && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <Loader2 className="w-8 h-8 animate-spin text-white" />
-                <span className="ml-2 text-sm text-gray-300">生成预览图中...</span>
+                <span className="ml-2 text-sm text-gray-300">Generating preview...</span>
               </div>
             )}
             {imageError && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800">
-                <div className="text-red-400 mb-2">预览图生成失败</div>
-                <div className="text-xs text-gray-400">将使用默认预览图</div>
+                <div className="text-red-400 mb-2">Failed to generate preview</div>
+                <div className="text-xs text-gray-400">Will use default preview image</div>
               </div>
             )}
             {imgSrc && (
               <img 
                 src={imgSrc} 
-                alt="网页预览" 
+                alt="Website Preview" 
                 className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
                 onLoad={() => {
                   setImageLoaded(true);
                 }}
                 onError={(e) => {
-                  console.error('预览图加载失败:', e);
+                  console.error('Failed to load preview:', e);
                   setImageError(true);
-                  setImageLoaded(true); // 即使失败也要隐藏加载状态
+                  setImageLoaded(true);
                 }}
               />
             )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="title">标题</Label>
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="输入网页标题"
+              placeholder="Enter website title"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="description">描述</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="输入网页描述"
+              placeholder="Enter website description"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>取消</Button>
-          <Button onClick={handleSave}>保存</Button>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -316,7 +316,7 @@ export function GenerationView({
       if (!isGenerating && generationComplete) {
         // 使用setTimeout避免初始化时的循环依赖问题
         setTimeout(() => {
-          createNewVersion(generatedCode, "AI生成版本", 'ai');
+          createNewVersion(generatedCode, "AI Generated Version", 'ai');
         }, 100);
       }
     }
@@ -426,7 +426,7 @@ export function GenerationView({
         timestamp: new Date(),
         thumbnail,
         code,
-        title: title || `版本 ${versionHistory.length + 1}`,
+        title: title || `Version ${versionHistory.length + 1}`,
         isPublished: false,  // 初始状态为未发布
         shareUrl: "",  // 初始无分享链接
         type: type as 'ai' | 'manual'
@@ -455,7 +455,7 @@ export function GenerationView({
     setHasChanges(false)
     
     // 保存时创建新版本，标记为手动保存类型
-    createNewVersion(editedCode, `手动保存版本 ${versionHistory.length + 1}`, 'manual');
+    createNewVersion(editedCode, `Manual Save Version ${versionHistory.length + 1}`, 'manual');
   }
 
   // Function to copy the generated code to clipboard
@@ -952,7 +952,7 @@ export function GenerationView({
       const timestamp = new Date().getTime();
       
       // 显示加载状态
-      toast.loading('正在保存网页...');
+      toast.loading('Saving website...');
       
       // 使用之前生成的缩略图，如果没有则重新生成
       let imageData = thumbnailUrl;
@@ -1013,7 +1013,7 @@ export function GenerationView({
         setThumbnailUrl(fullThumbnailUrl);
         
         // 为此保存创建新的历史版本，使用服务器返回的预览图
-        const savedVersion = await createNewVersion(currentContent, title || '保存的网页', 'manual');
+        const savedVersion = await createNewVersion(currentContent, title || 'Untitled Website', 'manual');
         if (savedVersion) {
           // 如果版本创建成功且有预览图，更新版本的预览图并标记为已发布
           setVersionHistory(prev => 
@@ -1021,7 +1021,7 @@ export function GenerationView({
               ? {
                   ...v, 
                   thumbnail: fullThumbnailUrl, 
-                  title: title || '保存的网页',
+                  title: title || 'Untitled Website',
                   isPublished: true,
                   shareUrl: fullShareUrl
                 } 

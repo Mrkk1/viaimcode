@@ -22,7 +22,7 @@ export default function RegisterForm() {
     const confirmPassword = formData.get("confirmPassword") as string;
 
     if (password !== confirmPassword) {
-      toast.error("两次输入的密码不一致");
+      toast.error("Passwords do not match");
       setIsLoading(false);
       return;
     }
@@ -36,13 +36,13 @@ export default function RegisterForm() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "注册失败");
+        throw new Error(error.message || "Registration failed");
       }
 
-      toast.success("注册成功");
+      toast.success("Registration successful");
       router.push("/login");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "注册失败");
+      toast.error(error instanceof Error ? error.message : "Registration failed");
     } finally {
       setIsLoading(false);
     }
@@ -51,34 +51,34 @@ export default function RegisterForm() {
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="username">用户名</Label>
+        <Label htmlFor="username">Username</Label>
         <Input
           id="username"
           name="username"
           type="text"
-          placeholder="请输入用户名"
+          placeholder="Enter your username"
           required
           disabled={isLoading}
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">密码</Label>
+        <Label htmlFor="password">Password</Label>
         <Input
           id="password"
           name="password"
           type="password"
-          placeholder="请输入密码"
+          placeholder="Enter your password"
           required
           disabled={isLoading}
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">确认密码</Label>
+        <Label htmlFor="confirmPassword">Confirm Password</Label>
         <Input
           id="confirmPassword"
           name="confirmPassword"
           type="password"
-          placeholder="请再次输入密码"
+          placeholder="Confirm your password"
           required
           disabled={isLoading}
         />
@@ -88,16 +88,16 @@ export default function RegisterForm() {
         className="w-full"
         disabled={isLoading}
       >
-        {isLoading ? "注册中..." : "注册"}
+        {isLoading ? "Registering..." : "Register"}
       </Button>
       <div className="text-center text-sm">
-        <span className="text-gray-400">已有账号？</span>
+        <span className="text-gray-400">Already have an account?</span>
         {" "}
         <Link
           href="/login"
           className="text-blue-500 hover:text-blue-400"
         >
-          立即登录
+          Login now
         </Link>
       </div>
     </form>
