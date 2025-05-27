@@ -11,7 +11,7 @@ const PixelAnimation = dynamic(
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <div className="min-h-[calc(100vh-61px)]  flex items-center justify-center bg-gray-900">
       <PixelAnimation />
       <div className="max-w-md w-full space-y-8 p-8 bg-gray-800/80 rounded-lg shadow-lg backdrop-blur-sm relative z-10">
         <div className="text-center">

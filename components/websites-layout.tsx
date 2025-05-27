@@ -6,7 +6,7 @@ interface WebsitesLayoutProps {
 
 export function WebsitesLayout({ children }: WebsitesLayoutProps) {
   return (
-    <div className="container mx-auto py-8" style={{ marginTop: '61px' }}>
+    <div className="container mx-auto py-8" >
       {children}
     </div>
   );

@@ -7,6 +7,7 @@ import { WebsiteItem } from '@/components/website-item';
 import { WebsitesLayout } from '@/components/websites-layout';
 import { Plus, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { LoadingScreen } from '@/components/loading-screen';
 
 interface User {
   userId: string;
@@ -74,53 +75,79 @@ export default function WebsitesPage() {
     }
   };
 
+  const handleUpdate = async (id: string, data: { title: string; description: string }) => {
+    try {
+      const response = await fetch(`/api/websites/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update');
+      }
+
+      // Update list
+      setWebsites(websites.map(website => 
+        website.id === id 
+          ? { ...website, ...data }
+          : website
+      ));
+    } catch (error) {
+      throw error;
+    }
+  };
+
   if (!user && !isLoading) {
     redirect('/login');
   }
 
   return (
     <WebsitesLayout>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <h1 className="text-3xl font-bold">Website Plaza
-        </h1>
-        <Button asChild className="w-full sm:w-auto">
-          <Link href="/" className="flex items-center justify-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create new website
-
-          </Link>
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3  gap-6">
-        {isLoading ? (
-          <div className="text-center py-12 col-span-full">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">加载中...</p>
-          </div>
-        ) : websites.length > 0 ? (
-          websites.map((website) => (
-            <div key={website.id} className="flex justify-center" style={{width: '100%'}}>
-              <WebsiteItem 
-                website={website} 
-                onDelete={handleDelete}
-              />
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg col-span-full">
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              还没有保存的网页
-            </p>
-            <Button asChild>
+      {isLoading ? (
+        <LoadingScreen />
+      ) : (
+        <>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <h1 className="text-3xl font-bold">Website Plaza
+            </h1>
+            <Button asChild className="w-full sm:w-auto">
               <Link href="/" className="flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" />
-                立即创建
+                Create
               </Link>
             </Button>
           </div>
-        )}
-      </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3  gap-6">
+            {websites.length > 0 ? (
+              websites.map((website) => (
+                <div key={website.id} className="flex justify-center" style={{width: '100%'}}>
+                  <WebsiteItem 
+                    website={website} 
+                    onDelete={handleDelete}
+                    onUpdate={handleUpdate}
+                  />
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12 border border-dashed border-gray-200 dark:border-gray-800 rounded-lg col-span-full">
+                <p className="text-gray-500 dark:text-gray-400 mb-4">
+                  No saved websites
+                </p>
+                <Button asChild>
+                  <Link href="/" className="flex items-center justify-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Create now
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </WebsitesLayout>
   );
 } 

@@ -5,9 +5,13 @@ import { LoadingScreen } from "@/components/loading-screen"
 import { WelcomeView } from "@/components/welcome-view"
 import { GenerationView } from "@/components/generation-view"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
-import { toast, Toaster } from "sonner"
+import { toast } from "sonner"
 import { getCurrentUser } from "@/lib/auth"
 import Link from "next/link"
+import { IncrementalEditor } from "@/components/incremental-editor"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { HistoryVersion } from "@/components/generation-view"
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
@@ -26,6 +30,9 @@ export default function Home() {
   const [user, setUser] = useState<{ userId: string; username: string } | null>(null)
   const [continuationAttempts, setContinuationAttempts] = useState(0)
   const MAX_CONTINUATION_ATTEMPTS = 3
+  const [useIncrementalMode, setUseIncrementalMode] = useState(false)
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>([])
 
   // 检查生成的代码是否完整
   const isCodeComplete = (code: string) => {
@@ -50,17 +57,43 @@ export default function Home() {
           provider: selectedProvider,
           maxTokens,
           customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
-            selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to generate complete, production-ready HTML code based on the user's requirements.
+            selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI specializing in modern, beautiful web interfaces. Your task is to generate complete, production-ready HTML code using Tailwind CSS.
 
 First, before writing any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover:
 1. Your interpretation of the user's requirements
-2. Planned HTML structure and components
-3. CSS styling approach
-4. Any JavaScript functionality needed
-5. Considerations for responsiveness and browser compatibility
+2. Planned HTML structure and semantic elements
+3. Tailwind CSS classes for styling and layout
+4. Color scheme and design system choices
+5. JavaScript functionality and interactivity
+6. Responsive design strategy (mobile-first approach)
+7. Accessibility considerations
 
-Only after this complete <think> block, proceed to output the code. The code MUST be complete and self-contained.
-IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>. Ensure the generated CSS and JavaScript are directly embedded in the HTML file, unless the CDN consideration in your <think> block justifies linking to an external CDN for a specific library/framework.` : null,
+After the <think> block, generate a complete HTML file with these requirements:
+
+MANDATORY INCLUSIONS:
+1. Include Tailwind CSS via CDN in the <head>:
+   <script src="https://cdn.tailwindcss.com"></script>
+2. Use semantic HTML5 elements (header, nav, main, section, article, footer, etc.)
+3. Implement a mobile-first responsive design using Tailwind's responsive prefixes (sm:, md:, lg:, xl:)
+4. Use modern Tailwind utility classes for all styling - NO custom CSS unless absolutely necessary
+
+DESIGN REQUIREMENTS:
+1. Create a visually appealing, modern design with:
+   - Proper spacing using Tailwind's spacing scale (p-4, m-8, gap-6, etc.)
+   - Beautiful typography (text-xl, font-semibold, leading-relaxed, etc.)
+   - Smooth transitions (transition-all, duration-300, ease-in-out)
+   - Hover effects on interactive elements (hover:scale-105, hover:bg-opacity-90, etc.)
+   - Focus states for accessibility (focus:outline-none, focus:ring-2, etc.)
+2. Use a cohesive color scheme with Tailwind's color palette
+3. Include subtle shadows and rounded corners where appropriate (shadow-lg, rounded-xl)
+4. Ensure proper contrast ratios for text readability
+
+INTERACTIVITY:
+1. Add smooth animations and micro-interactions where appropriate
+2. Include proper ARIA labels for accessibility
+3. Make forms and buttons fully interactive with proper states
+
+IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.` : null,
         }),
       });
 
@@ -154,6 +187,35 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
     setShowGenerationView(true);
     setContinuationAttempts(0);
 
+    // 如果用户已登录，创建新项目
+    if (user) {
+      try {
+        const response = await fetch('/api/projects', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: prompt.slice(0, 100) + (prompt.length > 100 ? '...' : ''), // 使用prompt的前100个字符作为标题
+            description: prompt,
+            prompt: prompt,
+            model: selectedModel,
+            provider: selectedProvider,
+          }),
+        });
+
+        if (response.ok) {
+          const project = await response.json();
+          setCurrentProjectId(project.id);
+          console.log('项目创建成功，ID:', project.id);
+        } else {
+          console.error('创建项目失败');
+        }
+      } catch (error) {
+        console.error('创建项目时出错:', error);
+      }
+    }
+
     await generateCode(prompt);
   };
 
@@ -185,16 +247,26 @@ ${newPrompt}
           provider: selectedProvider,
           maxTokens,
           customSystemPrompt: selectedSystemPrompt === 'custom' ? customSystemPrompt :
-            selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI. Your task is to modify the existing HTML code based on the user's new requirements.
+            selectedSystemPrompt === 'thinking' ? `You are an expert web developer AI specializing in modern, beautiful web interfaces. Your task is to modify the existing HTML code based on the user's new requirements while maintaining the Tailwind CSS design system.
 
 First, before modifying any code, you MUST articulate your detailed thinking process. Enclose this entire process within <think> and </think> tags. This thinking process should cover:
 1. Your interpretation of the user's new requirements
-2. Analysis of the existing code structure
-3. Planned modifications and their impact
-4. Strategy for maintaining consistency with the existing code
+2. Analysis of the existing code structure and Tailwind classes
+3. Planned modifications and their visual impact
+4. Strategy for maintaining design consistency
+5. Any new Tailwind utilities needed
+6. Responsive design considerations for the changes
 
-Only after this complete <think> block, proceed to output the modified code. Keep the existing code structure intact and only modify the necessary parts.
-IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.` : null,
+When modifying the code:
+1. Preserve the existing Tailwind CSS setup and design system
+2. Use Tailwind utility classes for all new styling
+3. Maintain responsive breakpoints and mobile-first approach
+4. Keep the same color scheme unless specifically asked to change it
+5. Ensure new elements follow the existing design patterns
+6. Add smooth transitions for any new interactive elements
+7. Maintain accessibility standards with proper ARIA labels
+
+IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.` : null,
         }),
       });
 
@@ -303,14 +375,43 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
     return () => clearTimeout(timer)
   }, [])
 
+  // 加载项目版本历史
+  useEffect(() => {
+    const loadVersionHistory = async () => {
+      if (currentProjectId && user) {
+        try {
+          const response = await fetch(`/api/projects/${currentProjectId}/versions`);
+          if (response.ok) {
+            const versions = await response.json();
+            // 转换为HistoryVersion格式
+            const historyVersions: HistoryVersion[] = versions.map((v: any) => ({
+              id: v.id,
+              timestamp: new Date(v.createdAt),
+              thumbnail: v.thumbnail || '',
+              code: v.code,
+              title: v.title,
+              isPublished: v.isPublished,
+              shareUrl: v.shareUrl,
+              type: v.type
+            }));
+            setVersionHistory(historyVersions);
+          }
+        } catch (error) {
+          console.error('加载版本历史失败:', error);
+        }
+      }
+    };
+
+    loadVersionHistory();
+  }, [currentProjectId, user]);
+
   if (isLoading) {
     return <LoadingScreen />
   }
 
   if (!user) {
     return (
-      <div className="min-h-[100vh] bg-black">
-        <Toaster position="top-right" />
+      <div className=" bg-black">
         {showGenerationView ? (
           <GenerationView
             prompt={prompt}
@@ -323,6 +424,8 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
             onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}
             thinkingOutput={thinkingOutput}
             isThinking={isThinking}
+            projectId={currentProjectId}
+            initialVersions={versionHistory}
           />
         ) : (
           <WelcomeView
@@ -347,27 +450,44 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
 
   if (showGenerationView) {
     return (
-      <div className="min-h-[100vh] bg-black">
-        <Toaster position="top-right" />
-        <GenerationView
-          prompt={prompt}
-          setPrompt={setPrompt}
-          model={selectedModel}
-          provider={selectedProvider}
-          generatedCode={generatedCode}
-          isGenerating={isGenerating}
-          generationComplete={generationComplete}
-          onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}
-          thinkingOutput={thinkingOutput}
-          isThinking={isThinking}
-        />
+      <div className=" bg-background">
+        <div className="  ">
+          
+          {isThinking && thinkingOutput && (
+            <ThinkingIndicator thinkingOutput={thinkingOutput} isThinking={isThinking} />
+          )}
+          
+          {useIncrementalMode && generationComplete ? (
+            <IncrementalEditor
+              initialCode={generatedCode}
+              model={selectedModel}
+              provider={selectedProvider}
+              onCodeUpdate={setGeneratedCode}
+              maxTokens={maxTokens}
+            />
+          ) : (
+            <GenerationView
+              prompt={prompt}
+              setPrompt={setPrompt}
+              model={selectedModel}
+              provider={selectedProvider}
+              generatedCode={generatedCode}
+              isGenerating={isGenerating}
+              generationComplete={generationComplete}
+              onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}
+              thinkingOutput={thinkingOutput}
+              isThinking={isThinking}
+              projectId={currentProjectId}
+              initialVersions={versionHistory}
+            />
+          )}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-[100vh] bg-black">
-      <Toaster position="top-right" />
+    <div className=" bg-black">
       <WelcomeView
         prompt={prompt}
         setPrompt={setPrompt}

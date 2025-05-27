@@ -45,6 +45,8 @@ interface GenerationViewProps {
   onRegenerateWithNewPrompt: (newPrompt: string) => void
   thinkingOutput?: string
   isThinking?: boolean
+  projectId?: string | null
+  initialVersions?: HistoryVersion[]
 }
 
 interface SaveDialogProps {
@@ -190,7 +192,9 @@ export function GenerationView({
   generationComplete,
   onRegenerateWithNewPrompt,
   thinkingOutput = "",
-  isThinking = false
+  isThinking = false,
+  projectId,
+  initialVersions = []
 }: GenerationViewProps) {
   const [viewportSize, setViewportSize] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const [copySuccess, setCopySuccess] = useState(false)
@@ -206,9 +210,17 @@ export function GenerationView({
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [thumbnailUrl, setThumbnailUrl] = useState<string>("")
   const [showHistory, setShowHistory] = useState(false)
-  const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>([])
+  const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>(initialVersions)
   const [currentVersionId, setCurrentVersionId] = useState<string>("")
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const isInitialMount = useRef(true)
+  const previousGeneratedCode = useRef(generatedCode)
+  const versionHistoryRef = useRef<HistoryVersion[]>(versionHistory)
+
+  // 同步更新 versionHistoryRef
+  useEffect(() => {
+    versionHistoryRef.current = versionHistory;
+  }, [versionHistory]);
 
   // Previous preview content for transition effect
   const prevContentRef = useRef<string>("")
@@ -302,25 +314,64 @@ export function GenerationView({
     []
   );
 
-  // Update editedCode and originalCode when generatedCode changes
+  // 监听生成的代码变化，并在生成完成时创建新版本
   useEffect(() => {
-    setEditedCode(generatedCode)
-    setOriginalCode(generatedCode)
-    setHasChanges(false)
-
-    // Update preview content with debounce
+    console.log('useEffect triggered:', {
+      hasGeneratedCode: !!generatedCode,
+      generatedCodeLength: generatedCode?.length || 0,
+      isGenerating,
+      generationComplete,
+      isInitialMount: isInitialMount.current,
+      previousCodeLength: previousGeneratedCode.current?.length || 0
+    });
+    
     if (generatedCode) {
-      debouncedUpdatePreview(generatedCode);
+      setOriginalCode(generatedCode)
+      setEditedCode(generatedCode)
+      debouncedUpdatePreview(generatedCode)
       
-      // 重新生成代码时创建新的历史版本
-      if (!isGenerating && generationComplete) {
-        // 使用setTimeout避免初始化时的循环依赖问题
-        setTimeout(() => {
-          createNewVersion(generatedCode, "AI Generated Version", 'ai');
-        }, 100);
+      // 只在生成完成且代码不为空时创建版本
+      if (generationComplete && !isGenerating && generatedCode.trim() !== '') {
+        console.log('生成已完成，检查是否需要创建版本');
+        
+        // 检查是否是新生成的代码（不在现有版本历史中）
+        const isNewCode = !versionHistory.some(v => v.code === generatedCode);
+        console.log('是否是新代码:', isNewCode);
+        
+        if (isNewCode) {
+          // 如果是从项目详情页加载的，且已有初始版本，则不创建新版本
+          const shouldSkip = isInitialMount.current && initialVersions.length > 0;
+          console.log('是否应该跳过创建:', shouldSkip, {
+            isInitialMount: isInitialMount.current,
+            initialVersionsLength: initialVersions.length
+          });
+          
+          if (!shouldSkip) {
+            // 延迟创建版本，确保所有状态都已更新
+            setTimeout(() => {
+              console.log('准备创建AI生成版本，代码长度:', generatedCode.length);
+              createNewVersion(generatedCode, "AI Generated Version", 'ai');
+            }, 1000); // 延迟1秒
+          }
+        }
+      } else if (generatedCode !== previousGeneratedCode.current) {
+        console.log('代码已更改但不满足创建版本的条件:', {
+          generationComplete,
+          isGenerating,
+          codeNotEmpty: generatedCode.trim() !== ''
+        });
       }
+      
+      // 更新之前的代码引用
+      previousGeneratedCode.current = generatedCode;
     }
-  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete])
+    
+    // 标记初始加载已完成
+    if (isInitialMount.current && generatedCode && generationComplete) {
+      console.log('初始加载完成，设置isInitialMount为false');
+      isInitialMount.current = false;
+    }
+  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, versionHistory, initialVersions])
 
   // Check if changes have been made and update preview content
   useEffect(() => {
@@ -410,14 +461,71 @@ export function GenerationView({
   
   // 创建新的历史版本
   const createNewVersion = useCallback(async (code: string, title?: string, type: string = 'manual') => {
+    console.log('createNewVersion 被调用:', { 
+      codeLength: code.length, 
+      title, 
+      type,
+      hasProjectId: !!projectId,
+      currentVersionCount: versionHistoryRef.current.length
+    });
+    
     try {
       // 生成缩略图
-      let thumbnail = thumbnailUrl;
+      let thumbnail = '';
       
-      // 如果没有缩略图或者使用的是之前的缩略图，重新生成
-      if (!thumbnail || versionHistory.some(v => v.thumbnail === thumbnail)) {
-        // 直接使用generateThumbnail函数
-        thumbnail = await generateThumbnail();
+      console.log('需要生成新的缩略图');
+      // 检查 generateThumbnail 是否存在
+      if (typeof generateThumbnail !== 'function') {
+        console.error('generateThumbnail 函数未定义！');
+        // 使用默认缩略图
+        const canvas = document.createElement('canvas');
+        canvas.width = 1200;
+        canvas.height = 630;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '48px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('AI Generated', canvas.width / 2, canvas.height / 2);
+          thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+        }
+      } else {
+        // 直接使用generateThumbnail函数，传入当前要保存的代码
+        thumbnail = await generateThumbnail(code);
+        console.log('缩略图生成完成，大小:', thumbnail.length);
+      }
+      
+      // 如果有projectId，创建项目版本
+      if (projectId) {
+        try {
+          const versionCount = versionHistoryRef.current.length;
+          const response = await fetch(`/api/projects/${projectId}/versions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              code,
+              thumbnail,
+              type,
+              title: title || `Version ${versionCount + 1}`,
+              description: prompt,
+            }),
+          });
+
+          if (response.ok) {
+            const versionData = await response.json();
+            console.log('项目版本创建成功:', versionData.id);
+          } else {
+            console.error('创建项目版本失败，状态码:', response.status);
+          }
+        } catch (error) {
+          console.error('创建项目版本失败:', error);
+        }
+      } else {
+        console.log('没有projectId，只在前端创建版本');
       }
       
       // 创建新版本对象
@@ -426,28 +534,33 @@ export function GenerationView({
         timestamp: new Date(),
         thumbnail,
         code,
-        title: title || `Version ${versionHistory.length + 1}`,
+        title: title || `Version ${versionHistoryRef.current.length + 1}`,
         isPublished: false,  // 初始状态为未发布
         shareUrl: "",  // 初始无分享链接
         type: type as 'ai' | 'manual'
       };
       
+      console.log('创建新版本对象:', newVersion.id, newVersion.title);
+      
       // 添加到历史版本列表
       setVersionHistory(prev => {
         // 保证版本不重复（根据代码内容去重）
         const filtered = prev.filter(v => v.code !== code);
-        return [...filtered, newVersion];
+        const newHistory = [...filtered, newVersion];
+        console.log('更新版本历史，新版本数量:', newHistory.length);
+        return newHistory;
       });
       
       // 设置当前版本ID
       setCurrentVersionId(newVersion.id);
+      console.log('设置当前版本ID:', newVersion.id);
       
       return newVersion;
     } catch (error) {
       console.error('创建历史版本失败:', error);
       return null;
     }
-  }, [thumbnailUrl, versionHistory]);
+  }, [projectId, prompt]);
 
   // Function to save changes
   const saveChanges = () => {
@@ -456,6 +569,7 @@ export function GenerationView({
     
     // 保存时创建新版本，标记为手动保存类型
     createNewVersion(editedCode, `Manual Save Version ${versionHistory.length + 1}`, 'manual');
+    
   }
 
   // Function to copy the generated code to clipboard
@@ -677,54 +791,74 @@ export function GenerationView({
     try {
       console.log('准备显示保存对话框...');
       
-      // 同步预览内容与当前编辑的代码
+      // 获取当前版本的缩略图
+      const currentVersion = versionHistory.find(v => v.id === currentVersionId);
       const currentCode = isEditable ? editedCode : originalCode;
       
-      // 强制更新预览内容
-      if (debouncedUpdatePreview && typeof debouncedUpdatePreview.flush === 'function') {
-        debouncedUpdatePreview.flush();
-      }
-      const preparedHtml = prepareHtmlContent(currentCode);
-      setPreviewContent(preparedHtml);
+      // 检查当前代码是否与版本中保存的代码不同
+      const codeChanged = currentVersion && currentVersion.code !== currentCode;
       
-      // 创建一个临时预览图
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('无法创建canvas上下文');
-      
-      // 设置画布大小为标准Open Graph图片尺寸
-      canvas.width = 1200;
-      canvas.height = 630;
-      
-      // 简单背景
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
-      // 添加标识文本
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('网页预览图生成中...', canvas.width / 2, canvas.height / 2);
-      ctx.font = '16px sans-serif';
-      ctx.fillText(`准备中...`, canvas.width / 2, canvas.height / 2 + 40);
-      
-      // 转换为base64图片格式
-      const tempImageData = canvas.toDataURL('image/jpeg', 0.8);
-      
-      // 设置临时预览图并显示对话框
-      setThumbnailUrl(tempImageData);
-      console.log('设置临时预览图，显示保存对话框');
-      setShowSaveDialog(true);
-      
-      // 异步生成真正的预览图
-      generateThumbnail().then(imageData => {
-        if (imageData && imageData.length > 1000) {
-          console.log('已生成真实预览图，更新UI');
-          setThumbnailUrl(imageData);
+      if (currentVersion && currentVersion.thumbnail && !codeChanged && !hasChanges) {
+        // 如果当前版本有缩略图且代码没有改变，直接使用
+        setThumbnailUrl(currentVersion.thumbnail);
+        console.log('使用当前版本的缩略图显示对话框（代码未改变）');
+        setShowSaveDialog(true);
+      } else {
+        // 如果没有缩略图或代码已改变，需要重新生成
+        console.log('需要重新生成缩略图，原因:', {
+          hasCurrentVersion: !!currentVersion,
+          hasThumbnail: !!(currentVersion && currentVersion.thumbnail),
+          codeChanged,
+          hasChanges
+        });
+        
+        // 同步预览内容与当前编辑的代码
+        // 强制更新预览内容
+        if (debouncedUpdatePreview && typeof debouncedUpdatePreview.flush === 'function') {
+          debouncedUpdatePreview.flush();
         }
-      }).catch(error => {
-        console.error('生成预览图失败:', error);
-      });
+        const preparedHtml = prepareHtmlContent(currentCode);
+        setPreviewContent(preparedHtml);
+        
+        // 创建一个临时预览图
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('无法创建canvas上下文');
+        
+        // 设置画布大小为标准Open Graph图片尺寸
+        canvas.width = 1200;
+        canvas.height = 630;
+        
+        // 简单背景
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 添加标识文本
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 32px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('网页预览图生成中...', canvas.width / 2, canvas.height / 2);
+        ctx.font = '16px sans-serif';
+        ctx.fillText(`准备中...`, canvas.width / 2, canvas.height / 2 + 40);
+        
+        // 转换为base64图片格式
+        const tempImageData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // 设置临时预览图并显示对话框
+        setThumbnailUrl(tempImageData);
+        console.log('设置临时预览图，显示保存对话框');
+        setShowSaveDialog(true);
+        
+        // 异步生成真正的预览图
+        generateThumbnail(currentCode).then(imageData => {
+          if (imageData && imageData.length > 1000) {
+            console.log('已生成真实预览图，更新UI');
+            setThumbnailUrl(imageData);
+          }
+        }).catch(error => {
+          console.error('生成预览图失败:', error);
+        });
+      }
       
     } catch (error) {
       console.error('准备显示对话框失败:', error);
@@ -734,44 +868,72 @@ export function GenerationView({
   };
 
   // 新增函数：生成缩略图
-  const generateThumbnail = async (): Promise<string> => {
+  const generateThumbnail = async (customCode?: string): Promise<string> => {
     try {
       // 1. 重置页面滚动位置 - 解决一些截图空白问题
       window.scrollTo(0, 0);
       
-      // 2. 当前的HTML内容
-      const htmlContent = isEditable ? editedCode : originalCode;
+      // 2. 当前的HTML内容 - 优先使用传入的代码，否则使用当前编辑的代码
+      const htmlContent = customCode || (isEditable ? editedCode : originalCode);
+      console.log('generateThumbnail 使用的代码长度:', htmlContent.length, '来源:', customCode ? 'customCode' : (isEditable ? 'editedCode' : 'originalCode'));
       
       // 3. 创建临时容器
       const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
+      container.style.position = 'fixed';  // 使用fixed而不是absolute
+      container.style.left = '0';
       container.style.top = '0';
-      container.style.width = '1000px';  // 较小的宽度，更接近实际网页比例
-      container.style.height = '800px';  // 增加高度，减少空白区域
-      container.style.background = '#121212'; // 深色背景
+      container.style.width = '1200px';  // 使用标准的OG图片宽度
+      container.style.height = '630px';  // 使用标准的OG图片高度
+      container.style.background = '#ffffff'; // 使用白色背景，避免透明问题
       container.style.overflow = 'hidden';
-      container.style.zIndex = '-1';
-      container.style.display = 'flex';
-      container.style.alignItems = 'center';
-      container.style.justifyContent = 'center';
+      container.style.zIndex = '-999999';  // 确保在最上层
+      container.style.transform = 'scale(1)';  // 确保没有缩放
       
-      // 4. 准备完整的HTML文档
-      const preparedHtml = prepareHtmlContent(htmlContent);
+      
+      // 4. 准备完整的HTML文档，但不添加额外的样式
+      const preparedHtml = htmlContent.includes('<!DOCTYPE') || htmlContent.includes('<html') 
+        ? htmlContent 
+        : `<!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                * {
+                  margin: 0;
+                  padding: 0;
+                  box-sizing: border-box;
+                }
+                body {
+                  margin: 0;
+                  padding: 0;
+                  overflow: hidden;
+                  width: 100%;
+                  height: 100%;
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>`;
       
       // 5. 使用iframe而不是直接注入DIV，确保HTML文档结构完整
       const iframe = document.createElement('iframe');
       iframe.style.width = '100%';
       iframe.style.height = '100%';
       iframe.style.border = 'none';
-      iframe.style.backgroundColor = '#121212';
+      iframe.style.backgroundColor = '#ffffff';
+      iframe.style.position = 'absolute';
+      iframe.style.left = '0';
+      iframe.style.top = '0';
       
       // 添加到DOM中
       container.appendChild(iframe);
       document.body.appendChild(container);
       
       // 设置一个更长的超时时间
-      const IFRAME_LOAD_TIMEOUT = 3000; // 3秒
+      const IFRAME_LOAD_TIMEOUT = 5000; // 5秒
       
       // 等待iframe加载，添加更可靠的加载检测
       await new Promise<void>((resolve) => {
@@ -781,7 +943,8 @@ export function GenerationView({
         iframe.onload = () => {
           if (!hasResolved) {
             hasResolved = true;
-            resolve();
+            // 额外等待一下，确保内容渲染
+            setTimeout(resolve, 1000);
           }
         };
         
@@ -790,13 +953,30 @@ export function GenerationView({
         
         // 如果iframe有contentDocument，监听它的DOMContentLoaded和load事件
         const checkContentLoaded = () => {
-          if (iframe.contentDocument) {
-            if (iframe.contentDocument.readyState === 'complete' || 
-                iframe.contentDocument.readyState === 'interactive') {
-              if (!hasResolved) {
-                hasResolved = true;
-                resolve();
-              }
+          if (iframe.contentDocument && iframe.contentWindow) {
+            const doc = iframe.contentDocument;
+            const win = iframe.contentWindow;
+            
+            // 检查文档是否已加载
+            if (doc.readyState === 'complete') {
+              // 检查是否有图片需要加载
+              const images = doc.querySelectorAll('img');
+              const imagePromises = Array.from(images).map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                });
+              });
+              
+              // 等待所有图片加载完成
+              Promise.all(imagePromises).then(() => {
+                if (!hasResolved) {
+                  hasResolved = true;
+                  // 额外等待，确保CSS动画等完成
+                  setTimeout(resolve, 1500);
+                }
+              });
             }
           }
         };
@@ -817,8 +997,8 @@ export function GenerationView({
         }, IFRAME_LOAD_TIMEOUT);
       });
       
-      // 额外等待时间，确保内容完全渲染，增加到1.5秒
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // 额外等待时间，确保内容完全渲染
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       let imageData = '';
       
@@ -826,43 +1006,90 @@ export function GenerationView({
       try {
         // 确保iframe内容已完全加载
         if (iframe.contentDocument && iframe.contentDocument.body) {
-          // 在截图前确保内容居中且填满可视区域
-          if (iframe.contentDocument.body.firstElementChild) {
-            const content = iframe.contentDocument.body.firstElementChild as HTMLElement;
-            if (content) {
-              content.style.width = '100%';
-              content.style.margin = '0 auto';
-              content.style.padding = '20px';
-              content.style.boxSizing = 'border-box';
-            }
-          }
+          // 获取实际内容的尺寸
+          const body = iframe.contentDocument.body;
+          const html = iframe.contentDocument.documentElement;
           
-          // 设置更长的超时时间和更好的配置
+          // 计算实际内容高度
+          const contentHeight = Math.max(
+            body.scrollHeight,
+            body.offsetHeight,
+            html.clientHeight,
+            html.scrollHeight,
+            html.offsetHeight
+          );
+          
+          // 限制最大高度，避免截图过大
+          const maxHeight = 2000;
+          const actualHeight = Math.min(contentHeight, maxHeight);
+          
+          // 调整iframe高度以适应内容
+          iframe.style.height = actualHeight + 'px';
+          container.style.height = actualHeight + 'px';
+          
+          // 等待布局更新
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 设置更好的html2canvas配置
           const canvas = await html2canvas(iframe.contentDocument.body, {
             allowTaint: true,
             useCORS: true,
             logging: false,
-            background: '#121212',
-            width: container.clientWidth,
-            height: container.clientHeight
-          });
+            backgroundColor: '#ffffff',  // 确保白色背景
+            width: 1200,  // 固定宽度
+            height: actualHeight,  // 使用实际高度
+            scale: 2,  // 提高清晰度
+            windowWidth: 1200,
+            windowHeight: actualHeight,
+            onclone: (clonedDoc: Document) => {
+              // 在克隆的文档中修复可能的样式问题
+              const clonedBody = clonedDoc.body;
+              if (clonedBody) {
+                clonedBody.style.margin = '0';
+                clonedBody.style.padding = '0';
+                clonedBody.style.overflow = 'visible';
+              }
+            }
+          } as any);  // 使用 as any 来避免类型错误
           
-          imageData = canvas.toDataURL('image/jpeg', 0.95);
-          console.log('成功生成预览图，大小:', imageData.length);
+          // 创建最终的缩略图，调整到标准尺寸
+          const finalCanvas = document.createElement('canvas');
+          finalCanvas.width = 1200;
+          finalCanvas.height = 630;
+          const finalCtx = finalCanvas.getContext('2d');
+          
+          if (finalCtx) {
+            // 填充白色背景
+            finalCtx.fillStyle = '#ffffff';
+            finalCtx.fillRect(0, 0, 1200, 630);
+            
+            // 计算如何将截图适配到630高度
+            const scale = Math.min(1, 630 / canvas.height);
+            const scaledWidth = canvas.width * scale;
+            const scaledHeight = canvas.height * scale;
+            const x = (1200 - scaledWidth) / 2;
+            const y = 0;
+            
+            // 绘制缩放后的截图
+            finalCtx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+            
+            imageData = finalCanvas.toDataURL('image/jpeg', 0.9);
+            console.log('成功生成预览图，大小:', imageData.length);
+          }
         } else {
           throw new Error('iframe内容未加载完成');
         }
       } catch (error) {
         console.error('截图失败:', error);
         
-        // 7. 如果截图失败，创建一个模拟预览图 - 使用更贴近网页比例的布局
+        // 7. 如果截图失败，创建一个模拟预览图
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('无法创建Canvas上下文');
         
-        // 设置尺寸为更符合网页比例的尺寸
-        canvas.width = 1000;
-        canvas.height = 800;
+        // 设置标准OG图片尺寸
+        canvas.width = 1200;
+        canvas.height = 630;
         
         // 创建渐变背景
         const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
@@ -873,7 +1100,7 @@ export function GenerationView({
         
         // 创建一个模拟的网页内容区域
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        const contentWidth = canvas.width * 0.9;
+        const contentWidth = canvas.width * 0.8;
         const contentHeight = canvas.height * 0.7;
         const contentX = (canvas.width - contentWidth) / 2;
         const contentY = (canvas.height - contentHeight) / 2;
@@ -887,22 +1114,20 @@ export function GenerationView({
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 48px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('网页预览', canvas.width / 2, contentY + 100);
+        ctx.fillText('网页预览', canvas.width / 2, contentY + 120);
         
         ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
         ctx.font = '24px system-ui, -apple-system, sans-serif';
-        ctx.fillText('由 LocalSite AI 生成', canvas.width / 2, contentY + 150);
+        ctx.fillText('由 LocalSite AI 生成', canvas.width / 2, contentY + 170);
         
         // 添加模拟内容块
         ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-        // 标题或导航
-        ctx.fillRect(contentX + 40, contentY + 200, contentWidth - 80, 40);
         // 内容区块
-        ctx.fillRect(contentX + 40, contentY + 260, (contentWidth - 80) * 0.7, 30);
-        ctx.fillRect(contentX + 40, contentY + 310, (contentWidth - 80) * 0.5, 30);
-        ctx.fillRect(contentX + 40, contentY + 360, (contentWidth - 80) * 0.6, 100);
+        ctx.fillRect(contentX + 40, contentY + 220, (contentWidth - 80) * 0.7, 30);
+        ctx.fillRect(contentX + 40, contentY + 270, (contentWidth - 80) * 0.5, 30);
+        ctx.fillRect(contentX + 40, contentY + 320, (contentWidth - 80) * 0.6, 80);
         
-        imageData = canvas.toDataURL('image/jpeg', 0.95);
+        imageData = canvas.toDataURL('image/jpeg', 0.9);
       }
       
       // 8. 清理临时DOM元素
@@ -918,8 +1143,8 @@ export function GenerationView({
       
       // 创建一个基础预览图作为备选
       const canvas = document.createElement('canvas');
-      canvas.width = 1000;  // 调整为更合适的宽高比
-      canvas.height = 800;
+      canvas.width = 1200;
+      canvas.height = 630;
       const ctx = canvas.getContext('2d');
       
       if (ctx) {
@@ -941,7 +1166,7 @@ export function GenerationView({
       }
       
       // 如果连Canvas都创建失败，返回静态图片的base64
-      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
+      return 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCAA8AGoDAREAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhNBUQdhcRKBMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9/KACgAoAKACgAoAKACgDj/ih8VvDnwh8KyeIPFN9tsEkSBQkbSSTzOcJFEigvI5weFBOAT2NAHzl4t/4Kw/Dqw1Qtovh7xdqtjn5Ly4jt7UTD13o7OAf9zd9KAKNl/wVd+GoushqPhrxZZ2JPz3KNbXJT32oyBvzBoA9l+Fv7RHgD4t6ZDdeFPFWnX0sy7ms5JPKurdvc9GX/aUkH0NAHaUAFABQAUAFABQAUAFABQB8xft8fFG9k8S+HfAdhI0VqsZ1jUCpwXdj5UKn2AV2I9StAHy5QAUAe6/sYa41l8SNT0pnxFqGnNIo/6aRMv9A5oA+p6ACgAoAKACgAoAKACgDO8WeL9K8D+G77XNbvY7HTtPhaa4mboqj09STwAOSxAHJoA/Pv4l+Op/iJ481bxBcEq1/OzxIf8AlnEPlRP+AgD8c0AZFABQBvfDDxq/w68faP4gRWcabdLJMi/8tITlZF/FGYUAAV+oHQO0AFABQAUAFABQAUAfnV+0T8aJPi18RbzUIZGbS9Pdraxts8Ii/KXx6sSCf9kL6UAfV/7HfwftvhZ8K7S8uLdRrXiJFvb52GZI0b/VRZ7Yj+9jndI2exoA9YoAKACgAoAKACgAoAKAPzN+LHhF/APxF8QaA6kLp1/NFHnrJHuLRt/wJCpoAx/DXiW+8I+I9P1nTJvIv9MuEuraXGdsiHIPuO49QTQAPrd7Nf8A2pr6423HmbpfMO/fndu3Zzu3fNnvnNAFagAoAKACgAoAKACgAoAKAPH/ANsb4Pt8Rfho+r2MJk1rwsWuoNo5ltT/AK1PwGJB/ut6UAfHVndzWF3DdW8jRXEEiyxSDqrqcgj8DQBDQAUAFABQAUAFABQAUAFABQB2nwK+M118C/HTaxGkk+nXUZtdRtU+9JDnIZP9pGw2PcqP4hQAufF+vPrTai2rX5v2ffcTfa33sScncuc5xz60AZ1ABQAUAFABQAUAFABQAUAGr4I8caj8P/ABRZa1pU3k3ti/mRk/dde6OOzKcEH60Af/Z';
     }
   };
 
@@ -954,20 +1179,40 @@ export function GenerationView({
       // 显示加载状态
       toast.loading('Saving website...');
       
-      // 使用之前生成的缩略图，如果没有则重新生成
-      let imageData = thumbnailUrl;
-      if (!imageData || imageData.includes('生成中')) {
-        try {
-          imageData = await generateThumbnail();
-        } catch (error) {
-          console.error('保存前生成预览图失败:', error);
-        }
-      }
-      
       // 确保使用当前显示的代码（优先使用编辑后的代码，如果没有编辑则使用原始生成的代码）
-      // 注意：明确使用当前正在编辑的代码，而不是使用其他变量
       const currentContent = isEditable ? editedCode : originalCode;
       console.log('保存网页中，使用代码长度:', currentContent.length, '编辑模式:', isEditable);
+      
+      // 获取当前版本的缩略图
+      let imageData = '';
+      const currentVersion = versionHistory.find(v => v.id === currentVersionId);
+      
+      // 检查当前代码是否与版本中保存的代码不同
+      const codeChanged = currentVersion && currentVersion.code !== currentContent;
+      
+      if (currentVersion && currentVersion.thumbnail && !codeChanged && !hasChanges) {
+        // 如果当前版本有缩略图且代码没有改变，直接使用
+        imageData = currentVersion.thumbnail;
+        console.log('使用当前版本的缩略图（代码未改变）');
+      } else if (thumbnailUrl && !thumbnailUrl.includes('生成中') && !codeChanged && !hasChanges) {
+        // 如果有thumbnailUrl且不是临时的，且代码没有改变，使用它
+        imageData = thumbnailUrl;
+        console.log('使用现有的缩略图URL（代码未改变）');
+      } else {
+        // 如果代码已改变或没有缩略图，需要重新生成
+        console.log('需要重新生成缩略图，原因:', {
+          hasCurrentVersion: !!currentVersion,
+          hasThumbnail: !!(currentVersion && currentVersion.thumbnail),
+          codeChanged,
+          hasChanges,
+          hasThumbnailUrl: !!thumbnailUrl
+        });
+        try {
+          imageData = await generateThumbnail(currentContent);
+        } catch (error) {
+          console.error('生成预览图失败:', error);
+        }
+      }
       
       // 保存到服务器
       const response = await fetch('/api/share', {
@@ -982,6 +1227,7 @@ export function GenerationView({
           prompt,
           imageData,
           timestamp,
+          useExistingImage: currentVersion && currentVersion.thumbnail ? true : false, // 标记是否使用现有图片
         }),
       });
 
@@ -1002,20 +1248,52 @@ export function GenerationView({
       // 打印调试信息
       console.log('保存成功，获得分享链接:', fullShareUrl);
       
-      // 确保使用服务器返回的thumbnailUrl
-      if (data.thumbnailUrl) {
-        // 使用完整URL
+      // 更新当前版本的发布状态
+      if (currentVersion) {
+        // 更新前端状态
+        setVersionHistory(prev => 
+          prev.map(v => v.id === currentVersion.id 
+            ? {
+                ...v,
+                isPublished: true,
+                shareUrl: fullShareUrl,
+                title: title || v.title || 'Untitled Website'
+              }
+            : v
+          )
+        );
+        
+        // 如果有projectId，更新数据库中的版本发布状态
+        if (projectId) {
+          try {
+            const updateResponse = await fetch(`/api/projects/${projectId}/versions/${currentVersion.id}/publish`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                isPublished: true,
+                shareUrl: fullShareUrl
+              }),
+            });
+            
+            if (!updateResponse.ok) {
+              console.error('更新版本发布状态失败');
+            } else {
+              console.log('版本发布状态已更新到数据库');
+            }
+          } catch (error) {
+            console.error('更新版本发布状态时出错:', error);
+          }
+        }
+      } else if (data.thumbnailUrl) {
+        // 如果没有当前版本，创建一个新版本
         const fullThumbnailUrl = data.thumbnailUrl.startsWith('http') 
           ? data.thumbnailUrl 
           : `${window.location.origin}${data.thumbnailUrl}`;
-        console.log('服务器返回的预览图URL:', fullThumbnailUrl);
-        // 更新缩略图URL，确保使用最新的服务器版本
-        setThumbnailUrl(fullThumbnailUrl);
         
-        // 为此保存创建新的历史版本，使用服务器返回的预览图
         const savedVersion = await createNewVersion(currentContent, title || 'Untitled Website', 'manual');
         if (savedVersion) {
-          // 如果版本创建成功且有预览图，更新版本的预览图并标记为已发布
           setVersionHistory(prev => 
             prev.map(v => v.id === savedVersion.id 
               ? {
@@ -1028,21 +1306,31 @@ export function GenerationView({
               : v
             )
           );
-          
-          // 同时更新当前版本的ID
           setCurrentVersionId(savedVersion.id);
-        } else {
-          // 如果没有创建新版本，则尝试更新当前版本
-          setVersionHistory(prev => 
-            prev.map(v => v.id === currentVersionId 
-              ? {
-                  ...v,
+          
+          // 如果有projectId，更新数据库中的版本发布状态
+          if (projectId) {
+            try {
+              const updateResponse = await fetch(`/api/projects/${projectId}/versions/${savedVersion.id}/publish`, {
+                method: 'PUT',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
                   isPublished: true,
                   shareUrl: fullShareUrl
-                }
-              : v
-            )
-          );
+                }),
+              });
+              
+              if (!updateResponse.ok) {
+                console.error('更新新版本发布状态失败');
+              } else {
+                console.log('新版本发布状态已更新到数据库');
+              }
+            } catch (error) {
+              console.error('更新新版本发布状态时出错:', error);
+            }
+          }
         }
       }
       
@@ -1186,21 +1474,73 @@ export function GenerationView({
   };
 
   // 删除历史版本
-  const handleDeleteVersion = useCallback((versionId: string) => {
+  const handleDeleteVersion = useCallback(async (versionId: string) => {
     // 确保不删除当前正在使用的版本
     if (versionId === currentVersionId) {
       toast.error('无法删除当前正在使用的版本');
       return;
     }
     
-    setVersionHistory(prev => prev.filter(v => v.id !== versionId));
-    toast.success('已删除历史版本');
-  }, [currentVersionId]);
+    console.log('删除前版本数量:', versionHistory.length);
+    
+    // 如果有projectId，调用API删除数据库中的版本
+    if (projectId) {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/versions/${versionId}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          throw new Error('删除版本失败');
+        }
+        
+        // 从前端状态中删除
+        setVersionHistory(prev => {
+          const newHistory = prev.filter(v => v.id !== versionId);
+          console.log('删除后版本数量:', newHistory.length);
+          return newHistory;
+        });
+        toast.success('已删除历史版本');
+      } catch (error) {
+        console.error('删除版本失败:', error);
+        toast.error('删除失败，请重试');
+      }
+    } else {
+      // 如果没有projectId，只从前端状态中删除（临时版本）
+      setVersionHistory(prev => {
+        const newHistory = prev.filter(v => v.id !== versionId);
+        console.log('删除后版本数量:', newHistory.length);
+        return newHistory;
+      });
+      toast.success('已删除历史版本');
+    }
+  }, [currentVersionId, projectId]);
+  
+  // 当initialVersions变化时，更新versionHistory
+  useEffect(() => {
+    if (initialVersions && initialVersions.length > 0) {
+      setVersionHistory(initialVersions);
+      // 如果还没有设置当前版本ID，设置为最新的版本（数组中的最后一个）
+      if (!currentVersionId && initialVersions.length > 0) {
+        const latestVersion = initialVersions[initialVersions.length - 1];
+        setCurrentVersionId(latestVersion.id);
+        console.log('设置默认当前版本为最新版本:', latestVersion.id, latestVersion.title);
+        
+        // 同时更新编辑器内容为最新版本的代码
+        if (latestVersion.code) {
+          setEditedCode(latestVersion.code);
+          setOriginalCode(latestVersion.code);
+          // 更新预览内容
+          updatePreviewAfterVersionChange(latestVersion.code);
+        }
+      }
+    }
+  }, [initialVersions, currentVersionId, updatePreviewAfterVersionChange]);
   
   return (
-    <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
+    <div className="h-[calc(100vh-61px)] bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
-      <header className="border-b border-gray-800 py-2 px-4"  style={{ marginTop: '61px' }}>
+      <header className="border-b border-gray-800 py-2 px-4"  >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold text-white">
@@ -1443,18 +1783,17 @@ export function GenerationView({
                     <Smartphone className="w-4 h-4" />
                   </Button>
                   {/* 只在桌面版显示历史按钮 */}
-                  {versionHistory.length > 0 && (
-                    <Button
-                      variant={showHistory ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 ml-2 px-2 flex items-center gap-1"
-                      onClick={() => setShowHistory(!showHistory)}
-                      title={showHistory ? "隐藏历史版本" : "显示历史版本"}
-                    >
-                      <History className="w-4 h-4" />
-                      <span className="text-xs">{versionHistory.length}</span>
-                    </Button>
-                  )}
+                  <Button
+                    key={`history-btn-${versionHistory.length}`}
+                    variant={showHistory ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 ml-2 px-2 flex items-center gap-1"
+                    onClick={() => setShowHistory(!showHistory)}
+                    title={showHistory ? "隐藏历史版本" : "显示历史版本"}
+                  >
+                    <History className="w-4 h-4" />
+                    <span className="text-xs">{versionHistory.length}</span>
+                  </Button>
                 </div>
               </div>
 
@@ -1490,7 +1829,6 @@ export function GenerationView({
                         srcDoc={previewContent}
                         className="w-full h-full absolute inset-0 z-10"
                         title="Preview"
-                        sandbox="allow-scripts"
                         style={{
                           backgroundColor: '#121212',
                           opacity: 1,
@@ -1690,18 +2028,17 @@ export function GenerationView({
                       <Smartphone className="w-4 h-4" />
                     </Button>
                     {/* 只在桌面版显示历史按钮 */}
-                    {versionHistory.length > 0 && (
-                      <Button
-                        variant={showHistory ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-7 ml-2 px-2 flex items-center gap-1"
-                        onClick={() => setShowHistory(!showHistory)}
-                        title={showHistory ? "隐藏历史版本" : "显示历史版本"}
-                      >
-                        <History className="w-4 h-4" />
-                        <span className="text-xs">{versionHistory.length}</span>
-                      </Button>
-                    )}
+                    <Button
+                      key={`history-btn-${versionHistory.length}`}
+                      variant={showHistory ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 ml-2 px-2 flex items-center gap-1"
+                      onClick={() => setShowHistory(!showHistory)}
+                      title={showHistory ? "隐藏历史版本" : "显示历史版本"}
+                    >
+                      <History className="w-4 h-4" />
+                      <span className="text-xs">{versionHistory.length}</span>
+                    </Button>
                   </div>
                 </div>
 
@@ -1737,7 +2074,6 @@ export function GenerationView({
                           srcDoc={previewContent}
                           className="w-full h-full absolute inset-0 z-10"
                           title="Preview"
-                          sandbox="allow-scripts"
                           style={{
                             backgroundColor: '#121212',
                             opacity: 1,

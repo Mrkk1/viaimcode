@@ -35,6 +35,15 @@ npm install
 3. 配置环境变量：
 复制 `.env.example` 到 `.env.local` 并填写必要的配置。
 
+必需的环境变量包括：
+```plaintext
+DB_HOST=localhost      # 数据库主机地址
+DB_PORT=3306          # 数据库端口
+DB_USER=root          # 数据库用户名
+DB_PASSWORD=******    # 数据库密码
+DB_NAME=localsite_ai  # 数据库名称
+```
+
 4. 启动开发服务器：
 ```bash
 npm run dev

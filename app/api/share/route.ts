@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, htmlContent, prompt, imageData, timestamp } = await request.json();
+    const { title, description, htmlContent, prompt, imageData, timestamp, useExistingImage } = await request.json();
     
     // Validate required fields
     if (!htmlContent) {
@@ -26,32 +26,81 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('Received image data, timestamp:', timestamp, 'length:', imageData ? imageData.length : 0);
+    console.log('Received image data, timestamp:', timestamp, 'length:', imageData ? imageData.length : 0, 'useExistingImage:', useExistingImage);
     
     // Save image and get relative path
     let thumbnailUrl = '';
+    let savedWebsite: any;
+    
     try {
-      if (imageData && imageData.length > 1000) {
+      if (useExistingImage && imageData && imageData.startsWith('http')) {
+        // 如果是现有的URL，直接使用
+        thumbnailUrl = imageData;
+        console.log('Using existing image URL:', thumbnailUrl);
+        
+        // 保存网站
+        savedWebsite = await saveWebsite({
+          userId: user.userId,
+          title: title || 'Untitled Website',
+          description: description || 'No description',
+          htmlContent,
+          prompt: prompt || '',
+          thumbnailUrl,
+        }, user.userId);
+        
+      } else if (imageData && imageData.length > 1000) {
+        // 只有在是base64数据时才上传
         const filename = `image-${timestamp || Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
         
-        thumbnailUrl = await uploadImage(imageData, filename, true);
-        console.log('Image uploaded to OSS:', thumbnailUrl);
+        // 先保存网站数据以获取ID
+        savedWebsite = await saveWebsite({
+          userId: user.userId,
+          title: title || 'Untitled Website',
+          description: description || 'No description',
+          htmlContent,
+          prompt: prompt || '',
+          thumbnailUrl: '', // 临时为空
+        }, user.userId);
+        
+        // 使用用户ID和网站ID作为目录结构
+        thumbnailUrl = await uploadImage(imageData, filename, true, {
+          userId: user.userId,
+          taskId: savedWebsite.id,
+          subFolder: 'thumbnails'
+        });
+        
+        // 更新网站的缩略图URL
+        savedWebsite = await saveWebsite({
+          ...savedWebsite,
+          thumbnailUrl,
+        }, user.userId);
+
       } else {
         console.error('Invalid image data');
+        
+        // 如果没有图片，直接保存网站
+        savedWebsite = await saveWebsite({
+          userId: user.userId,
+          title: title || 'Untitled Website',
+          description: description || 'No description',
+          htmlContent,
+          prompt: prompt || '',
+          thumbnailUrl: '',
+        }, user.userId);
       }
     } catch (imageError) {
       console.error('Failed to save image:', imageError);
+      
+      // 即使图片保存失败，也保存网站
+      savedWebsite = await saveWebsite({
+        userId: user.userId,
+        title: title || 'Untitled Website',
+        description: description || 'No description',
+        htmlContent,
+        prompt: prompt || '',
+        thumbnailUrl: '',
+      }, user.userId);
     }
-    
-    // Save website data
-    const savedWebsite = await saveWebsite({
-      userId: user.userId,
-      title: title || 'Untitled Website',
-      description: description || 'No description',
-      htmlContent,
-      prompt: prompt || '',
-      thumbnailUrl,
-    }, user.userId);
     
     console.log('Website saved, ID:', savedWebsite.id, 'Preview URL:', thumbnailUrl);
     

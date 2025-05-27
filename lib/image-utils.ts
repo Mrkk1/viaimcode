@@ -7,9 +7,18 @@ import { uploadImage } from './image-upload';
  * 将Base64格式的图片保存到本地文件系统或阿里云OSS
  * @param base64Data Base64格式的图片数据
  * @param timestamp 可选的时间戳，用于文件名
+ * @param options 可选的配置项，包含userId和taskId
  * @returns 保存后的图片相对路径或完整URL
  */
-export async function saveBase64Image(base64Data: string, timestamp?: number): Promise<string> {
+export async function saveBase64Image(
+  base64Data: string, 
+  timestamp?: number,
+  options?: {
+    userId?: string;
+    taskId?: string;
+    subFolder?: string;
+  }
+): Promise<string> {
   try {
     // 确保base64数据是有效的
     if (!base64Data) {
@@ -22,8 +31,8 @@ export async function saveBase64Image(base64Data: string, timestamp?: number): P
       : `${uuidv4()}.jpg`;
       
     // 使用新的图片上传服务
-    const imageUrl = await uploadImage(base64Data, filename);
-    console.log('图片已上传:', imageUrl);
+    const imageUrl = await uploadImage(base64Data, filename, undefined, options);
+  
     
     return imageUrl;
   } catch (error) {
@@ -38,7 +47,7 @@ export async function deleteImage(imagePath: string): Promise<void> {
   
   // 如果是OSS URL，不需要在本地删除
   if (imagePath.startsWith('http')) {
-    console.log('OSS图片不需要本地删除:', imagePath);
+
     // 注意：如果需要删除OSS中的图片，可以在这里调用OSS的删除API
     return;
   }

@@ -9,8 +9,8 @@ export function LoadingScreen() {
     // Apply glitch effect at intervals
     const glitchInterval = setInterval(() => {
       setGlitchClass("glitch")
-      setTimeout(() => setGlitchClass(""), 200)
-    }, 2000)
+      setTimeout(() => setGlitchClass(""), 100)
+    }, 100)
 
     return () => clearInterval(glitchInterval)
   }, [])

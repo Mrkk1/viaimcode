@@ -11,7 +11,7 @@ export default async function MainLayout({
   return (
     <>
       <NavBar user={user} />
-      <main className=" " style={{ marginTop: '-61px' }}>
+      <main className=" ">
         {children}
       </main>
     </>

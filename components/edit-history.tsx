@@ -53,7 +53,7 @@ const ThumbnailImage = memo(({
       
       {hasError ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90">
-          <div className="text-sm text-gray-500">加载失败</div>
+          <div className="text-sm text-gray-500">Load failed</div>
         </div>
       ) : (
         <Image
@@ -99,12 +99,12 @@ export const EditHistory = memo(function EditHistory({
       <div className="flex items-center justify-between px-3 mb-2">
         <div className="flex items-center">
           <Clock className="w-4 h-4 mr-2 text-gray-500" />
-          <span className="text-xs font-medium text-gray-400">编辑历史</span>
+          <span className="text-xs font-medium text-gray-400">Edit History</span>
         </div>
         
         {versions.length > 0 && (
           <div className="text-xs text-gray-500">
-            {versions.length} 个版本
+            {versions.length} Versions
           </div>
         )}
       </div>
@@ -113,7 +113,7 @@ export const EditHistory = memo(function EditHistory({
         <div className="flex flex-nowrap gap-4 pr-4 pb-2 min-w-full overflow-x-auto">
           {versions.length === 0 ? (
             <div className="w-full py-6 text-center text-sm text-gray-500">
-              暂无历史版本
+              No history versions
             </div>
           ) : (
             versions.map((version) => (
@@ -137,7 +137,7 @@ export const EditHistory = memo(function EditHistory({
                         <div className="w-full flex flex-col gap-1">
                           <ThumbnailImage
                             src={version.thumbnail}
-                            alt={version.title || `版本 ${version.id}`}
+                            alt={version.title || `Version ${version.id}`}
                             isActive={version.id === currentVersionId}
                           />
                           <div className="w-full flex items-center justify-between px-1 pt-1">
@@ -149,7 +149,7 @@ export const EditHistory = memo(function EditHistory({
                                     ? 'bg-purple-900/30 text-purple-400' 
                                     : 'bg-green-900/30 text-green-400'
                                 }`}>
-                                  {version.type === 'ai' ? 'AI生成' : '手动'}
+                                  {version.type === 'ai' ? 'AI Generated' : 'Manual'}
                                 </span>
                               )}
                               
@@ -157,14 +157,17 @@ export const EditHistory = memo(function EditHistory({
                                 {formatDistanceToNow(new Date(version.timestamp), { 
                                   addSuffix: true, 
                                   locale: zhCN 
-                                }).replace(/约 /, '')}
+                                }).replace(/about /, '')}
                               </span>
                             </div>
                             
                             <div className="flex items-center gap-1">
-                              {version.isPublished && (
-                                <span className="bg-blue-900/30 text-blue-400 text-[10px] px-1 py-0.5 rounded">已发布</span>
+                              {version.isPublished ? (
+                                <span className="bg-blue-900/30 text-blue-400 text-[10px] px-1 py-0.5 rounded">Published</span>
+                              ) : (
+                                <span className="bg-gray-900/30 text-gray-400 text-[10px] px-1 py-0.5 rounded">Unpublished</span>
                               )}
+                            
                               
                               {version.id !== currentVersionId && (
                                 <Undo2 className="w-3 h-3 text-blue-500" />
@@ -180,7 +183,7 @@ export const EditHistory = memo(function EditHistory({
                           className="absolute top-2 right-2 bg-black/60 text-red-400 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-black/80"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm('确定要删除此版本吗？')) {
+                            if (confirm('Are you sure you want to delete this version?')) {
                               onDeleteVersion(version.id);
                             }
                           }}
@@ -192,7 +195,7 @@ export const EditHistory = memo(function EditHistory({
                   </TooltipTrigger>
                   <TooltipContent side="top" className="bg-gray-800 border-gray-700">
                     <p className="text-xs">
-                      {version.title || `版本 ${version.id.substring(0, 8)}`}
+                      {version.title || `Version ${version.id.substring(0, 8)}`}
                       <br />
                       <span className="text-gray-400">
                         {formatDistanceToNow(new Date(version.timestamp), { 
@@ -202,11 +205,11 @@ export const EditHistory = memo(function EditHistory({
                       </span>
                       {version.type && (
                         <span className={`ml-1 ${version.type === 'ai' ? 'text-purple-400' : 'text-green-400'}`}>
-                          • {version.type === 'ai' ? 'AI生成' : '手动'}
+                          • {version.type === 'ai' ? 'AI Generated' : 'Manual'}
                         </span>
                       )}
                       {version.isPublished && (
-                        <span className="ml-1 text-blue-400">• 已发布</span>
+                        <span className="ml-1 text-blue-400">• Published</span>
                       )}
                     </p>
                   </TooltipContent>

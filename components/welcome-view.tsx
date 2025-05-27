@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 // Import only the icons that are actually used
-import { Loader2 } from "lucide-react"
+import { Loader2, Settings, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { ProviderSelector } from "@/components/provider-selector"
 import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
 
 // 动态导入 PixelAnimation 组件
 const PixelAnimation = dynamic(
@@ -57,6 +58,8 @@ export function WelcomeView({
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     // Add typing animation class after component mounts
@@ -151,8 +154,16 @@ export function WelcomeView({
     fetchModels();
   }, [selectedProvider, setSelectedModel, isLoggedIn]);
 
+  const handleButtonClick = () => {
+    if (isLoggedIn) {
+      onGenerate()
+    } else {
+      router.push('/login')
+    }
+  }
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
+    <div className="min-h-[calc(100vh-61px)] flex flex-col items-center justify-center p-4 relative overflow-hidden bg-black">
       <PixelAnimation />
       
       {/* Animated background */}
@@ -175,8 +186,8 @@ export function WelcomeView({
             className="min-h-[150px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 pr-[120px] transition-all duration-300"
           />
           <Button
-            onClick={onGenerate}
-            disabled={!prompt.trim() || (!isLoggedIn && !selectedModel)}
+            onClick={handleButtonClick}
+            disabled={!prompt.trim() && isLoggedIn}
             className="absolute bottom-4 right-4 bg-gray-900/90 hover:bg-gray-800 text-white font-medium tracking-wider py-3 px-12 text-base rounded-md transition-all duration-300 border border-gray-800 hover:border-gray-700 focus:border-white focus:ring-white"
           >
             {isLoggedIn ? 'GENERATE' : 'LOGIN TO GENERATE'}
@@ -185,116 +196,134 @@ export function WelcomeView({
 
         {isLoggedIn && (
           <>
-            <ProviderSelector
-              selectedProvider={selectedProvider}
-              setSelectedProvider={setSelectedProvider}
-              onProviderChange={() => {}}
-            />
-
+            {/* Settings Toggle Button */}
             <div className="w-full mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">SELECT MODEL</label>
-              <Select value={selectedModel} onValueChange={setSelectedModel} disabled={!selectedProvider || isLoadingModels}>
-                <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
-                  <SelectValue placeholder={selectedProvider ? "Choose a model..." : "Select a provider first"} />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-900 border-gray-800 text-white">
-                  {isLoadingModels ? (
-                    <div className="flex items-center justify-center py-2">
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      <span>Loading models...</span>
-                    </div>
-                  ) : models.length > 0 ? (
-                    models.map((model, index) => (
-                      <SelectItem key={`${index}-${model.id}`} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-2 text-sm text-gray-400">
-                      {selectedProvider ? "No models available" : "Select a provider first"}
-                    </div>
-                  )}
-                </SelectContent>
-              </Select>
+              <Button
+                variant="ghost"
+                onClick={() => setShowSettings(!showSettings)}
+                className="w-full flex items-center justify-between text-gray-300 hover:text-white hover:bg-gray-800/50 transition-all duration-200"
+              >
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4" />
+                  <span className="text-sm font-medium">Advanced Settings</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`} />
+              </Button>
             </div>
 
-            <div className="w-full mb-4">
-              <label className="block text-sm font-medium text-gray-300 mb-2">SYSTEM PROMPTS</label>
-              <Select value={selectedSystemPrompt} onValueChange={setSelectedSystemPrompt}>
-                <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
-                  <SelectValue placeholder="Choose a system prompt..." />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-900 border-gray-800 text-white">
-                  <SelectItem value="default">
-                    <div className="flex flex-col">
-                      <span>Default</span>
-                      <span className="text-xs text-gray-400">Standard code generation</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="thinking">
-                    <div className="flex flex-col">
-                      <span>Thinking</span>
-                      <span className="text-xs text-gray-400">Makes non thinking models think</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="custom">
-                    <div className="flex flex-col">
-                      <span>Custom System Prompt</span>
-                      <span className="text-xs text-gray-400">Specify a custom System Prompt</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Collapsible Settings Section */}
+            <div className={`w-full space-y-4 overflow-hidden transition-all duration-300 ${showSettings ? 'max-h-[1000px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
+              <ProviderSelector
+                selectedProvider={selectedProvider}
+                setSelectedProvider={setSelectedProvider}
+                onProviderChange={() => {}}
+              />
 
-            {selectedSystemPrompt === 'custom' && (
-              <div className="w-full mb-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT</label>
-                <Textarea
-                  value={customSystemPrompt}
-                  onChange={(e) => setCustomSystemPrompt(e.target.value)}
-                  placeholder="Enter a custom system prompt to override the default..."
-                  className="min-h-[100px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
-                />
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-300 mb-2">SELECT MODEL</label>
+                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={!selectedProvider || isLoadingModels}>
+                  <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
+                    <SelectValue placeholder={selectedProvider ? "Choose a model..." : "Select a provider first"} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-gray-800 text-white">
+                    {isLoadingModels ? (
+                      <div className="flex items-center justify-center py-2">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <span>Loading models...</span>
+                      </div>
+                    ) : models.length > 0 ? (
+                      models.map((model, index) => (
+                        <SelectItem key={`${index}-${model.id}`} value={model.id}>
+                          {model.name}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-400">
+                        {selectedProvider ? "No models available" : "Select a provider first"}
+                      </div>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-300 mb-2">SYSTEM PROMPTS</label>
+                <Select value={selectedSystemPrompt} onValueChange={setSelectedSystemPrompt}>
+                  <SelectTrigger className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white">
+                    <SelectValue placeholder="Choose a system prompt..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-gray-800 text-white">
+                    <SelectItem value="default">
+                      <div className="flex flex-col">
+                        <span>Default</span>
+                        <span className="text-xs text-gray-400">Standard code generation</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="thinking">
+                      <div className="flex flex-col">
+                        <span>Thinking</span>
+                        <span className="text-xs text-gray-400">Makes non thinking models think</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="custom">
+                      <div className="flex flex-col">
+                        <span>Custom System Prompt</span>
+                        <span className="text-xs text-gray-400">Specify a custom System Prompt</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedSystemPrompt === 'custom' && (
+                <div className="w-full">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">CUSTOM SYSTEM PROMPT</label>
+                  <Textarea
+                    value={customSystemPrompt}
+                    onChange={(e) => setCustomSystemPrompt(e.target.value)}
+                    placeholder="Enter a custom system prompt to override the default..."
+                    className="min-h-[100px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Your custom prompt will be used for this generation and subsequent regenerations.
+                  </p>
+                </div>
+              )}
+
+              <div className="w-full">
+                <label className="block text-sm font-medium text-gray-300 mb-2">MAX OUTPUT TOKENS</label>
+                <div className="flex items-center gap-4">
+                  <Input
+                    type="number"
+                    value={maxTokens || ''}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      if (newValue === '') {
+                        setMaxTokens(undefined);
+                      } else {
+                        const parsed = parseInt(newValue, 10);
+                        if (!isNaN(parsed) && parsed > 0) {
+                          setMaxTokens(parsed);
+                        }
+                      }
+                    }}
+                    placeholder="Default (model dependent)"
+                    className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
+                    min="100"
+                    step="100"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => setMaxTokens(undefined)}
+                    className="border-gray-800 hover:bg-gray-800 text-gray-300"
+                  >
+                    Reset
+                  </Button>
+                </div>
                 <p className="mt-1 text-xs text-gray-400">
-                  Your custom prompt will be used for this generation and subsequent regenerations.
+                  Set the maximum number of tokens for the model output. Higher values allow for longer code generation but may take more time. Leave empty to use the model's default.
                 </p>
               </div>
-            )}
-
-            <div className="w-full mb-8">
-              <label className="block text-sm font-medium text-gray-300 mb-2">MAX OUTPUT TOKENS</label>
-              <div className="flex items-center gap-4">
-                <Input
-                  type="number"
-                  value={maxTokens || ''}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    if (newValue === '') {
-                      setMaxTokens(undefined);
-                    } else {
-                      const parsed = parseInt(newValue, 10);
-                      if (!isNaN(parsed) && parsed > 0) {
-                        setMaxTokens(parsed);
-                      }
-                    }
-                  }}
-                  placeholder="Default (model dependent)"
-                  className="w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 transition-all duration-300"
-                  min="100"
-                  step="100"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => setMaxTokens(undefined)}
-                  className="border-gray-800 hover:bg-gray-800 text-gray-300"
-                >
-                  Reset
-                </Button>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                Set the maximum number of tokens for the model output. Higher values allow for longer code generation but may take more time. Leave empty to use the model's default.
-              </p>
             </div>
           </>
         )}

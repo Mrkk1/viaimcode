@@ -1,4 +1,4 @@
-import { generateUniqueFileName, uploadToOss } from './oss-client';
+import { generateUniqueFileName, generateStructuredFileName, uploadToOss } from './oss-client';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
@@ -24,10 +24,15 @@ const ensureUploadDir = async () => {
 export const uploadImage = async (
   imageData: Buffer | string, 
   originalName: string = 'image.png',
-  useOss: boolean = process.env.NODE_ENV === 'production'
+  useOss: boolean = process.env.NODE_ENV === 'production',
+  options?: {
+    userId?: string;
+    taskId?: string;
+    subFolder?: string;
+  }
 ): Promise<string> => {
   try {
-    console.log(`Start processing image upload: file name=${originalName}, use OSS=${useOss}, environment=${process.env.NODE_ENV}`);
+  
     
     let buffer: Buffer;
 
@@ -47,23 +52,42 @@ export const uploadImage = async (
     }
 
     // Generate file name
-    const fileName = generateUniqueFileName(originalName);
+    let fileName: string;
+    if (options?.userId && options?.taskId) {
+      // Use structured filename (with userId and taskId)
+      fileName = generateStructuredFileName(
+        options.userId,
+        options.taskId,
+        originalName,
+        options.subFolder
+      );
+    } else {
+      // Use old filename generation method (for backward compatibility)
+      fileName = generateUniqueFileName(originalName);
+    }
     console.log(`Generated unique file name: ${fileName}`);
 
     // Production environment or forced: Use Aliyun OSS
     if (useOss) {
-      console.log('Using Aliyun OSS to store image...');
       const ossUrl = await uploadToOss(buffer, fileName);
-      console.log(`Image uploaded to OSS: ${ossUrl}`);
       return ossUrl;
     } 
     // Development environment: Save to local
     else {
       console.log('Using local file system to store image...');
       await ensureUploadDir();
-      const filePath = path.join(UPLOAD_DIR, path.basename(fileName));
+      
+      // For local storage, need to create nested directories
+      if (options?.userId && options?.taskId) {
+        const dirParts = fileName.split('/');
+        dirParts.pop(); // Remove filename, keep only directory path
+        const nestedDir = path.join(UPLOAD_DIR, ...dirParts);
+        await mkdirAsync(nestedDir, { recursive: true });
+      }
+      
+      const filePath = path.join(UPLOAD_DIR, fileName);
       await writeFileAsync(filePath, buffer);
-      const relativePath = `/uploads/${path.basename(fileName)}`;
+      const relativePath = `/uploads/${fileName}`;
       console.log(`Image saved to local: ${relativePath}`);
       
       // Return relative URL path

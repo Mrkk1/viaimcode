@@ -3,19 +3,8 @@ import dotenv from 'dotenv';
 
 // 确保环境变量已加载
 if (process.env.NODE_ENV !== 'production') {
-  console.log('正在加载环境变量配置...');
   dotenv.config();
 }
-
-// 输出OSS配置检查日志(注意不要泄露完整的Secret)
-console.log('OSS配置检查:', {
-  accessKeyIdExists: !!process.env.ALICLOUD_ACCESS_KEY_ID,
-  accessKeySecretExists: !!process.env.ALICLOUD_ACCESS_KEY_SECRET,
-  bucket: process.env.ALICLOUD_OSS_BUCKET,
-  region: process.env.ALICLOUD_OSS_REGION,
-  endpoint: process.env.ALICLOUD_OSS_ENDPOINT,
-  env: process.env.NODE_ENV
-});
 
 // 阿里云OSS配置
 let ossClient: OSS | null = null;
@@ -45,15 +34,11 @@ export const initOssClient = () => {
     // 使用region或自定义endpoint
     if (endpoint) {
       config.endpoint = endpoint;
-      console.log(`OSS客户端使用自定义endpoint: ${endpoint}`);
     } else if (region) {
       config.region = region;
-      console.log(`OSS客户端使用region: ${region}`);
     }
 
-    console.log('正在初始化OSS客户端...');
     ossClient = new OSS(config);
-    console.log('OSS客户端初始化成功');
     return ossClient;
   } catch (error) {
     console.error('初始化阿里云OSS客户端失败:', error);
@@ -77,23 +62,39 @@ export const generateUniqueFileName = (originalName: string) => {
   return `images/${timestamp}-${randomString}.${extension}`;
 };
 
+// 生成带有用户ID和任务ID的文件路径
+export const generateStructuredFileName = (
+  userId: string, 
+  taskId: string, 
+  originalName: string,
+  subFolder?: string
+) => {
+  const timestamp = Date.now();
+  const randomString = Math.random().toString(36).substring(2, 8);
+  const extension = originalName.split('.').pop() || 'png';
+  
+  // 构建目录路径：/userId/taskId/[subFolder]/filename
+  const pathParts = ['users', userId, taskId];
+  if (subFolder) {
+    pathParts.push(subFolder);
+  }
+  
+  const fileName = `${timestamp}-${randomString}.${extension}`;
+  return `${pathParts.join('/')}/${fileName}`;
+};
+
 // 上传文件到OSS
 export const uploadToOss = async (file: Buffer, fileName: string) => {
-  console.log(`准备上传文件到OSS: ${fileName}, 大小: ${file.length}字节`);
   const client = getOssClient();
   if (!client) {
-    console.error('OSS客户端未初始化，无法上传文件');
     throw new Error('OSS客户端未初始化');
   }
 
   try {
-    console.log('开始上传文件到OSS...');
     const result = await client.put(fileName, file);
-    console.log('文件上传成功, 返回结果:', result.url ? '获得URL' : '无URL');
     // 使用类型断言访问options属性
     const options = client as any;
     const finalUrl = result.url || `https://${options.options.bucket}.${options.options.endpoint}/${fileName}`;
-    console.log('最终OSS文件URL:', finalUrl);
     return finalUrl;
   } catch (error) {
     console.error('上传到OSS失败:', error);
