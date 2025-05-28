@@ -5,6 +5,7 @@ import { jwtVerify } from 'jose';
 // 需要登录才能访问的路由
 const protectedRoutes = [
   '/websites',
+  '/admin',
 ];
 
 // 公开路由
@@ -41,7 +42,8 @@ export async function middleware(request: NextRequest) {
   const publicApiRoutes = [
     '/api/auth/login',
     '/api/auth/register',
-    '/api/share'
+    '/api/share',
+    '/api/featured-websites'
   ];
 
   // 如果是 API 路由
@@ -110,12 +112,14 @@ export const config = {
      * 匹配所有路由:
      * - `/`
      * - `/websites` 和其子路由
+     * - `/admin` 和其子路由
      * - `/login`
      * - `/register`
      * - `/api` 和其子路由
      */
     '/',
     '/websites/:path*',
+    '/admin/:path*',
     '/login',
     '/register',
     '/api/:path*'

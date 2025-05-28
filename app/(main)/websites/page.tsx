@@ -19,6 +19,7 @@ interface Website {
   title: string;
   description: string;
   createdAt: Date;
+  isFeatured?: boolean;
 }
 
 export default function WebsitesPage() {
@@ -99,6 +100,8 @@ export default function WebsitesPage() {
       throw error;
     }
   };
+
+
 
   if (!user && !isLoading) {
     redirect('/login');

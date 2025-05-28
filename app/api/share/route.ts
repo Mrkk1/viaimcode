@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveWebsite } from '@/lib/storage';
+import { saveWebsite, updateWebsite } from '@/lib/storage';
 import { saveBase64Image } from '@/lib/image-utils';
 import { getCurrentUser } from '@/lib/auth';
 import { SharedWebsite } from '@/lib/types';
@@ -38,60 +38,39 @@ export async function POST(request: NextRequest) {
         thumbnailUrl = imageData;
         console.log('Using existing image URL:', thumbnailUrl);
         
-        // 保存网站
-        savedWebsite = await saveWebsite({
-          userId: user.userId,
-          title: title || 'Untitled Website',
-          description: description || 'No description',
-          htmlContent,
-          prompt: prompt || '',
-          thumbnailUrl,
-        }, user.userId);
-        
       } else if (imageData && imageData.length > 1000) {
-        // 只有在是base64数据时才上传
+        // 先上传图片，再保存网站
         const filename = `image-${timestamp || Date.now()}-${Math.random().toString(36).substring(2, 10)}.jpg`;
         
-        // 先保存网站数据以获取ID
-        savedWebsite = await saveWebsite({
-          userId: user.userId,
-          title: title || 'Untitled Website',
-          description: description || 'No description',
-          htmlContent,
-          prompt: prompt || '',
-          thumbnailUrl: '', // 临时为空
-        }, user.userId);
-        
-        // 使用用户ID和网站ID作为目录结构
+        console.log('Uploading image first...');
         thumbnailUrl = await uploadImage(imageData, filename, true, {
           userId: user.userId,
-          taskId: savedWebsite.id,
+          taskId: 'temp', // 临时使用，因为还没有网站ID
           subFolder: 'thumbnails'
         });
+        console.log('Image uploaded successfully:', thumbnailUrl);
         
-        // 更新网站的缩略图URL
-        savedWebsite = await saveWebsite({
-          ...savedWebsite,
-          thumbnailUrl,
-        }, user.userId);
-
       } else {
-        console.error('Invalid image data');
-        
-        // 如果没有图片，直接保存网站
-        savedWebsite = await saveWebsite({
-          userId: user.userId,
-          title: title || 'Untitled Website',
-          description: description || 'No description',
-          htmlContent,
-          prompt: prompt || '',
-          thumbnailUrl: '',
-        }, user.userId);
+        console.log('No valid image data provided');
       }
+      
+      // 保存网站（包含缩略图URL）
+      savedWebsite = await saveWebsite({
+        userId: user.userId,
+        title: title || 'Untitled Website',
+        description: description || 'No description',
+        htmlContent,
+        prompt: prompt || '',
+        thumbnailUrl: thumbnailUrl || '',
+        isFeatured: false, // 新发布的网站默认不设为精选
+      }, user.userId);
+      
+      console.log('Website saved successfully with thumbnail:', savedWebsite.id);
+      
     } catch (imageError) {
       console.error('Failed to save image:', imageError);
-      
-      // 即使图片保存失败，也保存网站
+    
+      // 即使图片保存失败，也保存网站（但不包含缩略图）
       savedWebsite = await saveWebsite({
         userId: user.userId,
         title: title || 'Untitled Website',
@@ -99,7 +78,10 @@ export async function POST(request: NextRequest) {
         htmlContent,
         prompt: prompt || '',
         thumbnailUrl: '',
+        isFeatured: false, // 新发布的网站默认不设为精选
       }, user.userId);
+      
+      console.log('Website saved without thumbnail due to image error');
     }
     
     console.log('Website saved, ID:', savedWebsite.id, 'Preview URL:', thumbnailUrl);

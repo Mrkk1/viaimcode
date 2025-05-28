@@ -10,7 +10,12 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "ViaimCode",
-  description: "AI Website Generator",
+  description: "ViaimCode - AI Website Generator",
+  icons: {
+    icon: '/logo.ico',
+    shortcut: '/logo.ico',
+    apple: '/logo.ico',
+  },
 }
 
 // 检查是否是share路由
@@ -24,9 +29,13 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="color-scheme" content="dark" />
+        <link rel="icon" href="/logo.ico" sizes="any" />
+        <link rel="icon" href="/logo.ico" type="image/x-icon" />
+        <link rel="shortcut icon" href="/logo.ico" />
+        <meta name="theme-color" content="#000000" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider

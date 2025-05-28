@@ -37,6 +37,7 @@ interface WebsiteItemProps {
     description: string;
     createdAt: Date;
     thumbnailUrl?: string;
+    isFeatured?: boolean;
   };
   onDelete?: (id: string) => Promise<void>;
   onUpdate?: (id: string, data: { title: string; description: string }) => Promise<void>;
@@ -116,6 +117,8 @@ const ActionButtons = memo(({
     }
   }, [websiteId]);
 
+
+
   return (
     <div className="flex flex-row gap-2 justify-between pt-2 border-t border-gray-800/50">
       <Button
@@ -127,6 +130,8 @@ const ActionButtons = memo(({
         <Edit className="w-3.5 h-3.5" />
         <span className="text-xs font-medium">Edit</span>
       </Button>
+      
+
       
       <Button
         variant="ghost"

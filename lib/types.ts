@@ -8,6 +8,7 @@ export interface SharedWebsite {
   prompt: string;    // Prompt used to generate the website
   createdAt: Date;   // Creation time
   thumbnailUrl: string; // Website preview image URL
+  isFeatured: boolean; // Whether the website is featured on homepage
 }
 
 // Define user model

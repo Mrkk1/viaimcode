@@ -7,10 +7,23 @@ import { deleteImage } from './image-utils';
 export async function getAllWebsites(userId: string): Promise<SharedWebsite[]> {
   const pool = getPool();
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM websites WHERE userId = ? ORDER BY createdAt DESC',
-      [userId]
-    );
+    let query: string;
+    let params: any[];
+    
+    if (userId === '') {
+      // 管理员模式：获取所有网站，包含用户信息
+      query = `SELECT w.*, u.username as authorName 
+               FROM websites w 
+               JOIN users u ON w.userId = u.id 
+               ORDER BY w.createdAt DESC`;
+      params = [];
+    } else {
+      // 普通用户模式：只获取自己的网站
+      query = 'SELECT * FROM websites WHERE userId = ? ORDER BY createdAt DESC';
+      params = [userId];
+    }
+    
+    const [rows] = await pool.query(query, params);
     return rows as SharedWebsite[];
   } catch (error) {
     console.error('Error fetching websites:', error);
@@ -40,11 +53,11 @@ export async function saveWebsite(
   const id = uuidv4();
   
   try {
-    const { title, description, htmlContent, prompt, thumbnailUrl } = websiteData;
+    const { title, description, htmlContent, prompt, thumbnailUrl, isFeatured } = websiteData;
     
     await pool.execute(
-      'INSERT INTO websites (id, userId, title, description, htmlContent, prompt, thumbnailUrl) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, userId, title, description, htmlContent, prompt, thumbnailUrl || null]
+      'INSERT INTO websites (id, userId, title, description, htmlContent, prompt, thumbnailUrl, isFeatured) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, userId, title, description, htmlContent, prompt, thumbnailUrl || null, isFeatured ? 1 : 0]
     );
     
     const savedWebsite = await getWebsiteById(id);
@@ -62,7 +75,7 @@ export async function saveWebsite(
 // Update website
 export async function updateWebsite(
   id: string,
-  updates: { title?: string; description?: string }
+  updates: { title?: string; description?: string; isFeatured?: boolean; thumbnailUrl?: string }
 ): Promise<boolean> {
   const pool = getPool();
   try {
@@ -77,6 +90,16 @@ export async function updateWebsite(
     if (updates.description !== undefined) {
       fields.push('description = ?');
       values.push(updates.description);
+    }
+    
+    if (updates.isFeatured !== undefined) {
+      fields.push('isFeatured = ?');
+      values.push(updates.isFeatured ? 1 : 0);
+    }
+    
+    if (updates.thumbnailUrl !== undefined) {
+      fields.push('thumbnailUrl = ?');
+      values.push(updates.thumbnailUrl);
     }
     
     if (fields.length === 0) return false;
@@ -107,6 +130,26 @@ export async function deleteWebsite(id: string): Promise<boolean> {
   } catch (error) {
     console.error('Failed to delete website:', error);
     return false;
+  }
+}
+
+// Get featured websites for homepage display
+export async function getFeaturedWebsites(limit: number = 12): Promise<SharedWebsite[]> {
+  const pool = getPool();
+  try {
+    const [rows] = await pool.query(
+      `SELECT w.*, u.username as authorName 
+       FROM websites w 
+       JOIN users u ON w.userId = u.id 
+       WHERE w.isFeatured = 1 
+       ORDER BY w.createdAt DESC 
+       LIMIT ?`,
+      [limit]
+    );
+    return rows as SharedWebsite[];
+  } catch (error) {
+    console.error('Error fetching featured websites:', error);
+    return [];
   }
 }
 
@@ -366,5 +409,41 @@ export async function deleteProject(id: string): Promise<boolean> {
   } catch (error) {
     console.error('Error deleting project:', error);
     return false;
+  }
+}
+
+// 获取优秀项目列表（公开项目且有已发布版本）
+export async function getFeaturedProjects(): Promise<any[]> {
+  const pool = getPool();
+  try {
+    const [rows] = await pool.query(`
+      SELECT 
+        p.id,
+        p.title,
+        p.description,
+        p.thumbnail,
+        p.model,
+        p.provider,
+        p.createdAt,
+        p.lastSaveTime,
+        u.username as authorName,
+        v.shareUrl,
+        v.thumbnail as versionThumbnail,
+        v.title as versionTitle
+      FROM projects p
+      JOIN users u ON p.userId = u.id
+      JOIN versions v ON p.currentVersionId = v.id
+      WHERE p.isPublic = 1 
+        AND p.status = 'active' 
+        AND v.isPublished = 1
+        AND v.shareUrl IS NOT NULL
+      ORDER BY p.lastSaveTime DESC
+      LIMIT 12
+    `);
+    
+    return rows as any[];
+  } catch (error) {
+    console.error('Error fetching featured projects:', error);
+    return [];
   }
 } 

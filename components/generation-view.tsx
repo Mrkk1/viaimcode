@@ -119,9 +119,9 @@ const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Save Website</DialogTitle>
+          <DialogTitle>发布网站</DialogTitle>
           <DialogDescription>
-            Enter the title and description to save the website
+            填写标题和描述来发布网站，发布后将生成分享链接
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -155,27 +155,27 @@ const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) 
             )}
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="title">Title</Label>
+            <Label htmlFor="title">网站标题</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter website title"
+              placeholder="请输入网站标题"
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">网站描述</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter website description"
+              placeholder="请输入网站描述"
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button variant="outline" onClick={onClose}>取消</Button>
+          <Button onClick={handleSave}>发布</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1336,7 +1336,7 @@ export function GenerationView({
       
       // 关闭加载提示
       toast.dismiss();
-      toast.success('保存成功！');
+      toast.success('网站发布成功！');
       
       // 构建完整URL
       const fullUrl = data.shareUrl?.startsWith('http') 

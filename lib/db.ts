@@ -61,9 +61,11 @@ export async function initDatabase() {
         prompt TEXT,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         thumbnailUrl VARCHAR(255) DEFAULT NULL,
+        isFeatured TINYINT(1) DEFAULT 0 COMMENT '是否发布到首页展示 (0=否, 1=是)',
         KEY idx_websites_userId (userId),
         KEY idx_websites_createdAt (createdAt),
         KEY idx_websites_thumbnailUrl (thumbnailUrl),
+        KEY idx_websites_isFeatured (isFeatured),
         FOREIGN KEY (userId) REFERENCES users(id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
