@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2 } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -212,6 +212,7 @@ export function GenerationView({
   const [showHistory, setShowHistory] = useState(false)
   const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>(initialVersions)
   const [currentVersionId, setCurrentVersionId] = useState<string>("")
+  const [isElementSelectMode, setIsElementSelectMode] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const isInitialMount = useRef(true)
   const previousGeneratedCode = useRef(generatedCode)
@@ -1473,6 +1474,580 @@ export function GenerationView({
     }
   };
 
+  // 生成元素的XPath路径（从根节点开始往下构建）
+  const generateElementFingerprint = useCallback((element: HTMLElement) => {
+    console.log('开始生成元素XPath指纹，元素:', element);
+    
+    // 1. 从根节点开始往下生成完整的XPath路径
+    const generateXPath = (el: HTMLElement): string => {
+      const pathSegments: string[] = [];
+      let current = el;
+      
+      // 先收集从目标元素到根节点的路径
+      const reversePath: HTMLElement[] = [];
+      while (current && current !== document.body && current.parentElement) {
+        reversePath.push(current);
+        current = current.parentElement;
+      }
+      
+      // 反转路径，从根节点开始往下构建
+      const forwardPath = reversePath.reverse();
+      
+      // 为每个节点生成XPath段
+      forwardPath.forEach((node, index) => {
+        const parent = node.parentElement;
+        if (!parent) return;
+        
+        const siblings = Array.from(parent.children);
+        const tagName = node.tagName.toLowerCase();
+        
+        // 计算在相同标签兄弟中的位置（从1开始）
+        const sameTagSiblings = siblings.filter(sibling => sibling.tagName === node.tagName);
+        const tagIndex = sameTagSiblings.indexOf(node) + 1;
+        
+        // 优先级：ID > 唯一class > class+索引 > 标签+索引
+        if (node.id) {
+          // ID是唯一的，可以直接定位
+          pathSegments.push(`${tagName}[@id='${node.id}']`);
+        } else if (node.className) {
+          const className = node.className.trim();
+          
+          // 特殊处理body标签，过滤掉动态添加的类
+          let cleanClassName = className;
+          if (tagName === 'body') {
+            cleanClassName = className
+              .replace(/\s*element-selectable\s*/g, ' ')
+              .trim();
+          }
+          
+          if (cleanClassName) {
+            const sameClassSiblings = siblings.filter(sibling => 
+              sibling.tagName === node.tagName && sibling.className === className
+            );
+            
+            if (sameClassSiblings.length === 1) {
+              // class在同标签兄弟中是唯一的
+              pathSegments.push(`${tagName}[@class='${cleanClassName}']`);
+            } else {
+              // class不唯一，需要添加索引
+              const classIndex = sameClassSiblings.indexOf(node) + 1;
+              pathSegments.push(`${tagName}[@class='${cleanClassName}'][${classIndex}]`);
+            }
+          } else {
+            // 如果清理后没有class，使用标签索引
+            if (sameTagSiblings.length === 1) {
+              pathSegments.push(tagName);
+            } else {
+              pathSegments.push(`${tagName}[${tagIndex}]`);
+            }
+          }
+        } else {
+          // 没有ID和class，使用标签索引
+          if (sameTagSiblings.length === 1) {
+            pathSegments.push(tagName);
+          } else {
+            pathSegments.push(`${tagName}[${tagIndex}]`);
+          }
+        }
+      });
+      
+      return '//' + pathSegments.join('/');
+    };
+    
+    // 2. 生成分层路径信息（用于逐层匹配）
+    const generateLayeredPath = (el: HTMLElement): Array<{
+      tagName: string;
+      id?: string;
+      className?: string;
+      index?: number;
+      level: number;
+    }> => {
+      const layers: Array<{
+        tagName: string;
+        id?: string;
+        className?: string;
+        index?: number;
+        level: number;
+      }> = [];
+      let current = el;
+      let level = 0;
+      
+      // 收集从目标元素到根节点的路径
+      const reversePath: HTMLElement[] = [];
+      while (current && current !== document.body && current.parentElement) {
+        reversePath.push(current);
+        current = current.parentElement;
+      }
+      
+      // 反转路径，从根节点开始
+      const forwardPath = reversePath.reverse();
+      
+      forwardPath.forEach((node, index) => {
+        const parent = node.parentElement;
+        if (!parent) return;
+        
+        const siblings = Array.from(parent.children);
+        const sameTagSiblings = siblings.filter(sibling => sibling.tagName === node.tagName);
+        const tagIndex = sameTagSiblings.indexOf(node) + 1;
+        
+        const layer: {
+          tagName: string;
+          id?: string;
+          className?: string;
+          index?: number;
+          level: number;
+        } = {
+          tagName: node.tagName.toLowerCase(),
+          level: index,
+          index: tagIndex
+        };
+        
+        if (node.id) {
+          layer.id = node.id;
+        }
+        
+        if (node.className) {
+          layer.className = node.className.trim();
+          
+          // 特殊处理body标签，过滤掉动态添加的类
+          if (node.tagName.toLowerCase() === 'body') {
+            layer.className = layer.className
+              .replace(/\s*element-selectable\s*/g, ' ')
+              .trim();
+          }
+          
+          // 计算在相同class兄弟中的索引
+          const sameClassSiblings = siblings.filter(sibling => 
+            sibling.tagName === node.tagName && sibling.className === node.className
+          );
+          if (sameClassSiblings.length > 1) {
+            layer.index = sameClassSiblings.indexOf(node) + 1;
+          }
+        }
+        
+        layers.push(layer);
+      });
+      
+      return layers;
+    };
+    
+    // 3. 生成备用的CSS选择器路径
+    const generateCSSPath = (el: HTMLElement): string => {
+      const pathSegments: string[] = [];
+      let current = el;
+      
+      // 收集路径段
+      const reversePath: HTMLElement[] = [];
+      while (current && current !== document.body && current.parentElement) {
+        reversePath.push(current);
+        current = current.parentElement;
+      }
+      
+      // 从根节点开始构建CSS路径
+      reversePath.reverse().forEach(node => {
+        let selector = node.tagName.toLowerCase();
+        
+        if (node.id) {
+          selector += `#${node.id}`;
+        } else {
+          if (node.className) {
+            const classes = node.className.trim().split(/\s+/).join('.');
+            selector += `.${classes}`;
+          }
+          
+          // 添加nth-child以确保精确性
+          const parent = node.parentElement;
+          if (parent) {
+            const siblings = Array.from(parent.children);
+            const index = siblings.indexOf(node) + 1;
+            selector += `:nth-child(${index})`;
+          }
+        }
+        
+        pathSegments.push(selector);
+      });
+      
+      return pathSegments.join(' > ');
+    };
+    
+    // 4. 提取关键文本用于验证
+    const extractKeyText = (el: HTMLElement): string => {
+      // 获取元素的直接文本内容（不包括子元素）
+      const directText = Array.from(el.childNodes)
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent?.trim())
+        .filter(text => text && text.length > 0)
+        .join(' ');
+      
+      if (directText) return directText;
+      
+      // 如果没有直接文本，获取第一个有意义的子元素文本
+      const walker = document.createTreeWalker(
+        el,
+        NodeFilter.SHOW_TEXT,
+        null
+      );
+      
+      let node;
+      while (node = walker.nextNode()) {
+        const text = node.textContent?.trim();
+        if (text && text.length > 2) {
+          return text;
+        }
+      }
+      
+      return '';
+    };
+    
+    const xpath = generateXPath(element);
+    const layeredPath = generateLayeredPath(element);
+    const cssPath = generateCSSPath(element);
+    const keyText = extractKeyText(element);
+    
+
+    
+    return {
+      xpath,
+      layeredPath,
+      cssPath,
+      keyText,
+      tagName: element.tagName.toLowerCase(),
+      className: element.className,
+      id: element.id || '',
+      textContent: element.textContent?.trim() || ''
+    };
+  }, []);
+
+  // 在代码中通过完整DOM路径精确查找元素（完全模拟浏览器控制台）
+  const findElementInCode = useCallback((fingerprint: {
+    xpath: string;
+    layeredPath: Array<{
+      tagName: string;
+      id?: string;
+      className?: string;
+      index?: number;
+      level: number;
+    }>;
+    cssPath: string;
+    keyText: string;
+    tagName: string;
+    className: string;
+    id: string;
+    textContent: string;
+  }) => {
+    const currentCode = isEditable ? editedCode : originalCode;
+    const lines = currentCode.split('\n');
+    
+    
+    // 策略1: ID精确匹配（最高优先级）
+    if (fingerprint.id) {
+      const lineIndex = lines.findIndex(line => 
+        line.includes(`id="${fingerprint.id}"`) || line.includes(`id='${fingerprint.id}'`)
+      );
+      if (lineIndex !== -1) {
+        return {
+          lineIndex,
+          score: 100,
+          confidence: '精确'
+        };
+      }
+    }
+    
+    // 策略2: 完整DOM路径验证（模拟浏览器控制台）
+    const fullPathMatch = (): number | null => {
+      
+      if (fingerprint.layeredPath.length === 0) return null;
+      
+      // 获取目标层（最后一层）
+      const targetLayer = fingerprint.layeredPath[fingerprint.layeredPath.length - 1];
+      
+      // 首先找到所有可能的目标元素
+      const candidateLines: number[] = [];
+      
+      if (targetLayer.className) {
+        lines.forEach((line, index) => {
+          if (line.includes(`<${targetLayer.tagName}`) && 
+              (line.includes(`class="${targetLayer.className}"`) || 
+               line.includes(`class='${targetLayer.className}'`))) {
+            candidateLines.push(index);
+          }
+        });
+      } else {
+        lines.forEach((line, index) => {
+          if (line.includes(`<${targetLayer.tagName}`)) {
+            candidateLines.push(index);
+          }
+        });
+      }
+      
+      // console.log(`找到${candidateLines.length}个候选目标元素:`, candidateLines.map(i => i + 1));
+      
+      if (candidateLines.length === 0) return null;
+      if (candidateLines.length === 1) {
+        // console.log('✅ 唯一候选元素匹配:', candidateLines[0] + 1);
+        return candidateLines[0];
+      }
+      
+      // 多个候选元素，需要完整路径验证
+      // console.log('多个候选元素，开始完整路径验证');
+      
+      for (const candidateLineIndex of candidateLines) {
+        // console.log(`验证候选行 ${candidateLineIndex + 1}`);
+        
+        // 验证完整的父级路径
+        let isValidPath = true;
+        let currentSearchLine = candidateLineIndex;
+        
+        // 从倒数第二层开始向上验证（跳过目标层，因为已经匹配了）
+        // 同时跳过body标签（第0层），因为body标签可能有动态类
+        for (let layerIndex = fingerprint.layeredPath.length - 2; layerIndex >= 1; layerIndex--) {
+          const parentLayer = fingerprint.layeredPath[layerIndex];
+          console.log(`验证第${layerIndex}层父元素:`, parentLayer);
+          
+          // 向上搜索父元素（在当前行之前的一定范围内）
+          let foundParent = false;
+          const searchStart = Math.max(0, currentSearchLine - 50); // 向上搜索50行
+          
+          for (let i = currentSearchLine - 1; i >= searchStart; i--) {
+            const line = lines[i];
+            
+            // 检查是否匹配父层
+            let parentMatches = false;
+            
+            if (parentLayer.id) {
+              // 通过ID匹配父元素
+              if (line.includes(`<${parentLayer.tagName}`) && 
+                  (line.includes(`id="${parentLayer.id}"`) || line.includes(`id='${parentLayer.id}'`))) {
+                parentMatches = true;
+              }
+            } else if (parentLayer.className) {
+              // 通过class匹配父元素
+              if (line.includes(`<${parentLayer.tagName}`) && 
+                  (line.includes(`class="${parentLayer.className}"`) || 
+                   line.includes(`class='${parentLayer.className}'`))) {
+                parentMatches = true;
+              }
+            } else {
+              // 通过标签匹配父元素
+              if (line.includes(`<${parentLayer.tagName}`)) {
+                parentMatches = true;
+              }
+            }
+            
+            if (parentMatches) {
+              foundParent = true;
+              currentSearchLine = i;
+              break;
+            }
+          }
+          
+          if (!foundParent) {
+            isValidPath = false;
+            break;
+          }
+        }
+        
+        if (isValidPath) {
+          return candidateLineIndex;
+        } else {
+        }
+      }
+      
+      return candidateLines[0];
+    };
+    
+    const fullPathResult = fullPathMatch();
+    if (fullPathResult !== null) {
+      return {
+        lineIndex: fullPathResult,
+        score: 95,
+        confidence: '精确'
+      };
+    }
+    
+    // 策略3: 关键文本匹配（用于验证和备选）
+    if (fingerprint.keyText && fingerprint.keyText.length > 3) {
+      const lineIndex = lines.findIndex(line => line.includes(fingerprint.keyText));
+      if (lineIndex !== -1) {
+        return {
+          lineIndex,
+          score: 90,
+          confidence: '高'
+        };
+      }
+    }
+    
+    // 策略4: XPath直接解析匹配
+    const xpathDirectMatch = (): number | null => {
+      
+      // 解析XPath中的最具体的标识符
+      const xpathParts = fingerprint.xpath.split('/').filter(part => part.length > 0);
+      
+      // 寻找包含ID的部分
+      for (const part of xpathParts) {
+        const idMatch = part.match(/\[@id='([^']+)'\]/);
+        if (idMatch) {
+          const id = idMatch[1];
+          const lineIndex = lines.findIndex(line => 
+            line.includes(`id="${id}"`) || line.includes(`id='${id}'`)
+          );
+          if (lineIndex !== -1) {
+            return lineIndex;
+          }
+        }
+      }
+      
+      return null;
+    };
+    
+    const xpathResult = xpathDirectMatch();
+    if (xpathResult !== null) {
+      return {
+        lineIndex: xpathResult,
+        score: 85,
+        confidence: '高'
+      };
+    }
+    
+    // 策略5: CSS路径匹配（最后的备选）
+    if (fingerprint.cssPath.includes('nth-child')) {
+      const nthMatch = fingerprint.cssPath.match(/:nth-child\((\d+)\)/g);
+      if (nthMatch) {
+        const lastNthMatch = nthMatch[nthMatch.length - 1];
+        const indexMatch = lastNthMatch.match(/:nth-child\((\d+)\)/);
+        if (indexMatch) {
+          const nthIndex = parseInt(indexMatch[1]) - 1;
+          
+          const tagLines: number[] = [];
+          lines.forEach((line, index) => {
+            if (line.includes(`<${fingerprint.tagName}`)) {
+              tagLines.push(index);
+            }
+          });
+          
+          if (tagLines.length > nthIndex) {
+            return {
+              lineIndex: tagLines[nthIndex],
+              score: 80,
+              confidence: '中'
+            };
+          }
+        }
+      }
+    }
+    
+    console.log('❌ 所有匹配策略都失败了');
+    return null;
+  }, [isEditable, editedCode, originalCode]);
+
+  // 处理元素选择模式
+  const handleElementSelect = useCallback((element: HTMLElement) => {
+    if (!isElementSelectMode) return;
+    
+    try {
+      
+      // 生成元素指纹
+      const fingerprint = generateElementFingerprint(element);
+      
+      // 在代码中查找元素
+      const result = findElementInCode(fingerprint);
+      
+      if (result) {
+        const targetLineNumber = result.lineIndex + 1;
+        
+        // 通过自定义事件通知CodeEditor跳转到指定行
+        const event = new CustomEvent('jumpToLine', {
+          detail: { lineNumber: targetLineNumber }
+        });
+        
+        console.log('触发跳转事件:', event.detail);
+        window.dispatchEvent(event);
+        
+        // 显示成功提示
+        toast.success(`已定位到第 ${targetLineNumber} 行`, {
+          duration: 2000,
+        });
+      } else {
+        console.warn('未找到匹配的代码行');
+        toast.error('未能在代码中找到对应的元素');
+      }
+      
+      // 高亮选中的元素
+      element.style.outline = '2px solid #3b82f6';
+      element.style.outlineOffset = '2px';
+      
+      // 3秒后移除高亮
+      setTimeout(() => {
+        element.style.outline = '';
+        element.style.outlineOffset = '';
+      }, 3000);
+      
+    } catch (error) {
+      console.error('元素选择处理失败:', error);
+      toast.error('元素选择失败');
+    }
+  }, [isElementSelectMode, generateElementFingerprint, findElementInCode]);
+
+  // 设置iframe的元素选择事件监听
+  const setupElementSelection = useCallback(() => {
+    if (!iframeRef.current || !isElementSelectMode) return;
+    
+    const iframe = iframeRef.current;
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    
+    if (!iframeDoc) return;
+    
+    // 添加样式来显示可选择状态
+    const style = iframeDoc.createElement('style');
+    style.textContent = `
+      .element-selectable * {
+        cursor: crosshair !important;
+      }
+      .element-selectable *:hover {
+        outline: 2px dashed #3b82f6 !important;
+        outline-offset: 2px !important;
+      }
+    `;
+    iframeDoc.head.appendChild(style);
+    
+    // 为body添加选择模式类
+    if (iframeDoc.body) {
+      iframeDoc.body.classList.add('element-selectable');
+    }
+    
+    // 添加点击事件监听
+    const handleClick = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const target = e.target as HTMLElement;
+      if (target) {
+        handleElementSelect(target);
+      }
+    };
+    
+    iframeDoc.addEventListener('click', handleClick, true);
+    
+    // 返回清理函数
+    return () => {
+      if (iframeDoc.body) {
+        iframeDoc.body.classList.remove('element-selectable');
+      }
+      iframeDoc.removeEventListener('click', handleClick, true);
+      if (style.parentNode) {
+        style.parentNode.removeChild(style);
+      }
+    };
+  }, [isElementSelectMode, handleElementSelect]);
+
+  // 监听元素选择模式变化
+  useEffect(() => {
+    if (isElementSelectMode) {
+      const cleanup = setupElementSelection();
+      return cleanup;
+    }
+  }, [isElementSelectMode, setupElementSelection, previewKey]);
+
   // 删除历史版本
   const handleDeleteVersion = useCallback(async (versionId: string) => {
     // 确保不删除当前正在使用的版本
@@ -1758,6 +2333,18 @@ export function GenerationView({
                       <span className="text-xs hidden sm:inline">Refresh</span>
                     </Button>
                   )}
+                  {generationComplete && (
+                    <Button
+                      variant={isElementSelectMode ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-2 mr-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                      onClick={() => setIsElementSelectMode(!isElementSelectMode)}
+                      title={isElementSelectMode ? "退出元素选择模式" : "进入元素选择模式"}
+                    >
+                      <MousePointer2 className="w-4 h-4 mr-1" />
+                      <span className="text-xs hidden sm:inline">Select</span>
+                    </Button>
+                  )}
                   <Button
                     variant={viewportSize === "desktop" ? "secondary" : "ghost"}
                     size="sm"
@@ -1822,31 +2409,38 @@ export function GenerationView({
                       )}
                     </div>
                   ) : (
-                    <div className="w-full h-full relative bg-white">
-                      <iframe
-                        ref={iframeRef}
-                        key={previewKey}
-                        srcDoc={previewContent}
-                        className="w-full h-full absolute inset-0 z-10"
-                        title="Preview"
-                        style={{
-                          backgroundColor: '#121212',
-                          opacity: 1,
-                          transition: 'opacity 0.15s ease-in-out',
-                          width: '100%',
-                          height: '100%',
-                          border: 'none',
-                          overflow: 'hidden',
-                        }}
-                      />
-                      {/* Loading indicator that shows only during generation */}
-                      {isGenerating && (
-                        <div className="absolute bottom-4 right-4 z-20 bg-gray-800/80 text-white px-3 py-1 rounded-full text-xs flex items-center">
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Updating preview...
-                        </div>
-                      )}
-                    </div>
+                                          <div className="w-full h-full relative bg-white">
+                        <iframe
+                          ref={iframeRef}
+                          key={previewKey}
+                          srcDoc={previewContent}
+                          className="w-full h-full absolute inset-0 z-10"
+                          title="Preview"
+                          style={{
+                            backgroundColor: '#121212',
+                            opacity: 1,
+                            transition: 'opacity 0.15s ease-in-out',
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                            overflow: 'hidden',
+                          }}
+                        />
+                        {/* Loading indicator that shows only during generation */}
+                        {isGenerating && (
+                          <div className="absolute bottom-4 right-4 z-20 bg-gray-800/80 text-white px-3 py-1 rounded-full text-xs flex items-center">
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Updating preview...
+                          </div>
+                        )}
+                        {/* Element selection mode indicator */}
+                        {isElementSelectMode && (
+                          <div className="absolute top-4 left-4 z-20 bg-blue-600/90 text-white px-3 py-2 rounded-lg text-sm flex items-center shadow-lg">
+                            <MousePointer2 className="w-4 h-4 mr-2" />
+                            <span>点击元素定位到代码</span>
+                          </div>
+                        )}
+                      </div>
                   )}
                 </div>
               </div>
@@ -2003,6 +2597,18 @@ export function GenerationView({
                         <span className="text-xs hidden sm:inline">Refresh</span>
                       </Button>
                     )}
+                    {generationComplete && (
+                      <Button
+                        variant={isElementSelectMode ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 mr-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                        onClick={() => setIsElementSelectMode(!isElementSelectMode)}
+                        title={isElementSelectMode ? "退出元素选择模式" : "进入元素选择模式"}
+                      >
+                        <MousePointer2 className="w-4 h-4 mr-1" />
+                        <span className="text-xs hidden sm:inline">Select</span>
+                      </Button>
+                    )}
                     <Button
                       variant={viewportSize === "desktop" ? "secondary" : "ghost"}
                       size="sm"
@@ -2067,31 +2673,38 @@ export function GenerationView({
                         )}
                       </div>
                     ) : (
-                      <div className="w-full h-full relative bg-white">
-                        <iframe
-                          ref={iframeRef}
-                          key={previewKey}
-                          srcDoc={previewContent}
-                          className="w-full h-full absolute inset-0 z-10"
-                          title="Preview"
-                          style={{
-                            backgroundColor: '#121212',
-                            opacity: 1,
-                            transition: 'opacity 0.15s ease-in-out',
-                            width: '100%',
-                            height: '100%',
-                            border: 'none',
-                            overflow: 'hidden',
-                          }}
-                        />
-                        {/* Loading indicator that shows only during generation */}
-                        {isGenerating && (
-                          <div className="absolute bottom-4 right-4 z-20 bg-gray-800/80 text-white px-3 py-1 rounded-full text-xs flex items-center">
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            Updating preview...
-                          </div>
-                        )}
-                      </div>
+                                              <div className="w-full h-full relative bg-white">
+                          <iframe
+                            ref={iframeRef}
+                            key={previewKey}
+                            srcDoc={previewContent}
+                            className="w-full h-full absolute inset-0 z-10"
+                            title="Preview"
+                            style={{
+                              backgroundColor: '#121212',
+                              opacity: 1,
+                              transition: 'opacity 0.15s ease-in-out',
+                              width: '100%',
+                              height: '100%',
+                              border: 'none',
+                              overflow: 'hidden',
+                            }}
+                          />
+                          {/* Loading indicator that shows only during generation */}
+                          {isGenerating && (
+                            <div className="absolute bottom-4 right-4 z-20 bg-gray-800/80 text-white px-3 py-1 rounded-full text-xs flex items-center">
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Updating preview...
+                            </div>
+                          )}
+                          {/* Element selection mode indicator */}
+                          {isElementSelectMode && (
+                            <div className="absolute top-4 left-4 z-20 bg-blue-600/90 text-white px-3 py-2 rounded-lg text-sm flex items-center shadow-lg">
+                              <MousePointer2 className="w-4 h-4 mr-2" />
+                              <span>点击元素定位到代码</span>
+                            </div>
+                          )}
+                        </div>
                     )}
                   </div>
                 </div>

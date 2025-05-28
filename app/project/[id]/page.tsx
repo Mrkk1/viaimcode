@@ -179,7 +179,7 @@ export default function ProjectDetailPage() {
                 Back
               </Button>
               <div className="flex  " style={{padding: '15px 5px'}}>
-                <h1 className="text-xl font-bold text-white mr-1">{project.title}</h1>
+                <h1 className="text-xl font-bold text-white mr-1 text-ellipsis overflow-hidden whitespace-nowrap max-w-[500px]">{project.title}</h1>
                 <div className="flex items-center gap-4 mt-1">
                   <div className="flex items-center gap-2">
                     {project.provider && (
