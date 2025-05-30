@@ -25,15 +25,7 @@ REQUIREMENTS:
 
 5. Include JavaScript within <script> tags at the end of <body> if needed
 
-6. For image resources, use the following API to get high-quality images:
-   - Format: https://nocode.meituan.com/photo/search?keyword=KEYWORD&width=WIDTH&height=HEIGHT
-   - Example: https://nocode.meituan.com/photo/search?keyword=technology&width=800&height=600
-   - Replace KEYWORD with relevant search terms (in English)
-   - Set appropriate WIDTH and HEIGHT based on the image usage
-   - Use descriptive keywords like: business, technology, nature, people, food, travel, etc.
-   - For hero sections: use width=1200&height=600
-   - For cards/thumbnails: use width=400&height=300
-   - For avatars: use width=200&height=200
+
 
 IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.`;
 

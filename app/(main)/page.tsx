@@ -94,16 +94,7 @@ INTERACTIVITY:
 2. Include proper ARIA labels for accessibility
 3. Make forms and buttons fully interactive with proper states
 
-IMAGE RESOURCES:
-For image resources, use the following API to get high-quality images:
-- Format: https://nocode.meituan.com/photo/search?keyword=KEYWORD&width=WIDTH&height=HEIGHT
-- Example: https://nocode.meituan.com/photo/search?keyword=technology&width=800&height=600
-- Replace KEYWORD with relevant search terms (in English)
-- Set appropriate WIDTH and HEIGHT based on the image usage
-- Use descriptive keywords like: business, technology, nature, people, food, travel, etc.
-- For hero sections: use width=1200&height=600
-- For cards/thumbnails: use width=400&height=300
-- For avatars: use width=200&height=200
+
 
 IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.` : null,
         }),
@@ -278,15 +269,7 @@ When modifying the code:
 6. Add smooth transitions for any new interactive elements
 7. Maintain accessibility standards with proper ARIA labels
 
-For image resources, use the following API to get high-quality images:
-- Format: https://nocode.meituan.com/photo/search?keyword=KEYWORD&width=WIDTH&height=HEIGHT
-- Example: https://nocode.meituan.com/photo/search?keyword=technology&width=800&height=600
-- Replace KEYWORD with relevant search terms (in English)
-- Set appropriate WIDTH and HEIGHT based on the image usage
-- Use descriptive keywords like: business, technology, nature, people, food, travel, etc.
-- For hero sections: use width=1200&height=600
-- For cards/thumbnails: use width=400&height=300
-- For avatars: use width=200&height=200
+
 
 IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.` : null,
         }),
