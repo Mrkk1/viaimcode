@@ -182,6 +182,214 @@ const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) 
   );
 };
 
+// 添加图片替换对话框的接口
+interface ImageReplaceDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onReplace: (newImageSrc: string) => void;
+  currentImageSrc: string;
+}
+
+// 图片替换对话框组件
+const ImageReplaceDialog = ({ isOpen, onClose, onReplace, currentImageSrc }: ImageReplaceDialogProps) => {
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 重置状态
+  useEffect(() => {
+    if (isOpen) {
+      setImageUrl("");
+      setUploadedFile(null);
+      setPreviewUrl("");
+      setIsUploading(false);
+    }
+  }, [isOpen]);
+
+  // 处理文件上传
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setUploadedFile(file);
+      
+      // 创建预览URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      // 清空URL输入
+      setImageUrl("");
+    } else {
+      toast.error('请选择有效的图片文件');
+    }
+  };
+
+  // 处理URL输入
+  const handleUrlChange = (url: string) => {
+    setImageUrl(url);
+    if (url) {
+      setUploadedFile(null);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl("");
+    }
+  };
+
+  // 处理替换
+  const handleReplace = async () => {
+    try {
+      setIsUploading(true);
+      
+      let newImageSrc = "";
+      
+      if (uploadedFile) {
+        // 上传文件到服务器
+        const formData = new FormData();
+        formData.append('image', uploadedFile);
+        
+        const response = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!response.ok) {
+          throw new Error('图片上传失败');
+        }
+        
+        const data = await response.json();
+        newImageSrc = data.url;
+      } else if (imageUrl) {
+        // 使用URL
+        newImageSrc = imageUrl;
+      } else {
+        toast.error('请选择图片或输入图片链接');
+        return;
+      }
+      
+      onReplace(newImageSrc);
+      onClose();
+      toast.success('图片替换成功');
+    } catch (error) {
+      console.error('图片替换失败:', error);
+      toast.error('图片替换失败，请重试');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>替换图片</DialogTitle>
+          <DialogDescription>
+            上传新图片或输入图片链接来替换当前图片
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          {/* 当前图片预览 */}
+          <div className="space-y-2">
+            <Label>当前图片</Label>
+            <div className="w-full h-32 rounded-lg overflow-hidden border border-gray-300 bg-gray-100 flex items-center justify-center">
+              {currentImageSrc ? (
+                <img 
+                  src={currentImageSrc} 
+                  alt="Current" 
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).nextElementSibling!.textContent = '图片加载失败';
+                  }}
+                />
+              ) : (
+                <span className="text-gray-500">无图片</span>
+              )}
+            </div>
+          </div>
+
+          {/* 新图片预览 */}
+          {previewUrl && (
+            <div className="space-y-2">
+              <Label>新图片预览</Label>
+              <div className="w-full h-32 rounded-lg overflow-hidden border border-gray-300 bg-gray-100 flex items-center justify-center">
+                <img 
+                  src={previewUrl} 
+                  alt="Preview" 
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 文件上传 */}
+          <div className="space-y-2">
+            <Label>上传图片</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+              >
+                选择文件
+              </Button>
+            </div>
+          </div>
+
+          {/* 或者分隔线 */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-px bg-gray-300"></div>
+            <span className="text-sm text-gray-500">或者</span>
+            <div className="flex-1 h-px bg-gray-300"></div>
+          </div>
+
+          {/* URL输入 */}
+          <div className="space-y-2">
+            <Label htmlFor="imageUrl">图片链接</Label>
+            <Input
+              id="imageUrl"
+              value={imageUrl}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              placeholder="https://example.com/image.jpg"
+              disabled={isUploading}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={isUploading}>
+            取消
+          </Button>
+          <Button 
+            onClick={handleReplace} 
+            disabled={!previewUrl || isUploading}
+          >
+            {isUploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                处理中...
+              </>
+            ) : (
+              '替换图片'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 export function GenerationView({
   prompt,
   setPrompt,
@@ -213,6 +421,15 @@ export function GenerationView({
   const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>(initialVersions)
   const [currentVersionId, setCurrentVersionId] = useState<string>("")
   const [isElementSelectMode, setIsElementSelectMode] = useState(false)
+  const [showImageReplaceDialog, setShowImageReplaceDialog] = useState(false)
+  const [selectedImageSrc, setSelectedImageSrc] = useState("")
+  const [selectedImageFingerprint, setSelectedImageFingerprint] = useState<any>(null)
+  const [selectedImageElement, setSelectedImageElement] = useState<HTMLElement | null>(null)
+  const [imageReplaceButton, setImageReplaceButton] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+  }>({ show: false, x: 0, y: 0 })
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const isInitialMount = useRef(true)
   const previousGeneratedCode = useRef(generatedCode)
@@ -1945,7 +2162,191 @@ export function GenerationView({
     if (!isElementSelectMode) return;
     
     try {
+      console.log('选中的元素:', element.tagName, element);
       
+      // 检查是否为图片元素
+      const isImage = element.tagName.toLowerCase() === 'img';
+      
+      if (isImage) {
+        // 如果是图片，显示替换按钮
+        const imgElement = element as HTMLImageElement;
+        const currentSrc = imgElement.src || imgElement.getAttribute('src') || '';
+        
+        console.log('检测到图片元素，当前src:', currentSrc);
+        
+        // 生成元素指纹用于后续替换
+        const fingerprint = generateElementFingerprint(element);
+        
+        // 获取图片在iframe中的位置
+        const iframe = iframeRef.current;
+        if (iframe && iframe.contentWindow) {
+          const iframeRect = iframe.getBoundingClientRect();
+          const imgRect = element.getBoundingClientRect();
+          
+          // 计算图片在全局坐标系中的位置
+          const globalImgRect = {
+            left: iframeRect.left + imgRect.left,
+            top: iframeRect.top + imgRect.top,
+            right: iframeRect.left + imgRect.right,
+            bottom: iframeRect.top + imgRect.bottom,
+            width: imgRect.width,
+            height: imgRect.height
+          };
+          
+          // 获取视口尺寸
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          
+          // 检查图片是否完全在iframe可视区域内
+          // 只有完全在iframe内才认为是可见的，否则按超出处理
+          const isCompletelyVisible = globalImgRect.left >= iframeRect.left && 
+                                     globalImgRect.right <= iframeRect.right && 
+                                     globalImgRect.top >= iframeRect.top && 
+                                     globalImgRect.bottom <= iframeRect.bottom;
+          
+          const isVisible = isCompletelyVisible;
+          
+          // 添加可视性检测的调试信息
+          console.log('可视性检测:', {
+            isCompletelyVisible,
+            leftOK: globalImgRect.left >= iframeRect.left,
+            rightOK: globalImgRect.right <= iframeRect.right,
+            topOK: globalImgRect.top >= iframeRect.top,
+            bottomOK: globalImgRect.bottom <= iframeRect.bottom,
+            globalImgRect,
+            iframeRect
+          });
+          
+          let buttonX: number;
+          let buttonY: number;
+          
+          if (isVisible) {
+            // 图片在iframe内，计算基于图片位置的按钮位置
+            const preferredX = globalImgRect.right - 40; // 图片右上角偏移40px
+            const preferredY = globalImgRect.top + 10;   // 图片顶部偏移10px
+            
+            // 确保按钮不超出屏幕边界（按钮大小约为40x40px）
+            const buttonSize = 40;
+            const margin = 10; // 距离边界的最小距离
+            
+            buttonX = Math.max(margin, Math.min(preferredX, viewportWidth - buttonSize - margin));
+            buttonY = Math.max(margin, Math.min(preferredY, viewportHeight - buttonSize - margin));
+            
+            console.log('图片在iframe内，按钮位置:', { buttonX, buttonY, globalImgRect });
+          } else {
+            // 图片超出iframe范围，根据超出方向决定按钮位置
+            const buttonSize = 40;
+            const margin = 10;
+            
+            // 计算图片与iframe的相对位置
+            const isTopOverflow = globalImgRect.top < iframeRect.top;
+            const isBottomOverflow = globalImgRect.bottom > iframeRect.bottom;
+            const isLeftOverflow = globalImgRect.left < iframeRect.left;
+            const isRightOverflow = globalImgRect.right > iframeRect.right;
+            
+            // 计算图片在iframe内的可见部分
+            const visibleLeft = Math.max(globalImgRect.left, iframeRect.left);
+            const visibleRight = Math.min(globalImgRect.right, iframeRect.right);
+            const visibleTop = Math.max(globalImgRect.top, iframeRect.top);
+            const visibleBottom = Math.min(globalImgRect.bottom, iframeRect.bottom);
+            
+            // 添加详细调试信息
+            console.log('超出检测详情:', {
+              globalImgRect,
+              iframeRect,
+              isTopOverflow,
+              isBottomOverflow,
+              isLeftOverflow,
+              isRightOverflow,
+              visibleRect: { visibleLeft, visibleRight, visibleTop, visibleBottom }
+            });
+            
+            // X位置：优先放在图片可见部分的右侧
+            if (isRightOverflow) {
+              // 图片右侧超出，按钮放在可见部分内
+              buttonX = visibleRight - 35;
+            } else {
+              // 图片右侧没超出，按钮放在图片右侧
+              buttonX = globalImgRect.right - 35;
+            }
+            
+            // Y位置：根据超出方向决定
+            if (isTopOverflow && !isBottomOverflow) {
+              // 只有顶部超出，按钮显示在可见部分下方
+              buttonY = visibleBottom + 5;
+              console.log('顶部超出，按钮放在下方:', buttonY);
+            } else if (isBottomOverflow && !isTopOverflow) {
+              // 只有底部超出，按钮显示在可见部分上方
+              buttonY = visibleTop - buttonSize - 5;
+              console.log('底部超出，按钮放在上方:', buttonY);
+            } else if (isTopOverflow && isBottomOverflow) {
+              // 上下都超出，按钮放在可见区域中间
+              buttonY = visibleTop + (visibleBottom - visibleTop) / 2 - buttonSize / 2;
+              console.log('上下都超出，按钮放在中间:', buttonY);
+            } else {
+              // 只有左右超出，按钮放在图片顶部
+              buttonY = globalImgRect.top + 10;
+              console.log('左右超出，按钮放在顶部:', buttonY);
+            }
+            
+            // 确保按钮不超出屏幕边界
+            buttonX = Math.max(margin, Math.min(buttonX, viewportWidth - buttonSize - margin));
+            buttonY = Math.max(margin, Math.min(buttonY, viewportHeight - buttonSize - margin));
+            
+            console.log('最终按钮位置:', { buttonX, buttonY });
+          }
+          
+          setSelectedImageSrc(currentSrc);
+          setSelectedImageFingerprint(fingerprint);
+          setSelectedImageElement(element);
+          setImageReplaceButton({
+            show: true,
+            x: buttonX,
+            y: buttonY
+          });
+          
+          toast.success('已选中图片，点击替换按钮进行替换');
+          // return;
+          
+          // 对于图片，也执行代码跳转逻辑，但使用已生成的指纹
+          const result = findElementInCode(fingerprint);
+          
+          if (result) {
+            const targetLineNumber = result.lineIndex + 1;
+            
+            // 通过自定义事件通知CodeEditor跳转到指定行
+            const event = new CustomEvent('jumpToLine', {
+              detail: { lineNumber: targetLineNumber }
+            });
+            
+            console.log('图片元素跳转事件:', event.detail);
+            window.dispatchEvent(event);
+            
+            // 显示成功提示（包含图片和代码定位信息）
+            toast.success(`图片已选中，代码已定位到第 ${targetLineNumber} 行`, {
+              duration: 3000,
+            });
+          } else {
+            console.warn('图片元素未找到匹配的代码行');
+            // 只显示图片选中的提示
+            toast.success('已选中图片，但未能定位到对应代码');
+          }
+          
+          // 高亮选中的图片（绿色边框表示图片选中）
+          element.style.outline = '3px solid #10b981';
+          element.style.outlineOffset = '2px';
+          
+          // 3秒后移除高亮
+          setTimeout(() => {
+            element.style.outline = '';
+            element.style.outlineOffset = '';
+          }, 3000);
+          
+          return; // 图片处理完成，不再执行下面的通用逻辑
+        }
+      }
+      
+      // 如果不是图片，执行原有的代码定位逻辑
       // 生成元素指纹
       const fingerprint = generateElementFingerprint(element);
       
@@ -1993,50 +2394,119 @@ export function GenerationView({
     if (!iframeRef.current || !isElementSelectMode) return;
     
     const iframe = iframeRef.current;
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
     
-    if (!iframeDoc) return;
+    // 等待iframe加载完成的函数
+    const waitForIframeLoad = () => {
+      return new Promise<Document>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Iframe load timeout'));
+        }, 5000);
+        
+        const checkIframe = () => {
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (iframeDoc && iframeDoc.readyState === 'complete' && iframeDoc.body) {
+              clearTimeout(timeout);
+              resolve(iframeDoc);
+            } else {
+              setTimeout(checkIframe, 100);
+            }
+          } catch (error) {
+            clearTimeout(timeout);
+            reject(error);
+          }
+        };
+        
+        checkIframe();
+      });
+    };
     
-    // 添加样式来显示可选择状态
-    const style = iframeDoc.createElement('style');
-    style.textContent = `
-      .element-selectable * {
-        cursor: crosshair !important;
-      }
-      .element-selectable *:hover {
-        outline: 2px dashed #3b82f6 !important;
-        outline-offset: 2px !important;
-      }
-    `;
-    iframeDoc.head.appendChild(style);
-    
-    // 为body添加选择模式类
-    if (iframeDoc.body) {
-      iframeDoc.body.classList.add('element-selectable');
-    }
-    
-    // 添加点击事件监听
-    const handleClick = (e: Event) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      const target = e.target as HTMLElement;
-      if (target) {
-        handleElementSelect(target);
+    // 异步设置事件监听器
+    const setupListeners = async () => {
+      try {
+        const iframeDoc = await waitForIframeLoad();
+        
+        // 检查是否已经有样式，避免重复添加
+        const existingStyle = iframeDoc.querySelector('#element-selection-style');
+        if (!existingStyle) {
+          // 添加样式来显示可选择状态
+          const style = iframeDoc.createElement('style');
+          style.id = 'element-selection-style';
+          style.textContent = `
+            .element-selectable * {
+              cursor: crosshair !important;
+            }
+            .element-selectable *:hover {
+              outline: 2px dashed #3b82f6 !important;
+              outline-offset: 2px !important;
+            }
+          `;
+          iframeDoc.head.appendChild(style);
+        }
+        
+        // 为body添加选择模式类
+        if (iframeDoc.body && !iframeDoc.body.classList.contains('element-selectable')) {
+          iframeDoc.body.classList.add('element-selectable');
+        }
+        
+        // 移除之前的事件监听器（如果存在）
+        const existingHandler = (iframeDoc as any).__elementSelectHandler;
+        if (existingHandler) {
+          iframeDoc.removeEventListener('click', existingHandler, true);
+        }
+        
+        // 添加点击事件监听
+        const handleClick = (e: Event) => {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const target = e.target as HTMLElement;
+          if (target) {
+            handleElementSelect(target);
+          }
+        };
+        
+        // 保存处理器引用以便后续清理
+        (iframeDoc as any).__elementSelectHandler = handleClick;
+        iframeDoc.addEventListener('click', handleClick, true);
+        
+        console.log('元素选择事件监听器已设置');
+        
+        // 返回清理函数
+        return () => {
+          try {
+            if (iframeDoc.body) {
+              iframeDoc.body.classList.remove('element-selectable');
+            }
+            if ((iframeDoc as any).__elementSelectHandler) {
+              iframeDoc.removeEventListener('click', (iframeDoc as any).__elementSelectHandler, true);
+              delete (iframeDoc as any).__elementSelectHandler;
+            }
+            const style = iframeDoc.querySelector('#element-selection-style');
+            if (style && style.parentNode) {
+              style.parentNode.removeChild(style);
+            }
+            console.log('元素选择事件监听器已清理');
+          } catch (error) {
+            console.error('清理元素选择监听器时出错:', error);
+          }
+        };
+      } catch (error) {
+        console.error('设置元素选择监听器失败:', error);
+        return () => {}; // 返回空的清理函数
       }
     };
     
-    iframeDoc.addEventListener('click', handleClick, true);
+    // 立即尝试设置，如果失败则返回空的清理函数
+    const cleanupPromise = setupListeners();
     
-    // 返回清理函数
+    // 返回一个同步的清理函数，它会等待异步设置完成后再清理
     return () => {
-      if (iframeDoc.body) {
-        iframeDoc.body.classList.remove('element-selectable');
-      }
-      iframeDoc.removeEventListener('click', handleClick, true);
-      if (style.parentNode) {
-        style.parentNode.removeChild(style);
-      }
+      cleanupPromise.then(cleanup => {
+        if (cleanup) cleanup();
+      }).catch(() => {
+        // 忽略清理时的错误
+      });
     };
   }, [isElementSelectMode, handleElementSelect]);
 
@@ -2046,7 +2516,24 @@ export function GenerationView({
       const cleanup = setupElementSelection();
       return cleanup;
     }
-  }, [isElementSelectMode, setupElementSelection, previewKey]);
+  }, [isElementSelectMode, setupElementSelection, previewKey, editedCode]);
+
+  // 监听预览内容变化，重新设置元素选择
+  useEffect(() => {
+    if (isElementSelectMode && previewContent) {
+      // 延迟更长时间确保iframe内容已完全加载和渲染
+      const timer = setTimeout(() => {
+        console.log('预览内容已更新，重新设置元素选择监听器');
+        try {
+          setupElementSelection();
+        } catch (error) {
+          console.error('重新设置元素选择监听器失败:', error);
+        }
+      }, 1000); // 增加到1秒延迟
+      
+      return () => clearTimeout(timer);
+    }
+  }, [previewContent, isElementSelectMode, setupElementSelection]);
 
   // 删除历史版本
   const handleDeleteVersion = useCallback(async (versionId: string) => {
@@ -2112,6 +2599,160 @@ export function GenerationView({
     }
   }, [initialVersions, currentVersionId, updatePreviewAfterVersionChange]);
   
+  // 处理图片替换
+  const handleImageReplace = useCallback((newImageSrc: string) => {
+    if (!selectedImageFingerprint) {
+      toast.error('未找到选中的图片信息');
+      return;
+    }
+
+    try {
+      const currentCode = isEditable ? editedCode : originalCode;
+      const lines = currentCode.split('\n');
+      
+      // 在代码中查找图片元素
+      const result = findElementInCode(selectedImageFingerprint);
+      
+      if (result) {
+        const lineIndex = result.lineIndex;
+        const line = lines[lineIndex];
+        
+        console.log('找到图片所在行:', lineIndex + 1, line);
+        
+        // 替换图片src属性
+        let updatedLine = line;
+        
+        // 匹配各种可能的src属性格式
+        const srcPatterns = [
+          /src\s*=\s*["']([^"']*)["']/gi,
+          /src\s*=\s*([^\s>]*)/gi
+        ];
+        
+        let replaced = false;
+        for (const pattern of srcPatterns) {
+          if (pattern.test(line)) {
+            updatedLine = line.replace(pattern, `src="${newImageSrc}"`);
+            replaced = true;
+            break;
+          }
+        }
+        
+        if (!replaced) {
+          // 如果没有找到src属性，尝试添加src属性
+          if (line.includes('<img')) {
+            updatedLine = line.replace(/<img([^>]*?)>/gi, `<img$1 src="${newImageSrc}">`);
+            replaced = true;
+          }
+        }
+        
+        if (replaced) {
+          // 更新代码
+          const newLines = [...lines];
+          newLines[lineIndex] = updatedLine;
+          const newCode = newLines.join('\n');
+          
+          if (isEditable) {
+            setEditedCode(newCode);
+          } else {
+            // 如果不在编辑模式，自动启用编辑模式
+            setIsEditable(true);
+            setEditedCode(newCode);
+            setOriginalCode(currentCode);
+          }
+          
+          // 更新预览
+          updatePreviewAfterVersionChange(newCode);
+          
+          console.log('图片替换成功，新的src:', newImageSrc);
+          toast.success('图片已成功替换');
+        } else {
+          console.error('未能找到或替换图片src属性');
+          toast.error('图片替换失败：未找到src属性');
+        }
+      } else {
+        console.error('未能在代码中找到对应的图片元素');
+        toast.error('图片替换失败：未找到对应的代码');
+      }
+    } catch (error) {
+      console.error('图片替换过程出错:', error);
+      toast.error('图片替换失败');
+    } finally {
+      // 清理状态
+      setSelectedImageFingerprint(null);
+      setSelectedImageSrc("");
+    }
+  }, [selectedImageFingerprint, isEditable, editedCode, originalCode, findElementInCode, updatePreviewAfterVersionChange]);
+
+  // 显示图片替换对话框
+  const openImageReplaceDialog = useCallback(() => {
+    setImageReplaceButton({ show: false, x: 0, y: 0 });
+    setShowImageReplaceDialog(true);
+  }, []);
+
+  // 隐藏图片替换按钮
+  const hideImageReplaceButton = useCallback(() => {
+    setImageReplaceButton({ show: false, x: 0, y: 0 });
+    // 移除图片高亮
+    if (selectedImageElement) {
+      selectedImageElement.style.outline = '';
+      selectedImageElement.style.outlineOffset = '';
+      setSelectedImageElement(null);
+    }
+  }, [selectedImageElement]);
+
+  // 监听document点击事件，点击按钮外部时关闭按钮
+  useEffect(() => {
+    if (imageReplaceButton.show) {
+      const handleDocumentClick = (event: MouseEvent) => {
+        const target = event.target as HTMLElement;
+        const button = document.getElementById('image-replace-button');
+        
+        // 如果点击的不是按钮本身，则关闭按钮
+        if (button && !button.contains(target)) {
+          hideImageReplaceButton();
+        }
+      };
+
+      // 延迟添加事件监听器，避免立即触发
+      const timer = setTimeout(() => {
+        document.addEventListener('click', handleDocumentClick);
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('click', handleDocumentClick);
+      };
+    }
+  }, [imageReplaceButton.show, hideImageReplaceButton]);
+
+  // 跟踪全局鼠标位置，用于在图片不可见时定位按钮
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      // 将鼠标位置保存到全局变量中
+      (window as any).__lastMouseEvent = {
+        clientX: event.clientX,
+        clientY: event.clientY
+      };
+    };
+
+    // 只在元素选择模式下跟踪鼠标位置
+    if (isElementSelectMode) {
+      document.addEventListener('mousemove', handleMouseMove, { passive: true });
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+      };
+    }
+  }, [isElementSelectMode]);
+
+  // 监听元素选择模式变化
+  useEffect(() => {
+    if (!isElementSelectMode) {
+      // 退出选择模式时隐藏按钮
+      hideImageReplaceButton();
+    }
+  }, [isElementSelectMode, hideImageReplaceButton]);
+
   return (
     <div className="h-[calc(100vh-61px)] bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
@@ -2728,6 +3369,48 @@ export function GenerationView({
         onSave={handleSaveWebsite}
         thumbnailUrl={thumbnailUrl}
       />
+
+      <ImageReplaceDialog
+        isOpen={showImageReplaceDialog}
+        onClose={() => {
+          setShowImageReplaceDialog(false);
+          setSelectedImageSrc("");
+          setSelectedImageFingerprint(null);
+        }}
+        onReplace={handleImageReplace}
+        currentImageSrc={selectedImageSrc}
+      />
+
+      {/* 浮动图片替换按钮 */}
+      {imageReplaceButton.show && (
+        <div
+          className="fixed z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg cursor-pointer transition-all duration-200 hover:scale-110"
+          style={{
+            left: `${imageReplaceButton.x}px`,
+            top: `${imageReplaceButton.y}px`,
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            openImageReplaceDialog();
+          }}
+          title="替换图片"
+          id="image-replace-button"
+        >
+          <svg 
+            className="w-5 h-5" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" 
+            />
+          </svg>
+        </div>
+      )}
     </div>
   )
 }

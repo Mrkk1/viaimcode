@@ -163,11 +163,11 @@ export function WelcomeView({
   }
 
   return (
-    <div className="min-h-[70vh] max-h-[80vh] bg-transparent relative">
+    <div className="min-h-[70vh]  bg-transparent relative">
       <PixelAnimation />
 
       {/* Main Content Section */}
-      <div className="relative z-10 flex flex-col items-center justify-center p-4 min-h-[70vh] max-h-[80vh]">
+      <div className="relative z-10 flex flex-col items-center justify-center p-4 min-h-[70vh] ">
         <div className="w-full max-w-2xl mx-auto flex flex-col items-center">
         <h1
           className={`text-4xl md:text-6xl font-bold tracking-wider text-white mb-8 ${titleClass}`}
