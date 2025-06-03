@@ -1,4 +1,4 @@
-import { initDatabase } from '../lib/db.js';
+import { initDatabase } from '../lib/db';
 
 async function main() {
   try {

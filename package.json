@@ -2,13 +2,12 @@
   "name": "viaimcode",
   "version": "0.3.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "init-db": "node --loader ts-node/esm scripts/init-db.ts",
+    "init-db": "npx ts-node scripts/init-db.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -52,6 +51,7 @@
     "dom-to-image-more": "^3.6.0",
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
+    "graceful-fs": "^4.2.11",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "jose": "^6.0.11",

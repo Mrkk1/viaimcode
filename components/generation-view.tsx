@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2 } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2, Settings } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,7 @@ import { toast } from "sonner"
 import Image from "next/image"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
+import { VisualEditor } from "@/components/visual-editor"
 
 interface GenerationViewProps {
   prompt: string
@@ -434,6 +435,11 @@ export function GenerationView({
   const isInitialMount = useRef(true)
   const previousGeneratedCode = useRef(generatedCode)
   const versionHistoryRef = useRef<HistoryVersion[]>(versionHistory)
+  // 可视化编辑器相关状态
+  const [isVisualMode, setIsVisualMode] = useState(false)
+  const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null)
+  // 使用ref来跟踪是否是通过可视化编辑器更新的代码，避免触发额外的useEffect
+  const isVisualCodeUpdateRef = useRef(false)
 
   // 同步更新 versionHistoryRef
   useEffect(() => {
@@ -532,6 +538,197 @@ export function GenerationView({
     []
   );
 
+  // 直接更新iframe DOM的函数，避免闪烁
+  const updateIframeDOMDirectly = useCallback((newCode: string) => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentDocument || !iframe.contentWindow) {
+      console.log('iframe未准备好，回退到传统更新方式');
+      return false;
+    }
+
+    try {
+      const iframeDoc = iframe.contentDocument;
+      const iframeWin = iframe.contentWindow;
+      
+      // 检查新代码是否是完整的HTML文档
+      const isFullDocument = newCode.includes('<!DOCTYPE') || newCode.includes('<html');
+      
+      // 保存当前滚动位置（添加null检查）
+      let scrollTop = 0;
+      let scrollLeft = 0;
+      
+      try {
+        if (iframeDoc.documentElement) {
+          scrollTop = iframeDoc.documentElement.scrollTop || 0;
+          scrollLeft = iframeDoc.documentElement.scrollLeft || 0;
+        }
+        if (iframeDoc.body && scrollTop === 0 && scrollLeft === 0) {
+          scrollTop = iframeDoc.body.scrollTop || 0;
+          scrollLeft = iframeDoc.body.scrollLeft || 0;
+        }
+      } catch (scrollError) {
+        console.log('获取滚动位置失败，使用默认值:', scrollError);
+        scrollTop = 0;
+        scrollLeft = 0;
+      }
+      
+      if (isFullDocument) {
+        console.log('检测到完整HTML文档，尝试智能更新');
+        
+        // 对于完整HTML文档，尝试解析并更新
+        try {
+          // 创建一个临时DOM来解析新的HTML
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = newCode;
+          
+          // 查找body内容
+          let bodyContent = '';
+          const bodyElement = tempDiv.querySelector('body');
+          if (bodyElement) {
+            bodyContent = bodyElement.innerHTML;
+          } else {
+            // 如果没有body标签，使用整个内容
+            bodyContent = newCode;
+          }
+          
+          // 查找head内容中的样式
+          let headStyles = '';
+          const headElement = tempDiv.querySelector('head');
+          if (headElement) {
+            const styleElements = headElement.querySelectorAll('style');
+            styleElements.forEach(style => {
+              headStyles += style.outerHTML;
+            });
+            
+            const linkElements = headElement.querySelectorAll('link[rel="stylesheet"]');
+            linkElements.forEach(link => {
+              headStyles += link.outerHTML;
+            });
+          }
+          
+          // 更新head中的样式（如果有新样式）
+          if (headStyles && iframeDoc.head) {
+            // 移除旧的动态样式
+            const oldDynamicStyles = iframeDoc.head.querySelectorAll('style[data-dynamic], link[data-dynamic]');
+            oldDynamicStyles.forEach(el => el.remove());
+            
+            // 添加新样式
+            const tempStyleDiv = iframeDoc.createElement('div');
+            tempStyleDiv.innerHTML = headStyles;
+            Array.from(tempStyleDiv.children).forEach(child => {
+              child.setAttribute('data-dynamic', 'true');
+              iframeDoc.head.appendChild(child);
+            });
+          }
+          
+          // 更新body内容
+          if (iframeDoc.body && bodyContent) {
+            // 创建包装div
+            const wrapper = iframeDoc.createElement('div');
+            wrapper.style.width = '90%';
+            wrapper.style.maxWidth = '1200px';
+            wrapper.style.margin = '0 auto';
+            wrapper.style.padding = '20px';
+            wrapper.innerHTML = bodyContent;
+            
+            // 清空body并添加新内容
+            iframeDoc.body.innerHTML = '';
+            iframeDoc.body.appendChild(wrapper);
+            
+            console.log('完整HTML文档智能更新成功');
+            
+            // 恢复滚动位置
+            requestAnimationFrame(() => {
+              if (iframeDoc.documentElement) {
+                iframeDoc.documentElement.scrollTop = scrollTop;
+                iframeDoc.documentElement.scrollLeft = scrollLeft;
+              }
+              if (iframeDoc.body) {
+                iframeDoc.body.scrollTop = scrollTop;
+                iframeDoc.body.scrollLeft = scrollLeft;
+              }
+            });
+            
+            return true;
+          }
+        } catch (parseError) {
+          console.log('完整HTML文档解析失败，回退到传统方式:', parseError);
+          return false;
+        }
+      } else {
+        // 对于HTML片段，直接更新body内容
+        const bodyContent = newCode.trim();
+        
+        // 更新body内容
+        if (iframeDoc.body && bodyContent) {
+          // 创建一个包装div来容纳新内容
+          const wrapper = iframeDoc.createElement('div');
+          wrapper.style.width = '90%';
+          wrapper.style.maxWidth = '1200px';
+          wrapper.style.margin = '0 auto';
+          wrapper.style.padding = '20px';
+          wrapper.innerHTML = bodyContent;
+          
+          // 清空body并添加新内容
+          iframeDoc.body.innerHTML = '';
+          iframeDoc.body.appendChild(wrapper);
+          
+          console.log('HTML片段直接更新成功');
+          
+          // 恢复滚动位置
+          requestAnimationFrame(() => {
+            if (iframeDoc.documentElement) {
+              iframeDoc.documentElement.scrollTop = scrollTop;
+              iframeDoc.documentElement.scrollLeft = scrollLeft;
+            }
+            if (iframeDoc.body) {
+              iframeDoc.body.scrollTop = scrollTop;
+              iframeDoc.body.scrollLeft = scrollLeft;
+            }
+          });
+          
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('直接更新iframe DOM失败:', error);
+      return false;
+    }
+  }, []);
+
+  // 智能预览更新函数，优先使用DOM直接更新
+  const smartUpdatePreview = useCallback((code: string) => {
+    // 在可视化模式下不更新预览
+    if (isVisualMode) {
+      return;
+    }
+    
+    console.log('🔄 开始智能预览更新，代码长度:', code.length);
+    
+    // 尝试直接更新DOM
+    const domUpdateSuccess = updateIframeDOMDirectly(code);
+    
+    // 如果DOM直接更新失败，回退到传统方式
+    if (!domUpdateSuccess) {
+      console.log('⚠️ 智能更新失败，使用传统更新方式');
+      const preparedHtml = prepareHtmlContent(code);
+      prevContentRef.current = preparedHtml;
+      setPreviewContent(preparedHtml);
+      // 更新key以强制重新渲染
+      setPreviewKey(prev => prev + 1);
+    } else {
+      console.log('✅ 智能更新成功，预览已无缝更新');
+    }
+  }, [isVisualMode, updateIframeDOMDirectly, prepareHtmlContent]);
+
+  // 防抖的智能预览更新
+  const debouncedSmartUpdatePreview = useCallback(
+    debounce(smartUpdatePreview, 300), // 增加防抖时间，减少频繁更新
+    [smartUpdatePreview]
+  );
+
   // 监听生成的代码变化，并在生成完成时创建新版本
   useEffect(() => {
     console.log('useEffect triggered:', {
@@ -544,9 +741,15 @@ export function GenerationView({
     });
     
     if (generatedCode) {
-      setOriginalCode(generatedCode)
-      setEditedCode(generatedCode)
-      debouncedUpdatePreview(generatedCode)
+      // 只有在代码真正改变时才更新 originalCode 和 editedCode
+      // 避免在手动保存时重复设置
+      if (generatedCode !== previousGeneratedCode.current) {
+        console.log('代码发生变化，更新 originalCode 和 editedCode');
+        setOriginalCode(generatedCode)
+        setEditedCode(generatedCode)
+        // 对于AI生成的代码，使用传统更新方式确保完整加载
+        debouncedUpdatePreview(generatedCode)
+      }
       
       // 只在生成完成且代码不为空时创建版本
       if (generationComplete && !isGenerating && generatedCode.trim() !== '') {
@@ -589,10 +792,19 @@ export function GenerationView({
       console.log('初始加载完成，设置isInitialMount为false');
       isInitialMount.current = false;
     }
-  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, versionHistory, initialVersions])
+  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, initialVersions])
+  // 移除 versionHistory 依赖，避免在手动保存时重复触发
 
   // Check if changes have been made and update preview content
   useEffect(() => {
+    console.log('🔍 useEffect触发检查:', {
+      editedCode: editedCode?.length || 0,
+      originalCode: originalCode?.length || 0,
+      isVisualMode,
+      isVisualCodeUpdate: isVisualCodeUpdateRef.current,
+      hasChanges: editedCode !== originalCode
+    });
+    
     if (editedCode !== originalCode) {
       setHasChanges(true)
     } else {
@@ -600,10 +812,20 @@ export function GenerationView({
     }
 
     // Update preview content with debounce when code is edited
-    if (editedCode) {
-      debouncedUpdatePreview(editedCode);
+    // 在可视化模式下不自动更新预览，避免刷新iframe
+    // 在代码编辑模式下使用智能更新，避免闪烁
+    // 如果是通过可视化编辑器更新的代码，也不触发预览更新（因为DOM已经直接更新了）
+    if (editedCode && !isVisualMode && !isVisualCodeUpdateRef.current) {
+      console.log('📝 触发智能预览更新，原因: 代码编辑');
+      debouncedSmartUpdatePreview(editedCode);
+    } else {
+      console.log('⏸️ 跳过预览更新，原因:', {
+        noEditedCode: !editedCode,
+        isVisualMode,
+        isVisualCodeUpdate: isVisualCodeUpdateRef.current
+      });
     }
-  }, [editedCode, originalCode, debouncedUpdatePreview])
+  }, [editedCode, originalCode, debouncedSmartUpdatePreview, isVisualMode])
 
   // 更新预览内容的函数
   const updatePreviewAfterVersionChange = useCallback((code: string) => {
@@ -762,10 +984,18 @@ export function GenerationView({
       
       // 添加到历史版本列表
       setVersionHistory(prev => {
-        // 保证版本不重复（根据代码内容去重）
-        const filtered = prev.filter(v => v.code !== code);
+        console.log('当前版本历史数量:', prev.length);
+        console.log('准备添加新版本:', newVersion.title);
+        
+        // 只过滤掉完全相同的版本（ID相同），而不是代码相同的版本
+        // 允许用户保存多个具有相同代码但不同时间戳的版本
+        const filtered = prev.filter(v => v.id !== newVersion.id);
         const newHistory = [...filtered, newVersion];
-        console.log('更新版本历史，新版本数量:', newHistory.length);
+        
+        console.log('过滤后版本数量:', filtered.length);
+        console.log('添加新版本后数量:', newHistory.length);
+        console.log('新版本历史:', newHistory.map(v => ({ id: v.id, title: v.title, type: v.type })));
+        
         return newHistory;
       });
       
@@ -781,13 +1011,53 @@ export function GenerationView({
   }, [projectId, prompt]);
 
   // Function to save changes
-  const saveChanges = () => {
+  const saveChanges = async () => {
+    console.log('=== 开始保存操作 ===');
     setOriginalCode(editedCode)
     setHasChanges(false)
     
-    // 保存时创建新版本，标记为手动保存类型
-    createNewVersion(editedCode, `Manual Save Version ${versionHistory.length + 1}`, 'manual');
-    
+    // 保存时创建新版本，标记为手动保存类型，等待完成
+    try {
+      // 使用 versionHistoryRef 获取最新的版本数量
+      const currentVersionCount = versionHistoryRef.current.length;
+      console.log('保存前版本数量:', currentVersionCount);
+      console.log('保存前版本历史:', versionHistoryRef.current.map(v => ({ id: v.id, title: v.title })));
+      
+      const newVersion = await createNewVersion(editedCode, `Manual Save Version ${currentVersionCount + 1}`, 'manual');
+      
+      if (newVersion) {
+        console.log('手动保存版本创建完成:', newVersion.id, newVersion.title);
+        console.log('保存后版本历史长度:', versionHistory.length);
+        
+        // 立即检查状态是否更新
+        setTimeout(() => {
+          console.log('延迟检查 - 版本历史长度:', versionHistory.length);
+          console.log('延迟检查 - versionHistoryRef长度:', versionHistoryRef.current.length);
+          console.log('延迟检查 - 当前版本ID:', currentVersionId);
+        }, 50);
+        
+        // 强制触发重新渲染，确保UI更新
+        setTimeout(() => {
+          console.log('强制检查版本历史更新:', versionHistory.length);
+          // 如果历史版本没有更新，手动触发一次状态更新
+          setVersionHistory(prev => {
+            console.log('强制更新检查 - 当前版本数:', prev.length);
+            console.log('强制更新检查 - 版本列表:', prev.map(v => ({ id: v.id, title: v.title })));
+            return [...prev]; // 创建新数组引用，强制重新渲染
+          });
+        }, 100);
+        
+        // 显示成功提示
+        toast.success('代码已保存为新版本');
+        console.log('=== 保存操作完成 ===');
+      } else {
+        console.error('创建版本失败');
+        toast.error('保存失败，请重试');
+      }
+    } catch (error) {
+      console.error('创建手动保存版本失败:', error);
+      toast.error('保存失败，请重试');
+    }
   }
 
   // Function to copy the generated code to clipboard
@@ -809,15 +1079,37 @@ export function GenerationView({
     // Update the current content
     const currentCode = isEditable ? editedCode : originalCode;
 
-    // Force immediate update by flushing the debounce queue
-    debouncedUpdatePreview.flush();
+    if (isVisualMode) {
+      // 可视化模式下，强制刷新iframe
+      // Force immediate update by flushing the debounce queue
+      debouncedUpdatePreview.flush();
 
-    // Prepare the HTML content
-    const preparedHtml = prepareHtmlContent(currentCode);
-    setPreviewContent(preparedHtml);
+      // Prepare the HTML content
+      const preparedHtml = prepareHtmlContent(currentCode);
+      setPreviewContent(preparedHtml);
 
-    // Change the key to reload the preview
-    setPreviewKey(prevKey => prevKey + 1);
+      // Change the key to reload the preview
+      setPreviewKey(prevKey => prevKey + 1);
+    } else {
+      // 代码编辑模式下，优先尝试智能更新
+      const domUpdateSuccess = updateIframeDOMDirectly(currentCode);
+      
+      if (!domUpdateSuccess) {
+        // 如果智能更新失败，使用传统方式
+        console.log('手动刷新：智能更新失败，使用传统方式');
+        // Force immediate update by flushing the debounce queue
+        debouncedUpdatePreview.flush();
+
+        // Prepare the HTML content
+        const preparedHtml = prepareHtmlContent(currentCode);
+        setPreviewContent(preparedHtml);
+
+        // Change the key to reload the preview
+        setPreviewKey(prevKey => prevKey + 1);
+      } else {
+        console.log('手动刷新：智能更新成功');
+      }
+    }
   }
 
   // Function to download the generated code as an HTML file
@@ -993,6 +1285,545 @@ export function GenerationView({
   // 添加状态来跟踪最后保存的内容
   const [lastSavedPrompt, setLastSavedPrompt] = useState(prompt);
   const [lastSavedContent, setLastSavedContent] = useState('');
+
+  // 辅助函数：解析style字符串为对象
+  const parseStyleString = (styleString: string): Record<string, string> => {
+    const styleObj: Record<string, string> = {};
+    if (!styleString) return styleObj;
+    
+    const declarations = styleString.split(';');
+    declarations.forEach(declaration => {
+      const colonIndex = declaration.indexOf(':');
+      if (colonIndex > 0) {
+        const property = declaration.substring(0, colonIndex).trim();
+        const value = declaration.substring(colonIndex + 1).trim();
+        if (property && value) {
+          styleObj[property] = value;
+        }
+      }
+    });
+    
+    return styleObj;
+  };
+
+  // 处理可视化编辑器的样式变更
+  const handleStyleChange = useCallback((property: string, value: string) => {
+    console.log('样式变更:', property, value, selectedElement);
+    if (!selectedElement) {
+      console.log('没有选中的元素');
+      return;
+    }
+
+    try {
+      // 特殊处理文本内容属性
+      if (property === 'textContent' || property === 'innerHTML') {
+        console.log('处理文本内容更新:', property, value);
+        
+        // 直接更新DOM中的文本内容
+        if (property === 'textContent') {
+          selectedElement.textContent = value;
+        } else if (property === 'innerHTML') {
+          selectedElement.innerHTML = value;
+        }
+        
+        // 确保编辑模式已启用
+        if (!isEditable) {
+          console.log('启用编辑模式');
+          setIsEditable(true);
+        }
+
+        // 获取当前代码
+        const currentCode = isEditable ? editedCode : originalCode;
+        const lines = currentCode.split('\n');
+        
+        // 查找元素所在的行
+        const findElementLine = () => {
+          // 策略1: 通过ID精确匹配
+          if (selectedElement.id) {
+            const idMatch = lines.findIndex(line => 
+              line.includes(`id="${selectedElement.id}"`) || line.includes(`id='${selectedElement.id}'`)
+            );
+            if (idMatch !== -1) {
+              console.log('通过ID找到元素:', selectedElement.id);
+              return idMatch;
+            }
+          }
+          
+          // 策略2: 通过类名匹配
+          if (selectedElement.className) {
+            const className = selectedElement.className.trim();
+            const classMatch = lines.findIndex(line => 
+              line.includes(`class="${className}"`) || line.includes(`class='${className}'`)
+            );
+            if (classMatch !== -1) {
+              console.log('通过类名找到元素:', className);
+              return classMatch;
+            }
+          }
+          
+          // 策略3: 通过标签名和原始文本内容匹配
+          const tagName = selectedElement.tagName.toLowerCase();
+          const originalText = selectedElement.textContent?.trim();
+          
+          if (originalText && originalText.length > 3) {
+            const textMatch = lines.findIndex(line => 
+              line.includes(`<${tagName}`) && line.includes(originalText)
+            );
+            if (textMatch !== -1) {
+              console.log('通过标签名和文本内容找到元素:', tagName, originalText);
+              return textMatch;
+            }
+          }
+          
+          // 策略4: 通过标签名匹配第一个
+          const tagMatch = lines.findIndex(line => line.includes(`<${tagName}`));
+          if (tagMatch !== -1) {
+            console.log('通过标签名找到元素:', tagName);
+            return tagMatch;
+          }
+          
+          console.warn('所有元素定位策略都失败了');
+          return -1;
+        };
+        
+        const targetLineIndex = findElementLine();
+        
+        if (targetLineIndex !== -1) {
+          const targetLine = lines[targetLineIndex];
+          console.log('找到元素所在行:', targetLineIndex + 1, targetLine);
+          
+          // 更新文本内容
+          let updatedLine = targetLine;
+          const tagName = selectedElement.tagName.toLowerCase();
+          
+          if (property === 'textContent') {
+            // 更新纯文本内容 - 替换标签之间的内容
+            const tagPattern = new RegExp(`(<${tagName}[^>]*>)([^<]*?)(</${tagName}>)`, 'i');
+            const selfClosingPattern = new RegExp(`(<${tagName}[^>]*?)\\s*/>`, 'i');
+            
+            if (tagPattern.test(targetLine)) {
+              // 有开始和结束标签
+              updatedLine = targetLine.replace(tagPattern, `$1${value}$3`);
+              console.log('成功更新文本内容');
+            } else if (selfClosingPattern.test(targetLine)) {
+              // 自闭合标签，转换为开始结束标签
+              updatedLine = targetLine.replace(selfClosingPattern, `$1>${value}</${tagName}>`);
+              console.log('成功将自闭合标签转换并添加文本内容');
+            }
+          } else if (property === 'innerHTML') {
+            // 更新HTML内容
+            const tagPattern = new RegExp(`(<${tagName}[^>]*>)(.*?)(</${tagName}>)`, 'is');
+            const selfClosingPattern = new RegExp(`(<${tagName}[^>]*?)\\s*/>`, 'i');
+            
+            if (tagPattern.test(targetLine)) {
+              // 有开始和结束标签
+              updatedLine = targetLine.replace(tagPattern, `$1${value}$3`);
+              console.log('成功更新HTML内容');
+            } else if (selfClosingPattern.test(targetLine)) {
+              // 自闭合标签，转换为开始结束标签
+              updatedLine = targetLine.replace(selfClosingPattern, `$1>${value}</${tagName}>`);
+              console.log('成功将自闭合标签转换并添加HTML内容');
+            }
+          }
+          
+          if (updatedLine !== targetLine) {
+            // 更新代码
+            const newLines = [...lines];
+            newLines[targetLineIndex] = updatedLine;
+            const newCode = newLines.join('\n');
+            
+            // 标记这是通过可视化编辑器更新的代码
+            isVisualCodeUpdateRef.current = true;
+            
+            // 在可视化模式下，只更新代码，不触发预览刷新
+            if (isVisualMode) {
+              // 静默更新代码，不触发预览刷新
+              setEditedCode(newCode);
+              setHasChanges(true);
+              console.log('可视化模式：文本内容已静默更新，不刷新预览');
+            } else {
+              // 非可视化模式，正常更新代码和预览
+              setEditedCode(newCode);
+              setHasChanges(true);
+              console.log('文本内容代码已更新');
+            }
+            
+            // 重置标志
+            setTimeout(() => {
+              isVisualCodeUpdateRef.current = false;
+            }, 100);
+            
+            console.log('文本内容替换成功，新内容:', value);
+          } else {
+            console.error('未能更新文本内容');
+          }
+        } else {
+          console.error('未能在代码中找到对应的元素');
+        }
+        
+        return; // 文本内容处理完成，直接返回
+      }
+      
+      // 特殊处理图片src属性
+      if (property === 'src' && selectedElement.tagName.toLowerCase() === 'img') {
+        console.log('处理图片src属性更新:', value);
+        
+        // 直接更新DOM中的图片src
+        const imgElement = selectedElement as HTMLImageElement;
+        const originalSrc = imgElement.src || imgElement.getAttribute('src') || '';
+        imgElement.src = value;
+        
+        // 确保编辑模式已启用
+        if (!isEditable) {
+          console.log('启用编辑模式');
+          setIsEditable(true);
+        }
+
+        // 获取当前代码
+        const currentCode = isEditable ? editedCode : originalCode;
+        const lines = currentCode.split('\n');
+        let targetLineIndex = -1;
+        
+        // 改进的图片定位策略：使用多重匹配条件
+        const findImageLine = () => {
+          // 策略1: 通过ID精确匹配
+          if (selectedElement.id) {
+            const idMatch = lines.findIndex(line => 
+              line.includes('<img') && 
+              (line.includes(`id="${selectedElement.id}"`) || line.includes(`id='${selectedElement.id}'`))
+            );
+            if (idMatch !== -1) {
+              console.log('通过ID找到图片:', selectedElement.id);
+              return idMatch;
+            }
+          }
+          
+          // 策略2: 通过类名和原始src组合匹配
+          if (selectedElement.className && originalSrc) {
+            const className = selectedElement.className.trim();
+            // 提取原始src的文件名部分用于匹配
+            const srcFileName = originalSrc.split('/').pop()?.split('?')[0] || '';
+            
+            const classAndSrcMatch = lines.findIndex(line => 
+              line.includes('<img') && 
+              (line.includes(`class="${className}"`) || line.includes(`class='${className}'`)) &&
+              (srcFileName ? line.includes(srcFileName) : true)
+            );
+            if (classAndSrcMatch !== -1) {
+              console.log('通过类名和src文件名找到图片:', className, srcFileName);
+              return classAndSrcMatch;
+            }
+          }
+          
+          // 策略3: 通过原始src精确匹配
+          if (originalSrc) {
+            // 尝试匹配完整的src
+            const fullSrcMatch = lines.findIndex(line => 
+              line.includes('<img') && line.includes(originalSrc)
+            );
+            if (fullSrcMatch !== -1) {
+              console.log('通过完整src找到图片:', originalSrc);
+              return fullSrcMatch;
+            }
+            
+            // 尝试匹配src的文件名部分
+            const srcFileName = originalSrc.split('/').pop()?.split('?')[0];
+            if (srcFileName && srcFileName.length > 3) {
+              const fileNameMatch = lines.findIndex(line => 
+                line.includes('<img') && line.includes(srcFileName)
+              );
+              if (fileNameMatch !== -1) {
+                console.log('通过src文件名找到图片:', srcFileName);
+                return fileNameMatch;
+              }
+            }
+          }
+          
+          // 策略4: 通过alt属性匹配
+          const altText = selectedElement.getAttribute('alt');
+          if (altText) {
+            const altMatch = lines.findIndex(line => 
+              line.includes('<img') && 
+              (line.includes(`alt="${altText}"`) || line.includes(`alt='${altText}'`))
+            );
+            if (altMatch !== -1) {
+              console.log('通过alt属性找到图片:', altText);
+              return altMatch;
+            }
+          }
+          
+          // 策略5: 通过类名匹配（如果没有原始src）
+          if (selectedElement.className) {
+            const className = selectedElement.className.trim();
+            const classMatch = lines.findIndex(line => 
+              line.includes('<img') && 
+              (line.includes(`class="${className}"`) || line.includes(`class='${className}'`))
+            );
+            if (classMatch !== -1) {
+              console.log('通过类名找到图片:', className);
+              return classMatch;
+            }
+          }
+          
+          // 策略6: 通过元素在DOM中的位置匹配（最后的备选）
+          // 获取所有img元素，找到当前元素的索引
+          const iframe = iframeRef.current;
+          if (iframe?.contentDocument) {
+            const allImages = Array.from(iframe.contentDocument.querySelectorAll('img'));
+            const elementIndex = allImages.indexOf(selectedElement as HTMLImageElement);
+            
+            if (elementIndex !== -1) {
+              // 在代码中找到第N个img标签
+              let imgCount = 0;
+              for (let i = 0; i < lines.length; i++) {
+                if (lines[i].includes('<img')) {
+                  if (imgCount === elementIndex) {
+                    console.log('通过DOM位置找到图片，索引:', elementIndex);
+                    return i;
+                  }
+                  imgCount++;
+                }
+              }
+            }
+          }
+          
+          console.warn('所有图片定位策略都失败了');
+          return -1;
+        };
+        
+        targetLineIndex = findImageLine();
+        
+        if (targetLineIndex !== -1) {
+          const targetLine = lines[targetLineIndex];
+          console.log('找到图片所在行:', targetLineIndex + 1, targetLine);
+          
+          // 替换图片src属性
+          let updatedLine = targetLine;
+          
+          // 匹配各种可能的src属性格式
+          const srcPatterns = [
+            /src\s*=\s*["']([^"']*)["']/gi,
+            /src\s*=\s*([^\s>]*)/gi
+          ];
+          
+          let replaced = false;
+          for (const pattern of srcPatterns) {
+            if (pattern.test(targetLine)) {
+              updatedLine = targetLine.replace(pattern, `src="${value}"`);
+              replaced = true;
+              console.log('成功替换src属性');
+              break;
+            }
+          }
+          
+          if (!replaced) {
+            // 如果没有找到src属性，尝试添加src属性
+            if (targetLine.includes('<img')) {
+              updatedLine = targetLine.replace(/<img([^>]*?)>/gi, `<img$1 src="${value}">`);
+              replaced = true;
+              console.log('成功添加src属性');
+            }
+          }
+          
+          if (replaced) {
+            // 更新代码
+            const newLines = [...lines];
+            newLines[targetLineIndex] = updatedLine;
+            const newCode = newLines.join('\n');
+            
+            // 标记这是通过可视化编辑器更新的代码
+            isVisualCodeUpdateRef.current = true;
+            
+            // 在可视化模式下，只更新代码，不触发预览刷新
+            if (isVisualMode) {
+              // 静默更新代码，不触发预览刷新
+              setEditedCode(newCode);
+              setHasChanges(true);
+              console.log('可视化模式：图片src已静默更新，不刷新预览');
+            } else {
+              // 非可视化模式，正常更新代码和预览
+              setEditedCode(newCode);
+              setHasChanges(true);
+              console.log('图片src代码已更新');
+            }
+            
+            // 重置标志
+            setTimeout(() => {
+              isVisualCodeUpdateRef.current = false;
+            }, 100);
+            
+            console.log('图片src替换成功，新的src:', value);
+          } else {
+            console.error('未能找到或替换图片src属性');
+          }
+        } else {
+          console.error('未能在代码中找到对应的图片元素');
+        }
+        
+        return; // 图片src处理完成，直接返回
+      }
+      
+      // 处理CSS样式属性（原有逻辑）
+      // 直接修改元素样式（用于实时预览），使用!important确保优先级
+      selectedElement.style.setProperty(property, value, 'important');
+      console.log('已应用样式到元素:', selectedElement.style.cssText);
+
+      // 确保编辑模式已启用
+      if (!isEditable) {
+        console.log('启用编辑模式');
+        setIsEditable(true);
+        // 不要更新originalCode，保持原有的基准代码
+        // setOriginalCode(editedCode || originalCode);
+      }
+
+      // 获取当前代码
+      const currentCode = isEditable ? editedCode : originalCode;
+      
+      // 简化的元素定位：通过元素的ID、类名或标签名来查找
+      const lines = currentCode.split('\n');
+      let targetLineIndex = -1;
+      
+      // 策略1: 通过ID查找
+      if (selectedElement.id) {
+        targetLineIndex = lines.findIndex(line => 
+          line.includes(`id="${selectedElement.id}"`) || line.includes(`id='${selectedElement.id}'`)
+        );
+      }
+      
+      // 策略2: 通过类名查找（如果没有ID）
+      if (targetLineIndex === -1 && selectedElement.className) {
+        const className = selectedElement.className.trim();
+        targetLineIndex = lines.findIndex(line => 
+          line.includes(`class="${className}"`) || line.includes(`class='${className}'`)
+        );
+      }
+      
+      // 策略3: 通过标签名查找第一个匹配项（最后的备选）
+      if (targetLineIndex === -1) {
+        const tagName = selectedElement.tagName.toLowerCase();
+        targetLineIndex = lines.findIndex(line => line.includes(`<${tagName}`));
+      }
+      
+      if (targetLineIndex !== -1) {
+        const targetLine = lines[targetLineIndex];
+        console.log('找到目标行:', targetLineIndex + 1, targetLine);
+        
+        // 修改目标行的样式
+        let updatedLine = targetLine;
+        
+        // 检查是否已有style属性
+        const styleRegex = /style\s*=\s*["']([^"']*)["']/i;
+        const styleMatch = targetLine.match(styleRegex);
+        
+        if (styleMatch) {
+          // 已有style属性，更新它
+          const existingStyles = styleMatch[1];
+          const styleObj = parseStyleString(existingStyles);
+          
+          // 更新特定属性，添加!important确保优先级
+          styleObj[property] = `${value} !important`;
+          
+          // 重新构建style字符串
+          const newStyleString = Object.entries(styleObj)
+            .filter(([_, val]) => val && val.trim() !== '')
+            .map(([prop, val]) => `${prop}: ${val}`)
+            .join('; ');
+          
+          // 替换style属性
+          updatedLine = targetLine.replace(styleRegex, `style="${newStyleString}"`);
+        } else {
+          // 没有style属性，添加一个，使用!important确保优先级
+          const newStyle = `${property}: ${value} !important`;
+          
+          // 找到标签的结束位置（>之前）
+          const tagEndMatch = targetLine.match(/^(\s*<[^>]*?)(\s*\/?>.*)/);
+          if (tagEndMatch) {
+            updatedLine = `${tagEndMatch[1]} style="${newStyle}"${tagEndMatch[2]}`;
+          } else {
+            console.warn('无法解析标签结构，跳过样式更新');
+            return;
+          }
+        }
+        
+        console.log('更新后的行:', updatedLine);
+        
+        // 更新代码
+        const newLines = [...lines];
+        newLines[targetLineIndex] = updatedLine;
+        const newCode = newLines.join('\n');
+        
+        // 标记这是通过可视化编辑器更新的代码
+        isVisualCodeUpdateRef.current = true;
+        
+        // 在可视化模式下，只更新代码，不触发预览刷新
+        if (isVisualMode) {
+          // 静默更新代码，不触发预览刷新
+          setEditedCode(newCode);
+          setHasChanges(true);
+          console.log('可视化模式：代码已静默更新，不刷新预览');
+        } else {
+          // 非可视化模式，正常更新代码和预览
+          setEditedCode(newCode);
+          setHasChanges(true);
+          console.log('代码已更新');
+        }
+        
+        // 重置标志
+        setTimeout(() => {
+          isVisualCodeUpdateRef.current = false;
+        }, 100);
+        
+      } else {
+        console.warn('未能在代码中找到对应的元素');
+      }
+    } catch (error) {
+      console.error('更新代码时出错:', error);
+    }
+  }, [selectedElement, isEditable, editedCode, originalCode, isVisualMode]);
+
+  // 防抖的预览更新函数
+ 
+
+  // 监听editedCode变化，防抖更新预览
+  useEffect(() => {
+    // 在可视化模式下不自动更新预览，避免抖动
+    // 如果是通过可视化编辑器更新的代码，也不触发预览更新（因为DOM已经直接更新了）
+    if (editedCode && hasChanges && !isVisualMode && !isVisualCodeUpdateRef.current) {
+      console.log('防抖预览更新');
+    }
+  }, [editedCode, hasChanges, isVisualMode]);
+
+  // 处理元素选择（扩展现有的元素选择功能）
+  const handleElementSelectForVisual = useCallback((element: HTMLElement) => {
+    if (!isVisualMode) return;
+    
+    setSelectedElement(element);
+    
+    // 高亮选中的元素
+    const iframe = iframeRef.current;
+    if (iframe?.contentDocument) {
+      // 移除之前的高亮
+      const prevHighlighted = iframe.contentDocument.querySelectorAll('.visual-editor-selected');
+      prevHighlighted.forEach(el => el.classList.remove('visual-editor-selected'));
+      
+      // 添加高亮样式
+      element.classList.add('visual-editor-selected');
+      
+      // 添加高亮样式到iframe的head中
+      let style = iframe.contentDocument.getElementById('visual-editor-styles');
+      if (!style) {
+        style = iframe.contentDocument.createElement('style');
+        style.id = 'visual-editor-styles';
+        style.textContent = `
+          .visual-editor-selected {
+            outline: 2px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+          }
+        `;
+        iframe.contentDocument.head.appendChild(style);
+      }
+    }
+  }, [isVisualMode]);
 
   // 修改按钮函数逻辑，确保点击分享按钮时也会打开保存对话框
   const handleDownloadOrShare = (action: 'download' | 'share') => {
@@ -2159,7 +2990,13 @@ export function GenerationView({
 
   // 处理元素选择模式
   const handleElementSelect = useCallback((element: HTMLElement) => {
-    if (!isElementSelectMode) return;
+    if (!isElementSelectMode && !isVisualMode) return;
+    
+    // 如果是可视化模式，调用可视化编辑器的元素选择处理
+    if (isVisualMode) {
+      handleElementSelectForVisual(element);
+      return;
+    }
     
     try {
       console.log('选中的元素:', element.tagName, element);
@@ -2391,7 +3228,7 @@ export function GenerationView({
 
   // 设置iframe的元素选择事件监听
   const setupElementSelection = useCallback(() => {
-    if (!iframeRef.current || !isElementSelectMode) return;
+    if (!iframeRef.current || (!isElementSelectMode && !isVisualMode)) return;
     
     const iframe = iframeRef.current;
     
@@ -2508,7 +3345,7 @@ export function GenerationView({
         // 忽略清理时的错误
       });
     };
-  }, [isElementSelectMode, handleElementSelect]);
+  }, [isElementSelectMode, isVisualMode, handleElementSelect]);
 
   // 监听元素选择模式变化
   useEffect(() => {
@@ -2581,7 +3418,18 @@ export function GenerationView({
   // 当initialVersions变化时，更新versionHistory
   useEffect(() => {
     if (initialVersions && initialVersions.length > 0) {
-      setVersionHistory(initialVersions);
+      // 只在初始化时设置版本历史，避免覆盖用户手动保存的版本
+      setVersionHistory(prev => {
+        // 如果当前版本历史为空或者长度小于初始版本，则使用初始版本
+        if (prev.length === 0 || prev.length < initialVersions.length) {
+          console.log('初始化版本历史，从', prev.length, '个版本更新到', initialVersions.length, '个版本');
+          return initialVersions;
+        }
+        // 否则保持当前版本历史不变
+        console.log('保持当前版本历史不变，当前有', prev.length, '个版本');
+        return prev;
+      });
+      
       // 如果还没有设置当前版本ID，设置为最新的版本（数组中的最后一个）
       if (!currentVersionId && initialVersions.length > 0) {
         const latestVersion = initialVersions[initialVersions.length - 1];
@@ -2597,8 +3445,9 @@ export function GenerationView({
         }
       }
     }
-  }, [initialVersions, currentVersionId, updatePreviewAfterVersionChange]);
-  
+  }, [initialVersions, updatePreviewAfterVersionChange]);
+  // 移除 currentVersionId 依赖，避免在版本切换时重置版本历史
+
   // 处理图片替换
   const handleImageReplace = useCallback((newImageSrc: string) => {
     if (!selectedImageFingerprint) {
@@ -2777,6 +3626,81 @@ export function GenerationView({
                 />
               </div>
             )}
+
+            {/* 切换模式 */}
+            {generationComplete && (
+              <div className="ml-3 flex items-center space-x-3 px-3 py-1 bg-gray-800/50 rounded-lg border border-gray-700">
+                <div className="flex items-center space-x-1">
+                  {/* 代码编辑模式 */}
+                  <button
+                    onClick={() => {
+                      if (isVisualMode) {
+                        setIsVisualMode(false);
+                        
+                        // 切换模式时，取消元素选择模式
+                        setIsElementSelectMode(false);
+                        
+                        // 切换到代码编辑模式时，清理可视化编辑相关状态
+                        setSelectedElement(null);
+                        
+                        // 清理图片替换相关状态
+                        setImageReplaceButton({ show: false, x: 0, y: 0 });
+                        setSelectedImageSrc("");
+                        setSelectedImageFingerprint(null);
+                        setSelectedImageElement(null);
+                      }
+                    }}
+                    disabled={isGenerating || !isVisualMode}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                      !isVisualMode 
+                        ? 'bg-blue-600 text-white shadow-md' 
+                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium">Code</span>
+                  </button>
+                  
+                  {/* 可视化编辑模式 */}
+                  <button
+                    onClick={() => {
+                      if (!isVisualMode) {
+                        setIsVisualMode(true);
+                        
+                        // 切换模式时，取消元素选择模式
+                        setIsElementSelectMode(false);
+                        
+                        // 切换到可视化模式时，自动启用编辑模式
+                        if (!isEditable) {
+                          setIsEditable(true);
+                        }
+                        
+                        // 清理图片替换相关状态
+                        setImageReplaceButton({ show: false, x: 0, y: 0 });
+                        setSelectedImageSrc("");
+                        setSelectedImageFingerprint(null);
+                        setSelectedImageElement(null);
+                      }
+                    }}
+                    disabled={isGenerating || isVisualMode}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                      isVisualMode 
+                        ? 'bg-green-600 text-white shadow-md' 
+                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 4a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1V8zm8 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V8zm0 4a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium">No Code</span>
+                  </button>
+                </div>
+                
+          
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -2844,7 +3768,7 @@ export function GenerationView({
                 <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-medium">GENERATED HTML</h2>
-                    {generationComplete && (
+                    {generationComplete && !isVisualMode && (
                       <div className="ml-3 flex items-center space-x-2">
                         <span className="text-xs text-gray-400">
                           {isEditable ? 'Edit' : 'Read Only'}
@@ -2876,16 +3800,18 @@ export function GenerationView({
                         Save
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
-                      onClick={copyToClipboard}
-                      disabled={!generatedCode || isGenerating}
-                    >
-                      <Copy className="w-4 h-4 mr-1" />
-                      {copySuccess ? "Copied!" : "Copy"}
-                    </Button>
+                    {!isVisualMode && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                        onClick={copyToClipboard}
+                        disabled={!generatedCode || isGenerating}
+                      >
+                        <Copy className="w-4 h-4 mr-1" />
+                        {copySuccess ? "Copied!" : "Copy"}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <div className="flex-1 overflow-hidden">
@@ -2896,6 +3822,19 @@ export function GenerationView({
                         <p className="text-gray-400">Generating code...</p>
                       </div>
                     </div>
+                  ) : isVisualMode ? (
+                    <VisualEditor
+                      selectedElement={selectedElement}
+                      onStyleChange={handleStyleChange}
+                      onRefreshPreview={() => {
+                        console.log('手动刷新预览');
+                        debouncedUpdatePreview.flush();
+                        const currentCode = isEditable ? editedCode : originalCode;
+                        const preparedHtml = prepareHtmlContent(currentCode);
+                        setPreviewContent(preparedHtml);
+                        setPreviewKey(prev => prev + 1);
+                      }}
+                    />
                   ) : (
                     <CodeEditor
                       code={isEditable ? editedCode : originalCode}
@@ -3012,7 +3951,6 @@ export function GenerationView({
                   </Button>
                   {/* 只在桌面版显示历史按钮 */}
                   <Button
-                    key={`history-btn-${versionHistory.length}`}
                     variant={showHistory ? "secondary" : "ghost"}
                     size="sm"
                     className="h-7 ml-2 px-2 flex items-center gap-1"
@@ -3078,7 +4016,7 @@ export function GenerationView({
                         {isElementSelectMode && (
                           <div className="absolute top-4 left-4 z-20 bg-blue-600/90 text-white px-3 py-2 rounded-lg text-sm flex items-center shadow-lg">
                             <MousePointer2 className="w-4 h-4 mr-2" />
-                            <span>点击元素定位到代码</span>
+                            <span>Click element to code</span>
                           </div>
                         )}
                       </div>
@@ -3103,7 +4041,7 @@ export function GenerationView({
                   <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-medium">GENERATED HTML</h2>
-                      {generationComplete && (
+                      {generationComplete && !isVisualMode && (
                         <div className="ml-3 flex items-center space-x-2">
                           <span className="text-xs text-gray-400">
                             {isEditable ? 'Edit' : 'Read Only'}
@@ -3135,16 +4073,18 @@ export function GenerationView({
                           Save
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
-                        onClick={copyToClipboard}
-                        disabled={!generatedCode || isGenerating}
-                      >
-                        <Copy className="w-4 h-4 mr-1" />
-                        {copySuccess ? "Copied!" : "Copy"}
-                      </Button>
+                      {!isVisualMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                          onClick={copyToClipboard}
+                          disabled={!generatedCode || isGenerating}
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          {copySuccess ? "Copied!" : "Copy"}
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="flex-1 overflow-hidden">
@@ -3155,6 +4095,19 @@ export function GenerationView({
                           <p className="text-gray-400">Generating code...</p>
                         </div>
                       </div>
+                    ) : isVisualMode ? (
+                      <VisualEditor
+                        selectedElement={selectedElement}
+                        onStyleChange={handleStyleChange}
+                        onRefreshPreview={() => {
+                          console.log('手动刷新预览');
+                          debouncedUpdatePreview.flush();
+                          const currentCode = isEditable ? editedCode : originalCode;
+                          const preparedHtml = prepareHtmlContent(currentCode);
+                          setPreviewContent(preparedHtml);
+                          setPreviewKey(prev => prev + 1);
+                        }}
+                      />
                     ) : (
                       <CodeEditor
                         code={isEditable ? editedCode : originalCode}
@@ -3276,7 +4229,6 @@ export function GenerationView({
                     </Button>
                     {/* 只在桌面版显示历史按钮 */}
                     <Button
-                      key={`history-btn-${versionHistory.length}`}
                       variant={showHistory ? "secondary" : "ghost"}
                       size="sm"
                       className="h-7 ml-2 px-2 flex items-center gap-1"
@@ -3342,7 +4294,8 @@ export function GenerationView({
                           {isElementSelectMode && (
                             <div className="absolute top-4 left-4 z-20 bg-blue-600/90 text-white px-3 py-2 rounded-lg text-sm flex items-center shadow-lg">
                               <MousePointer2 className="w-4 h-4 mr-2" />
-                              <span>点击元素定位到代码</span>
+                              <span>Click to modify elements
+                              </span>
                             </div>
                           )}
                         </div>

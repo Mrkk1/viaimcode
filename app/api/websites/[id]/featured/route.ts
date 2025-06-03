@@ -4,7 +4,7 @@ import { getWebsiteById, updateWebsite } from '@/lib/storage';
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser();
@@ -12,7 +12,8 @@ export async function PUT(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const website = await getWebsiteById(params.id);
+    const { id } = await params;
+    const website = await getWebsiteById(id);
     if (!website) {
       return new NextResponse('Website not found', { status: 404 });
     }
@@ -29,7 +30,7 @@ export async function PUT(
       return new NextResponse('Invalid isFeatured value', { status: 400 });
     }
 
-    const success = await updateWebsite(params.id, { isFeatured });
+    const success = await updateWebsite(id, { isFeatured });
     
     if (!success) {
       return new NextResponse('Failed to update website', { status: 500 });
