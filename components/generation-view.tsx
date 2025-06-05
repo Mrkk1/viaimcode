@@ -3629,7 +3629,7 @@ export function GenerationView({
 
             {/* 切换模式 */}
             {generationComplete && (
-              <div className="ml-3 flex items-center space-x-3 px-3 py-1 bg-gray-800/50 rounded-lg border border-gray-700">
+              <div className="ml-3 flex items-center space-x-3 px-2 py-1 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
                 <div className="flex items-center space-x-1">
                   {/* 代码编辑模式 */}
                   <button
@@ -3651,10 +3651,10 @@ export function GenerationView({
                       }
                     }}
                     disabled={isGenerating || !isVisualMode}
-                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
                       !isVisualMode 
-                        ? 'bg-blue-600 text-white shadow-md' 
-                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+                        ? 'bg-blue-500/80 text-white shadow-lg shadow-blue-500/25 border border-blue-400/30' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
                     } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -3685,10 +3685,10 @@ export function GenerationView({
                       }
                     }}
                     disabled={isGenerating || isVisualMode}
-                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
                       isVisualMode 
-                        ? 'bg-green-600 text-white shadow-md' 
-                        : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+                        ? 'bg-green-500/80 text-white shadow-lg shadow-green-500/25 border border-green-400/30' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
                     } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">

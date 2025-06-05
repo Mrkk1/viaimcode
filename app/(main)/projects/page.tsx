@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, Clock, Code, Edit, Trash2, Eye } from "lucide-react";
+import { Loader2, Plus, Calendar, Clock, Code, Edit, Trash2, Eye, ArrowRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { enUS } from "date-fns/locale";
 import Link from "next/link";
@@ -159,15 +159,15 @@ export default function ProjectsPage() {
   const getProviderBadgeColor = (provider?: string) => {
     switch (provider) {
       case 'deepseek':
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+        return 'bg-blue-400/20 text-blue-200 border-blue-400/30 hover:bg-blue-400/30';
       case 'openai_compatible':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
+        return 'bg-green-400/20 text-green-200 border-green-400/30 hover:bg-green-400/30';
       case 'ollama':
-        return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+        return 'bg-purple-400/20 text-purple-200 border-purple-400/30 hover:bg-purple-400/30';
       case 'lm_studio':
-        return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+        return 'bg-orange-400/20 text-orange-200 border-orange-400/30 hover:bg-orange-400/30';
       default:
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
+        return 'bg-gray-400/20 text-gray-200 border-gray-400/30 hover:bg-gray-400/30';
     }
   };
 
@@ -178,8 +178,12 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className=" bg-black">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 " style={{'--tw-gradient-to': '#091d4a'} as React.CSSProperties}>
+      {/* 背景装饰 */}
+      <div className="absolute inset-0 from-blue-900/20 via-transparent to-transparent" />
+      <div className="absolute inset-0  from-purple-900/20 via-transparent to-transparent" />
+      
+      <div className="relative z-10 container mx-auto px-4">
         {/* 页面标题和操作 */}
         <div className="flex items-center justify-between mb-8">
           <div>
@@ -212,42 +216,41 @@ export default function ProjectsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <Card key={project.id} className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors">
-                <CardHeader>
+              <Card key={project.id} className="group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 hover:border-white/20 transition-all duration-300 hover:bg-white/10 hover:shadow-xl hover:shadow-white/5">
+                {/* 毛玻璃背景装饰 */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                
+                <CardHeader className="relative z-10">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-white text-lg line-clamp-1">
+                      <CardTitle className="text-white text-lg line-clamp-1 font-medium">
                         {project.title}
                       </CardTitle>
-                      <CardDescription className="text-gray-400 mt-1 line-clamp-2">
+                      <CardDescription className="text-gray-300/80 mt-1 line-clamp-2">
                         {project.description || project.prompt || 'No description'}
                       </CardDescription>
                     </div>
-                    {/* {project.status === 'active' && (
-                      <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 ml-2">
-                        Active
-                      </Badge>
-                    )} */}
+               
                   </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="relative z-10">
                   <div className="space-y-2">
                     {/* 模型和提供商信息 */}
                     <div className="flex items-center gap-2">
                       {project.provider && (
-                        <Badge variant="outline" className={getProviderBadgeColor(project.provider)}>
+                        <Badge variant="outline" className={`backdrop-blur-sm border-white/20 ${getProviderBadgeColor(project.provider)}`}>
                           {project.provider.toUpperCase()}
                         </Badge>
                       )}
                       {project.model && (
-                        <Badge variant="outline" className="bg-gray-700 text-gray-300 border-gray-600">
+                        <Badge variant="outline" className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/15">
                           {project.model}
                         </Badge>
                       )}
                     </div>
                     
                     {/* 时间信息 */}
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-4 text-xs text-gray-300/70">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         <span>Created {project.createdAt ? formatDistanceToNow(new Date(project.createdAt), { addSuffix: true, locale: enUS }) : 'Unknown'}</span>
@@ -261,28 +264,28 @@ export default function ProjectsPage() {
                     </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex justify-between">
+                <CardFooter className="relative z-10 flex justify-between">
                   <div className="flex gap-2">
                     <Link href={`/project/${project.id}`}>
-                      <Button variant="outline" size="sm" className="text-gray-300 border-gray-700 hover:bg-gray-800  hover:text-white">
-                        <Eye className="w-4 h-4 mr-1" />
+                      <Button variant="outline" size="sm" className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20 hover:text-white hover:border-white/30 transition-all duration-200">
+                        <ArrowRight className="w-4 h-4 " />
                         Enter
                       </Button>
                     </Link>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="text-gray-300 border-gray-700 hover:bg-gray-800 hover:text-white"
+                      className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20 hover:text-white hover:border-white/30 transition-all duration-200"
                       onClick={() => handleEditProject(project)}
                     >
-                      <Edit className="w-4 h-4 mr-1" />
+                      <Edit className="w-4 h-4" />
                       Edit
                     </Button>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                    className="text-red-300/80 hover:text-red-200 hover:bg-red-500/20 backdrop-blur-sm transition-all duration-200"
                     onClick={() => setDeleteProjectId(project.id)}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -296,35 +299,35 @@ export default function ProjectsPage() {
 
       {/* 编辑对话框 */}
       <Dialog open={!!editingProject} onOpenChange={() => setEditingProject(null)}>
-        <DialogContent className="bg-gray-900 border-gray-800">
+        <DialogContent className="backdrop-blur-md bg-black/80 border border-white/20">
           <DialogHeader>
             <DialogTitle className="text-white">Edit Project</DialogTitle>
-            <DialogDescription className="text-gray-400">
+            <DialogDescription className="text-gray-300/80">
               Modify project name and description
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="title" className="text-gray-300">
+              <Label htmlFor="title" className="text-gray-200">
                 Project Name
               </Label>
               <Input
                 id="title"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="backdrop-blur-sm bg-white/10 border-white/20 text-white placeholder:text-gray-400"
                 placeholder="Enter project name"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="description" className="text-gray-300">
+              <Label htmlFor="description" className="text-gray-200">
                 Project Description
               </Label>
               <Textarea
                 id="description"
                 value={editDescription}
                 onChange={(e) => setEditDescription(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white min-h-[100px]"
+                className="backdrop-blur-sm bg-white/10 border-white/20 text-white placeholder:text-gray-400 min-h-[100px]"
                 placeholder="Enter project description (optional)"
               />
             </div>
@@ -333,7 +336,7 @@ export default function ProjectsPage() {
             <Button
               variant="outline"
               onClick={() => setEditingProject(null)}
-              className="bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700"
+              className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20"
             >
               Cancel
             </Button>
@@ -357,19 +360,19 @@ export default function ProjectsPage() {
 
       {/* 删除确认对话框 */}
       <AlertDialog open={!!deleteProjectId} onOpenChange={() => setDeleteProjectId(null)}>
-        <AlertDialogContent className="bg-gray-900 border-gray-800">
+        <AlertDialogContent className="backdrop-blur-md bg-black/80 border border-white/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white">Confirm Delete Project</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-400">
+            <AlertDialogDescription className="text-gray-300/80">
               This action will permanently delete this project and all its versions. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700">
+            <AlertDialogCancel className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 text-white hover:bg-red-700"
+              className="bg-red-500/80 text-white hover:bg-red-500 backdrop-blur-sm"
               onClick={() => deleteProjectId && handleDeleteProject(deleteProjectId)}
             >
               Delete
