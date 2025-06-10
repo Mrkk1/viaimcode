@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, Calendar, Clock, Code, Edit, Trash2, Eye, ArrowRight } from "lucide-react";
+import { Loader2, Plus, Calendar, Clock, Code, Edit, Trash2, Rocket } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { enUS } from "date-fns/locale";
 import Link from "next/link";
@@ -268,7 +268,7 @@ export default function ProjectsPage() {
                   <div className="flex gap-2">
                     <Link href={`/project/${project.id}`}>
                       <Button variant="outline" size="sm" className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20 hover:text-white hover:border-white/30 transition-all duration-200">
-                        <ArrowRight className="w-4 h-4 " />
+                        <Rocket className="w-4 h-4 mr-1" />
                         Enter
                       </Button>
                     </Link>
@@ -278,7 +278,7 @@ export default function ProjectsPage() {
                       className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20 hover:text-white hover:border-white/30 transition-all duration-200"
                       onClick={() => handleEditProject(project)}
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-4 h-4 mr-1" />
                       Edit
                     </Button>
                   </div>
