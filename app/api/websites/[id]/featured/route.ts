@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import { getWebsiteById, updateWebsite } from '@/lib/storage';
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  context: any
 ) {
   try {
     const user = await getCurrentUser();
@@ -12,7 +12,7 @@ export async function PUT(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const website = await getWebsiteById(params.id);
+    const website = await getWebsiteById(context.params.id);
     if (!website) {
       return new NextResponse('Website not found', { status: 404 });
     }
@@ -29,7 +29,7 @@ export async function PUT(
       return new NextResponse('Invalid isFeatured value', { status: 400 });
     }
 
-    const success = await updateWebsite(params.id, { isFeatured });
+    const success = await updateWebsite(context.params.id, { isFeatured });
     
     if (!success) {
       return new NextResponse('Failed to update website', { status: 500 });
