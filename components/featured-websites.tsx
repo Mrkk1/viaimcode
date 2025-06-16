@@ -101,7 +101,7 @@ export function FeaturedWebsites() {
               className="block"
             >
               <Card 
-                className="group bg-gray-900/80 border-2 border-gray-700/60 hover:border-blue-500/60 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 overflow-hidden cursor-pointer"
+               style={{height: '100%'}}  className="group bg-gray-900/80 border-2 border-gray-700/60 hover:border-blue-500/60 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 overflow-hidden cursor-pointer"
               >
                 <div className="aspect-video relative bg-gray-950 overflow-hidden">
                   {website.thumbnailUrl ? (
