@@ -440,6 +440,8 @@ export function GenerationView({
   const [selectedElement, setSelectedElement] = useState<HTMLElement | null>(null)
   // 使用ref来跟踪是否是通过可视化编辑器更新的代码，避免触发额外的useEffect
   const isVisualCodeUpdateRef = useRef(false)
+  // 添加保存加载状态
+  const [isSaving, setIsSaving] = useState(false)
 
   // 同步更新 versionHistoryRef
   useEffect(() => {
@@ -1013,15 +1015,34 @@ export function GenerationView({
   // Function to save changes
   const saveChanges = async () => {
     console.log('=== 开始保存操作 ===');
-    setOriginalCode(editedCode)
-    setHasChanges(false)
     
-    // 保存时创建新版本，标记为手动保存类型，等待完成
+    // 设置保存加载状态
+    setIsSaving(true);
+    
     try {
+      // 立即显示一个测试toast，确保toast系统正常工作
+   
+      
+      // 显示正在生成缩略图的提示
+      toast.loading('Generating Thumbnail...', {
+        id: 'saving-toast',
+        duration: 10000, // 10秒超时
+      });
+      
+      setOriginalCode(editedCode)
+      setHasChanges(false)
+      
+      // 保存时创建新版本，标记为手动保存类型，等待完成
       // 使用 versionHistoryRef 获取最新的版本数量
       const currentVersionCount = versionHistoryRef.current.length;
       console.log('保存前版本数量:', currentVersionCount);
       console.log('保存前版本历史:', versionHistoryRef.current.map(v => ({ id: v.id, title: v.title })));
+      
+      // 更新提示为正在保存版本
+      toast.loading('Saving Version...', {
+        id: 'saving-toast',
+        duration: 10000,
+      });
       
       const newVersion = await createNewVersion(editedCode, `Manual Save Version ${currentVersionCount + 1}`, 'manual');
       
@@ -1048,15 +1069,27 @@ export function GenerationView({
         }, 100);
         
         // 显示成功提示
-        toast.success('代码已保存为新版本');
+        toast.success('Code saved as new version', {
+          id: 'saving-toast',
+          duration: 3000,
+        });
         console.log('=== 保存操作完成 ===');
       } else {
         console.error('创建版本失败');
-        toast.error('保存失败，请重试');
+        toast.error('Save failed, please try again', {
+          id: 'saving-toast',
+          duration: 5000,
+        });
       }
     } catch (error) {
       console.error('创建手动保存版本失败:', error);
-      toast.error('保存失败，请重试');
+      toast.error('Save failed, please try again', {
+        id: 'saving-toast',
+        duration: 5000,
+      });
+    } finally {
+      // 重置保存加载状态
+      setIsSaving(false);
     }
   }
 
@@ -2522,471 +2555,446 @@ export function GenerationView({
     }
   };
 
-  // 生成元素的XPath路径（从根节点开始往下构建）
+  // 生成元素的绝对DOM路径指纹（100%精确定位）
   const generateElementFingerprint = useCallback((element: HTMLElement) => {
-    console.log('开始生成元素XPath指纹，元素:', element);
+    console.log('开始生成元素绝对DOM路径指纹，元素:', element);
     
-    // 1. 从根节点开始往下生成完整的XPath路径
-    const generateXPath = (el: HTMLElement): string => {
-      const pathSegments: string[] = [];
-      let current = el;
-      
-      // 先收集从目标元素到根节点的路径
-      const reversePath: HTMLElement[] = [];
-      while (current && current !== document.body && current.parentElement) {
-        reversePath.push(current);
-        current = current.parentElement;
-      }
-      
-      // 反转路径，从根节点开始往下构建
-      const forwardPath = reversePath.reverse();
-      
-      // 为每个节点生成XPath段
-      forwardPath.forEach((node, index) => {
-        const parent = node.parentElement;
-        if (!parent) return;
-        
-        const siblings = Array.from(parent.children);
-        const tagName = node.tagName.toLowerCase();
-        
-        // 计算在相同标签兄弟中的位置（从1开始）
-        const sameTagSiblings = siblings.filter(sibling => sibling.tagName === node.tagName);
-        const tagIndex = sameTagSiblings.indexOf(node) + 1;
-        
-        // 优先级：ID > 唯一class > class+索引 > 标签+索引
-        if (node.id) {
-          // ID是唯一的，可以直接定位
-          pathSegments.push(`${tagName}[@id='${node.id}']`);
-        } else if (node.className) {
-          const className = node.className.trim();
-          
-          // 特殊处理body标签，过滤掉动态添加的类
-          let cleanClassName = className;
-          if (tagName === 'body') {
-            cleanClassName = className
-              .replace(/\s*element-selectable\s*/g, ' ')
-              .trim();
-          }
-          
-          if (cleanClassName) {
-            const sameClassSiblings = siblings.filter(sibling => 
-              sibling.tagName === node.tagName && sibling.className === className
-            );
-            
-            if (sameClassSiblings.length === 1) {
-              // class在同标签兄弟中是唯一的
-              pathSegments.push(`${tagName}[@class='${cleanClassName}']`);
-            } else {
-              // class不唯一，需要添加索引
-              const classIndex = sameClassSiblings.indexOf(node) + 1;
-              pathSegments.push(`${tagName}[@class='${cleanClassName}'][${classIndex}]`);
-            }
-          } else {
-            // 如果清理后没有class，使用标签索引
-            if (sameTagSiblings.length === 1) {
-              pathSegments.push(tagName);
-            } else {
-              pathSegments.push(`${tagName}[${tagIndex}]`);
-            }
-          }
-        } else {
-          // 没有ID和class，使用标签索引
-          if (sameTagSiblings.length === 1) {
-            pathSegments.push(tagName);
-          } else {
-            pathSegments.push(`${tagName}[${tagIndex}]`);
-          }
-        }
-      });
-      
-      return '//' + pathSegments.join('/');
-    };
-    
-    // 2. 生成分层路径信息（用于逐层匹配）
-    const generateLayeredPath = (el: HTMLElement): Array<{
+    // 1. 生成绝对DOM路径 - 记录从根节点到目标元素的完整路径
+    const generateAbsoluteDOMPath = (el: HTMLElement): Array<{
       tagName: string;
+      index: number; // 在所有同级元素中的索引（包括文本节点等）
+      tagIndex: number; // 在同标签同级元素中的索引
+      totalSiblings: number; // 同级元素总数
+      totalTagSiblings: number; // 同标签同级元素总数
       id?: string;
       className?: string;
-      index?: number;
-      level: number;
+      attributes?: Record<string, string>; // 所有属性
     }> => {
-      const layers: Array<{
+      const path: Array<{
         tagName: string;
+        index: number;
+        tagIndex: number;
+        totalSiblings: number;
+        totalTagSiblings: number;
         id?: string;
         className?: string;
-        index?: number;
-        level: number;
+        attributes?: Record<string, string>;
       }> = [];
+      
       let current = el;
-      let level = 0;
       
-      // 收集从目标元素到根节点的路径
-      const reversePath: HTMLElement[] = [];
+      // 从目标元素向上遍历到body
       while (current && current !== document.body && current.parentElement) {
-        reversePath.push(current);
-        current = current.parentElement;
-      }
-      
-      // 反转路径，从根节点开始
-      const forwardPath = reversePath.reverse();
-      
-      forwardPath.forEach((node, index) => {
-        const parent = node.parentElement;
-        if (!parent) return;
+        const parent = current.parentElement;
+        const allSiblings = Array.from(parent.children); // 所有同级元素
+        const sameTagSiblings = allSiblings.filter(sibling => 
+          sibling.tagName === current.tagName
+        ); // 同标签同级元素
         
-        const siblings = Array.from(parent.children);
-        const sameTagSiblings = siblings.filter(sibling => sibling.tagName === node.tagName);
-        const tagIndex = sameTagSiblings.indexOf(node) + 1;
+        // 计算索引
+        const index = allSiblings.indexOf(current); // 在所有同级中的索引
+        const tagIndex = sameTagSiblings.indexOf(current); // 在同标签同级中的索引
         
-        const layer: {
-          tagName: string;
-          id?: string;
-          className?: string;
-          index?: number;
-          level: number;
-        } = {
-          tagName: node.tagName.toLowerCase(),
-          level: index,
-          index: tagIndex
+        // 收集所有属性
+        const attributes: Record<string, string> = {};
+        if (current.attributes) {
+          for (let i = 0; i < current.attributes.length; i++) {
+            const attr = current.attributes[i];
+            attributes[attr.name] = attr.value;
+          }
+        }
+        
+        const pathNode = {
+          tagName: current.tagName.toLowerCase(),
+          index: index,
+          tagIndex: tagIndex,
+          totalSiblings: allSiblings.length,
+          totalTagSiblings: sameTagSiblings.length,
+          id: current.id || undefined,
+          className: current.className || undefined,
+          attributes: Object.keys(attributes).length > 0 ? attributes : undefined
         };
         
-        if (node.id) {
-          layer.id = node.id;
-        }
-        
-        if (node.className) {
-          layer.className = node.className.trim();
-          
-          // 特殊处理body标签，过滤掉动态添加的类
-          if (node.tagName.toLowerCase() === 'body') {
-            layer.className = layer.className
-              .replace(/\s*element-selectable\s*/g, ' ')
-              .trim();
-          }
-          
-          // 计算在相同class兄弟中的索引
-          const sameClassSiblings = siblings.filter(sibling => 
-            sibling.tagName === node.tagName && sibling.className === node.className
-          );
-          if (sameClassSiblings.length > 1) {
-            layer.index = sameClassSiblings.indexOf(node) + 1;
-          }
-        }
-        
-        layers.push(layer);
-      });
-      
-      return layers;
-    };
-    
-    // 3. 生成备用的CSS选择器路径
-    const generateCSSPath = (el: HTMLElement): string => {
-      const pathSegments: string[] = [];
-      let current = el;
-      
-      // 收集路径段
-      const reversePath: HTMLElement[] = [];
-      while (current && current !== document.body && current.parentElement) {
-        reversePath.push(current);
-        current = current.parentElement;
+        path.unshift(pathNode); // 添加到路径开头，保持从根到叶的顺序
+        current = parent;
       }
       
-      // 从根节点开始构建CSS路径
-      reversePath.reverse().forEach(node => {
-        let selector = node.tagName.toLowerCase();
+      return path;
+    };
+    
+    // 2. 提取元素的唯一特征
+    const extractUniqueFeatures = (el: HTMLElement) => {
+      // 获取直接文本内容（不包括子元素）
+      const getDirectText = (element: HTMLElement): string => {
+        return Array.from(element.childNodes)
+          .filter(node => node.nodeType === Node.TEXT_NODE)
+          .map(node => node.textContent?.trim())
+          .filter(text => text && text.length > 0)
+          .join(' ');
+      };
+      
+      // 获取所有文本内容
+      const getAllText = (element: HTMLElement): string => {
+        return element.textContent?.trim() || '';
+      };
+      
+      // 获取特殊属性（如src, href等）
+      const getSpecialAttributes = (element: HTMLElement): Record<string, string> => {
+        const specialAttrs: Record<string, string> = {};
+        const importantAttrs = ['src', 'href', 'alt', 'title', 'data-*', 'aria-*'];
         
-        if (node.id) {
-          selector += `#${node.id}`;
-        } else {
-          if (node.className) {
-            const classes = node.className.trim().split(/\s+/).join('.');
-            selector += `.${classes}`;
-          }
-          
-          // 添加nth-child以确保精确性
-          const parent = node.parentElement;
-          if (parent) {
-            const siblings = Array.from(parent.children);
-            const index = siblings.indexOf(node) + 1;
-            selector += `:nth-child(${index})`;
+        if (element.attributes) {
+          for (let i = 0; i < element.attributes.length; i++) {
+            const attr = element.attributes[i];
+            if (importantAttrs.some(pattern => 
+              pattern.endsWith('*') ? attr.name.startsWith(pattern.slice(0, -1)) : attr.name === pattern
+            )) {
+              specialAttrs[attr.name] = attr.value;
+            }
           }
         }
         
-        pathSegments.push(selector);
-      });
+        return specialAttrs;
+      };
       
-      return pathSegments.join(' > ');
+      return {
+        directText: getDirectText(el),
+        allText: getAllText(el),
+        specialAttributes: getSpecialAttributes(el),
+        innerHTML: el.innerHTML,
+        outerHTML: el.outerHTML
+      };
     };
     
-    // 4. 提取关键文本用于验证
-    const extractKeyText = (el: HTMLElement): string => {
-      // 获取元素的直接文本内容（不包括子元素）
-      const directText = Array.from(el.childNodes)
-        .filter(node => node.nodeType === Node.TEXT_NODE)
-        .map(node => node.textContent?.trim())
-        .filter(text => text && text.length > 0)
-        .join(' ');
-      
-      if (directText) return directText;
-      
-      // 如果没有直接文本，获取第一个有意义的子元素文本
-      const walker = document.createTreeWalker(
-        el,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
-      
-      let node;
-      while (node = walker.nextNode()) {
-        const text = node.textContent?.trim();
-        if (text && text.length > 2) {
-          return text;
-        }
-      }
-      
-      return '';
-    };
+    const absolutePath = generateAbsoluteDOMPath(element);
+    const uniqueFeatures = extractUniqueFeatures(element);
     
-    const xpath = generateXPath(element);
-    const layeredPath = generateLayeredPath(element);
-    const cssPath = generateCSSPath(element);
-    const keyText = extractKeyText(element);
-    
-
+    console.log('生成的绝对DOM路径:', absolutePath);
+    console.log('元素唯一特征:', uniqueFeatures);
     
     return {
-      xpath,
-      layeredPath,
-      cssPath,
-      keyText,
+      // 绝对DOM路径 - 这是最可靠的定位方式
+      absolutePath,
+      // 元素基本信息
       tagName: element.tagName.toLowerCase(),
-      className: element.className,
       id: element.id || '',
-      textContent: element.textContent?.trim() || ''
+      className: element.className || '',
+      // 唯一特征
+      uniqueFeatures,
+      // 备用信息（兼容现有代码）
+      xpath: '', // 保留字段但不使用
+      layeredPath: [], // 保留字段但不使用
+      cssPath: '', // 保留字段但不使用
+      keyText: uniqueFeatures.directText || uniqueFeatures.allText.substring(0, 50),
+      textContent: uniqueFeatures.allText
     };
   }, []);
 
-  // 在代码中通过完整DOM路径精确查找元素（完全模拟浏览器控制台）
+  // 通过绝对DOM路径在代码中精确定位元素
   const findElementInCode = useCallback((fingerprint: {
-    xpath: string;
-    layeredPath: Array<{
+    absolutePath: Array<{
       tagName: string;
+      index: number;
+      tagIndex: number;
+      totalSiblings: number;
+      totalTagSiblings: number;
       id?: string;
       className?: string;
-      index?: number;
-      level: number;
+      attributes?: Record<string, string>;
     }>;
-    cssPath: string;
-    keyText: string;
     tagName: string;
-    className: string;
     id: string;
+    className: string;
+    uniqueFeatures: {
+      directText: string;
+      allText: string;
+      specialAttributes: Record<string, string>;
+      innerHTML: string;
+      outerHTML: string;
+    };
+    keyText: string;
     textContent: string;
+    // 兼容字段
+    xpath?: string;
+    layeredPath?: any[];
+    cssPath?: string;
   }) => {
     const currentCode = isEditable ? editedCode : originalCode;
     const lines = currentCode.split('\n');
     
+    console.log('🔍 开始通过绝对DOM路径查找元素');
+    console.log('目标路径:', fingerprint.absolutePath);
+    console.log('目标特征:', fingerprint.uniqueFeatures);
     
-    // 策略1: ID精确匹配（最高优先级）
+    // 策略1: 通过绝对DOM路径精确定位
+    if (fingerprint.absolutePath && fingerprint.absolutePath.length > 0) {
+      console.log('🔍 使用绝对DOM路径匹配');
+      
+      // 找到所有可能的目标标签行
+      const targetTag = fingerprint.tagName;
+      const candidateLines: Array<{lineIndex: number, line: string}> = [];
+      
+      lines.forEach((line, index) => {
+        // 修复：查找包含目标标签的行，不管是自闭合、只有开始标签还是完整标签
+        if (line.includes(`<${targetTag}`)) {
+          candidateLines.push({lineIndex: index, line});
+        }
+      });
+      
+      console.log(`找到 ${candidateLines.length} 个候选 ${targetTag} 标签`);
+      
+      if (candidateLines.length === 0) {
+        console.log('❌ 没有找到目标标签');
+        return null;
+      }
+      
+      // 如果只有一个候选，直接返回
+      if (candidateLines.length === 1) {
+        console.log('✅ 唯一候选标签，行号:', candidateLines[0].lineIndex + 1);
+        return {
+          lineIndex: candidateLines[0].lineIndex,
+          score: 100,
+          confidence: '绝对精确'
+        };
+      }
+      
+      // 多个候选时，通过DOM路径信息进行精确匹配
+      const targetPathNode = fingerprint.absolutePath[fingerprint.absolutePath.length - 1]; // 目标元素的路径节点
+      
+      console.log('目标元素路径节点:', targetPathNode);
+      
+      // 方法1: 通过ID精确匹配
+      if (targetPathNode.id) {
+        const exactMatch = candidateLines.find(({line}) => 
+          line.includes(`id="${targetPathNode.id}"`) || line.includes(`id='${targetPathNode.id}'`)
+        );
+        if (exactMatch) {
+          console.log('✅ 通过ID绝对精确匹配，行号:', exactMatch.lineIndex + 1);
+          return {
+            lineIndex: exactMatch.lineIndex,
+            score: 100,
+            confidence: '绝对精确'
+          };
+        }
+      }
+      
+      // 方法2: 通过类名精确匹配
+      if (targetPathNode.className) {
+        const exactMatch = candidateLines.find(({line}) => 
+          line.includes(`class="${targetPathNode.className}"`) || line.includes(`class='${targetPathNode.className}'`)
+        );
+        if (exactMatch) {
+          console.log('✅ 通过类名绝对精确匹配，行号:', exactMatch.lineIndex + 1);
+          return {
+            lineIndex: exactMatch.lineIndex,
+            score: 100,
+            confidence: '绝对精确'
+          };
+        }
+      }
+      
+      // 方法3: 通过特殊属性匹配（如src, href等）
+      if (targetPathNode.attributes) {
+        for (const [attrName, attrValue] of Object.entries(targetPathNode.attributes)) {
+          if (['src', 'href', 'alt', 'title'].includes(attrName) && attrValue) {
+            const exactMatch = candidateLines.find(({line}) => 
+              line.includes(`${attrName}="${attrValue}"`) || line.includes(`${attrName}='${attrValue}'`)
+            );
+            if (exactMatch) {
+              console.log(`✅ 通过属性${attrName}绝对精确匹配，行号:`, exactMatch.lineIndex + 1);
+              return {
+                lineIndex: exactMatch.lineIndex,
+                score: 100,
+                confidence: '绝对精确'
+              };
+            }
+          }
+        }
+      }
+      
+      // 方法4: 通过直接文本内容匹配
+      if (fingerprint.uniqueFeatures.directText && fingerprint.uniqueFeatures.directText.length > 2) {
+        const exactMatch = candidateLines.find(({line}) => 
+          line.includes(fingerprint.uniqueFeatures.directText)
+        );
+        if (exactMatch) {
+          console.log('✅ 通过直接文本内容绝对精确匹配，行号:', exactMatch.lineIndex + 1);
+          return {
+            lineIndex: exactMatch.lineIndex,
+            score: 100,
+            confidence: '绝对精确'
+          };
+        }
+      }
+      
+      // 方法5: 通过DOM位置索引匹配（最精确的方法）
+      console.log('🔍 尝试通过DOM位置索引匹配');
+      
+      // 重新构建DOM树来确定精确位置
+      const iframe = iframeRef.current;
+      if (iframe?.contentDocument) {
+        // 获取iframe中所有相同标签的元素
+        const allTargetElements = Array.from(iframe.contentDocument.querySelectorAll(targetTag));
+        console.log(`iframe中找到 ${allTargetElements.length} 个 ${targetTag} 元素`);
+        
+        // 找到与指纹路径完全匹配的元素
+        let matchingElementIndex = -1;
+        
+        for (let i = 0; i < allTargetElements.length; i++) {
+          const element = allTargetElements[i] as HTMLElement;
+          // 为当前元素生成路径进行比较
+          const generateCurrentElementPath = (el: HTMLElement): Array<{
+            tagName: string;
+            index: number;
+            tagIndex: number;
+            totalSiblings: number;
+            totalTagSiblings: number;
+            id?: string;
+            className?: string;
+            attributes?: Record<string, string>;
+          }> => {
+            const path: Array<{
+              tagName: string;
+              index: number;
+              tagIndex: number;
+              totalSiblings: number;
+              totalTagSiblings: number;
+              id?: string;
+              className?: string;
+              attributes?: Record<string, string>;
+            }> = [];
+            
+            let current = el;
+            
+            // 从目标元素向上遍历到body
+            while (current && current !== iframe.contentDocument!.body && current.parentElement) {
+              const parent = current.parentElement;
+              const allSiblings = Array.from(parent.children);
+              const sameTagSiblings = allSiblings.filter(sibling => 
+                sibling.tagName === current.tagName
+              );
+              
+              const index = allSiblings.indexOf(current);
+              const tagIndex = sameTagSiblings.indexOf(current);
+              
+              const attributes: Record<string, string> = {};
+              if (current.attributes) {
+                for (let i = 0; i < current.attributes.length; i++) {
+                  const attr = current.attributes[i];
+                  attributes[attr.name] = attr.value;
+                }
+              }
+              
+              const pathNode = {
+                tagName: current.tagName.toLowerCase(),
+                index: index,
+                tagIndex: tagIndex,
+                totalSiblings: allSiblings.length,
+                totalTagSiblings: sameTagSiblings.length,
+                id: current.id || undefined,
+                className: current.className || undefined,
+                attributes: Object.keys(attributes).length > 0 ? attributes : undefined
+              };
+              
+              path.unshift(pathNode);
+              current = parent;
+            }
+            
+            return path;
+          };
+          
+          const elementPath = generateCurrentElementPath(element);
+          
+          // 比较路径是否完全匹配
+          if (pathsMatch(elementPath, fingerprint.absolutePath)) {
+            matchingElementIndex = i;
+            break;
+          }
+        }
+        
+        // 如果找到匹配的元素，返回对应的代码行
+        if (matchingElementIndex !== -1 && matchingElementIndex < candidateLines.length) {
+          console.log(`✅ 通过DOM位置索引绝对精确匹配，元素索引: ${matchingElementIndex}，行号:`, candidateLines[matchingElementIndex].lineIndex + 1);
+          return {
+            lineIndex: candidateLines[matchingElementIndex].lineIndex,
+            score: 100,
+            confidence: '绝对精确'
+          };
+        }
+      }
+      
+      // 方法6: 如果以上都失败，使用tagIndex作为备选
+      if (targetPathNode.tagIndex !== undefined && targetPathNode.tagIndex < candidateLines.length) {
+        console.log(`⚠️ 使用tagIndex备选方案，索引: ${targetPathNode.tagIndex}，行号:`, candidateLines[targetPathNode.tagIndex].lineIndex + 1);
+        return {
+          lineIndex: candidateLines[targetPathNode.tagIndex].lineIndex,
+          score: 90,
+          confidence: '高精确'
+        };
+      }
+    }
+    
+    // 备选策略: 兼容旧版本指纹格式
+    console.log('🔍 使用备选匹配策略');
+    
+    // ID匹配
     if (fingerprint.id) {
       const lineIndex = lines.findIndex(line => 
-        line.includes(`id="${fingerprint.id}"`) || line.includes(`id='${fingerprint.id}'`)
+        line.includes(`<${fingerprint.tagName}`) &&
+        (line.includes(`id="${fingerprint.id}"`) || line.includes(`id='${fingerprint.id}'`))
       );
       if (lineIndex !== -1) {
+        console.log('✅ 备选ID匹配成功，行号:', lineIndex + 1);
         return {
           lineIndex,
-          score: 100,
+          score: 95,
           confidence: '精确'
         };
       }
     }
     
-    // 策略2: 完整DOM路径验证（模拟浏览器控制台）
-    const fullPathMatch = (): number | null => {
-      
-      if (fingerprint.layeredPath.length === 0) return null;
-      
-      // 获取目标层（最后一层）
-      const targetLayer = fingerprint.layeredPath[fingerprint.layeredPath.length - 1];
-      
-      // 首先找到所有可能的目标元素
-      const candidateLines: number[] = [];
-      
-      if (targetLayer.className) {
-        lines.forEach((line, index) => {
-          if (line.includes(`<${targetLayer.tagName}`) && 
-              (line.includes(`class="${targetLayer.className}"`) || 
-               line.includes(`class='${targetLayer.className}'`))) {
-            candidateLines.push(index);
-          }
-        });
-      } else {
-        lines.forEach((line, index) => {
-          if (line.includes(`<${targetLayer.tagName}`)) {
-            candidateLines.push(index);
-          }
-        });
-      }
-      
-      // console.log(`找到${candidateLines.length}个候选目标元素:`, candidateLines.map(i => i + 1));
-      
-      if (candidateLines.length === 0) return null;
-      if (candidateLines.length === 1) {
-        // console.log('✅ 唯一候选元素匹配:', candidateLines[0] + 1);
-        return candidateLines[0];
-      }
-      
-      // 多个候选元素，需要完整路径验证
-      // console.log('多个候选元素，开始完整路径验证');
-      
-      for (const candidateLineIndex of candidateLines) {
-        // console.log(`验证候选行 ${candidateLineIndex + 1}`);
-        
-        // 验证完整的父级路径
-        let isValidPath = true;
-        let currentSearchLine = candidateLineIndex;
-        
-        // 从倒数第二层开始向上验证（跳过目标层，因为已经匹配了）
-        // 同时跳过body标签（第0层），因为body标签可能有动态类
-        for (let layerIndex = fingerprint.layeredPath.length - 2; layerIndex >= 1; layerIndex--) {
-          const parentLayer = fingerprint.layeredPath[layerIndex];
-          console.log(`验证第${layerIndex}层父元素:`, parentLayer);
-          
-          // 向上搜索父元素（在当前行之前的一定范围内）
-          let foundParent = false;
-          const searchStart = Math.max(0, currentSearchLine - 50); // 向上搜索50行
-          
-          for (let i = currentSearchLine - 1; i >= searchStart; i--) {
-            const line = lines[i];
-            
-            // 检查是否匹配父层
-            let parentMatches = false;
-            
-            if (parentLayer.id) {
-              // 通过ID匹配父元素
-              if (line.includes(`<${parentLayer.tagName}`) && 
-                  (line.includes(`id="${parentLayer.id}"`) || line.includes(`id='${parentLayer.id}'`))) {
-                parentMatches = true;
-              }
-            } else if (parentLayer.className) {
-              // 通过class匹配父元素
-              if (line.includes(`<${parentLayer.tagName}`) && 
-                  (line.includes(`class="${parentLayer.className}"`) || 
-                   line.includes(`class='${parentLayer.className}'`))) {
-                parentMatches = true;
-              }
-            } else {
-              // 通过标签匹配父元素
-              if (line.includes(`<${parentLayer.tagName}`)) {
-                parentMatches = true;
-              }
-            }
-            
-            if (parentMatches) {
-              foundParent = true;
-              currentSearchLine = i;
-              break;
-            }
-          }
-          
-          if (!foundParent) {
-            isValidPath = false;
-            break;
-          }
-        }
-        
-        if (isValidPath) {
-          return candidateLineIndex;
-        } else {
-        }
-      }
-      
-      return candidateLines[0];
-    };
-    
-    const fullPathResult = fullPathMatch();
-    if (fullPathResult !== null) {
-      return {
-        lineIndex: fullPathResult,
-        score: 95,
-        confidence: '精确'
-      };
-    }
-    
-    // 策略3: 关键文本匹配（用于验证和备选）
-    if (fingerprint.keyText && fingerprint.keyText.length > 3) {
-      const lineIndex = lines.findIndex(line => line.includes(fingerprint.keyText));
+    // 类名匹配
+    if (fingerprint.className && fingerprint.tagName) {
+      const lineIndex = lines.findIndex(line => 
+        line.includes(`<${fingerprint.tagName}`) && 
+        (line.includes(`class="${fingerprint.className}"`) || line.includes(`class='${fingerprint.className}'`))
+      );
       if (lineIndex !== -1) {
+        console.log('✅ 备选类名匹配成功，行号:', lineIndex + 1);
         return {
           lineIndex,
-          score: 90,
+          score: 85,
           confidence: '高'
         };
-      }
-    }
-    
-    // 策略4: XPath直接解析匹配
-    const xpathDirectMatch = (): number | null => {
-      
-      // 解析XPath中的最具体的标识符
-      const xpathParts = fingerprint.xpath.split('/').filter(part => part.length > 0);
-      
-      // 寻找包含ID的部分
-      for (const part of xpathParts) {
-        const idMatch = part.match(/\[@id='([^']+)'\]/);
-        if (idMatch) {
-          const id = idMatch[1];
-          const lineIndex = lines.findIndex(line => 
-            line.includes(`id="${id}"`) || line.includes(`id='${id}'`)
-          );
-          if (lineIndex !== -1) {
-            return lineIndex;
-          }
-        }
-      }
-      
-      return null;
-    };
-    
-    const xpathResult = xpathDirectMatch();
-    if (xpathResult !== null) {
-      return {
-        lineIndex: xpathResult,
-        score: 85,
-        confidence: '高'
-      };
-    }
-    
-    // 策略5: CSS路径匹配（最后的备选）
-    if (fingerprint.cssPath.includes('nth-child')) {
-      const nthMatch = fingerprint.cssPath.match(/:nth-child\((\d+)\)/g);
-      if (nthMatch) {
-        const lastNthMatch = nthMatch[nthMatch.length - 1];
-        const indexMatch = lastNthMatch.match(/:nth-child\((\d+)\)/);
-        if (indexMatch) {
-          const nthIndex = parseInt(indexMatch[1]) - 1;
-          
-          const tagLines: number[] = [];
-          lines.forEach((line, index) => {
-            if (line.includes(`<${fingerprint.tagName}`)) {
-              tagLines.push(index);
-            }
-          });
-          
-          if (tagLines.length > nthIndex) {
-            return {
-              lineIndex: tagLines[nthIndex],
-              score: 80,
-              confidence: '中'
-            };
-          }
-        }
       }
     }
     
     console.log('❌ 所有匹配策略都失败了');
     return null;
   }, [isEditable, editedCode, originalCode]);
+
+  // 辅助函数：比较两个DOM路径是否匹配
+  const pathsMatch = useCallback((path1: any[], path2: any[]): boolean => {
+    if (path1.length !== path2.length) return false;
+    
+    for (let i = 0; i < path1.length; i++) {
+      const node1 = path1[i];
+      const node2 = path2[i];
+      
+      // 比较关键属性
+      if (node1.tagName !== node2.tagName) return false;
+      if (node1.index !== node2.index) return false;
+      if (node1.tagIndex !== node2.tagIndex) return false;
+      
+      // 如果有ID，必须匹配
+      if (node1.id && node2.id && node1.id !== node2.id) return false;
+      
+      // 如果有类名，必须匹配
+      if (node1.className && node2.className && node1.className !== node2.className) return false;
+    }
+    
+    return true;
+  }, []);
 
   // 处理元素选择模式
   const handleElementSelect = useCallback((element: HTMLElement) => {
@@ -3629,7 +3637,8 @@ export function GenerationView({
 
             {/* 切换模式 */}
             {generationComplete && (
-              <div style={{ display: 'none' }} className="ml-3 flex items-center space-x-3 px-2 py-1 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
+              
+              <div  style={{display: 'none'}} className="ml-3 flex items-center space-x-3 px-2 py-1 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
                 <div className="flex items-center space-x-1">
                   {/* 代码编辑模式 */}
                   <button
@@ -3793,9 +3802,19 @@ export function GenerationView({
                         size="sm"
                         className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
                         onClick={saveChanges}
+                        disabled={isSaving}
                       >
-                        <Save className="w-4 h-4 mr-1" />
-                        Save
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-1" />
+                            Save
+                          </>
+                        )}
                       </Button>
                     )}
                     {!isVisualMode && (
@@ -4066,9 +4085,19 @@ export function GenerationView({
                           size="sm"
                           className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
                           onClick={saveChanges}
+                          disabled={isSaving}
                         >
-                          <Save className="w-4 h-4 mr-1" />
-                          Save
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-4 h-4 mr-1" />
+                              Save
+                            </>
+                          )}
                         </Button>
                       )}
                       {!isVisualMode && (
