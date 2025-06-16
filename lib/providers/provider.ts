@@ -25,7 +25,7 @@ REQUIREMENTS:
 
 5. Include JavaScript within <script> tags at the end of <body> if needed
 
-
+6. For similar or repeated elements (such as cards, buttons, list items, sections, etc.), assign unique IDs to each element for better identification and potential JavaScript interaction. Use descriptive naming conventions like "card-1", "card-2", "btn-submit", "section-hero", etc.
 
 IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html and \`\`\` tags. Do NOT output any text or explanation before or after the HTML code. Only output the raw HTML code itself, starting with <!DOCTYPE html> and ending with </html>.`;
 
