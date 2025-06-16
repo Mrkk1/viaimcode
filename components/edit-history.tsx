@@ -75,7 +75,7 @@ const ThumbnailImage = memo(({
 
 ThumbnailImage.displayName = 'ThumbnailImage'
 
-export const EditHistory = memo(function EditHistory({ 
+export const EditHistory = function EditHistory({ 
   versions, 
   onSelectVersion,
   onDeleteVersion,
@@ -222,4 +222,4 @@ export const EditHistory = memo(function EditHistory({
       </ScrollArea>
     </div>
   )
-}) 
+} 
