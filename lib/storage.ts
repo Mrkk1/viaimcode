@@ -2,32 +2,88 @@ import { v4 as uuidv4 } from 'uuid';
 import { SharedWebsite } from './types';
 import { getPool } from './db';
 import { deleteImage } from './image-utils';
+import { generateCacheKey, getCachedWebsites, cacheWebsites, clearUserCache } from './cache';
 
 // Get all saved websites
-export async function getAllWebsites(userId: string): Promise<SharedWebsite[]> {
+export async function getAllWebsites(
+  userId: string,
+  page: number = 1,
+  pageSize: number = 12,
+  searchTerm: string = ''
+): Promise<{ websites: SharedWebsite[], total: number }> {
+  // 检查缓存
+  const cacheKey = generateCacheKey(userId, page, pageSize, searchTerm);
+  const cachedData = getCachedWebsites(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+
   const pool = getPool();
   try {
     let query: string;
+    let countQuery: string;
     let params: any[];
+    const offset = (page - 1) * pageSize;
+    const searchPattern = `%${searchTerm}%`;
     
     if (userId === '') {
-      // 管理员模式：获取所有网站，包含用户信息
-      query = `SELECT w.*, u.username as authorName 
-               FROM websites w 
-               JOIN users u ON w.userId = u.id 
-               ORDER BY w.createdAt DESC`;
-      params = [];
+      // 管理员模式：获取所有网站，包含用户信息，但不包含htmlContent
+      // 使用FORCE INDEX强制使用特定索引
+      query = `
+        SELECT SQL_CALC_FOUND_ROWS
+          w.id, w.userId, w.title, w.description, 
+          w.thumbnailUrl, w.isFeatured, w.createdAt,
+          u.username as authorName 
+        FROM websites w FORCE INDEX (idx_created_at)
+        JOIN users u ON w.userId = u.id 
+        WHERE (w.title LIKE ? OR w.description LIKE ?)
+        ORDER BY w.createdAt DESC
+        LIMIT ? OFFSET ?
+      `;
+      params = [searchPattern, searchPattern, pageSize, offset];
+      
+      // 使用SQL_CALC_FOUND_ROWS和FOUND_ROWS()来优化总数查询
+      countQuery = 'SELECT FOUND_ROWS() as total';
     } else {
       // 普通用户模式：只获取自己的网站
-      query = 'SELECT * FROM websites WHERE userId = ? ORDER BY createdAt DESC';
-      params = [userId];
+      // 使用FORCE INDEX强制使用特定索引
+      query = `
+        SELECT SQL_CALC_FOUND_ROWS
+          id, userId, title, description, 
+          thumbnailUrl, isFeatured, createdAt
+        FROM websites FORCE INDEX (idx_user_created)
+        WHERE userId = ? 
+        ${searchTerm ? 'AND (title LIKE ? OR description LIKE ?)' : ''}
+        ORDER BY createdAt DESC 
+        LIMIT ? OFFSET ?
+      `;
+      params = searchTerm 
+        ? [userId, searchPattern, searchPattern, pageSize, offset]
+        : [userId, pageSize, offset];
+      
+      // 使用SQL_CALC_FOUND_ROWS和FOUND_ROWS()来优化总数查询
+      countQuery = 'SELECT FOUND_ROWS() as total';
     }
     
+    // 执行分页查询
     const [rows] = await pool.query(query, params);
-    return rows as SharedWebsite[];
+    
+    // 获取总数
+    const [countRows] = await pool.query(countQuery);
+    const total = (countRows as any)[0].total;
+
+    const result = {
+      websites: rows as SharedWebsite[],
+      total: Number(total)
+    };
+
+    // 缓存结果
+    cacheWebsites(cacheKey, result);
+
+    return result;
   } catch (error) {
     console.error('Error fetching websites:', error);
-    return [];
+    return { websites: [], total: 0 };
   }
 }
 
@@ -108,7 +164,17 @@ export async function updateWebsite(
     const query = `UPDATE websites SET ${fields.join(', ')} WHERE id = ?`;
     
     const [result] = await pool.execute(query, values);
-    return (result as any).affectedRows > 0;
+    const success = (result as any).affectedRows > 0;
+
+    if (success) {
+      // 获取网站信息以清除相关缓存
+      const website = await getWebsiteById(id);
+      if (website) {
+        clearUserCache(website.userId);
+      }
+    }
+
+    return success;
   } catch (error) {
     console.error('Failed to update website:', error);
     return false;
@@ -119,14 +185,20 @@ export async function updateWebsite(
 export async function deleteWebsite(id: string): Promise<boolean> {
   const pool = getPool();
   try {
-    // First get website info to delete image
+    // First get website info to delete image and clear cache
     const website = await getWebsiteById(id);
     if (website?.thumbnailUrl) {
       await deleteImage(website.thumbnailUrl);
     }
 
     const [result] = await pool.execute('DELETE FROM websites WHERE id = ?', [id]);
-    return (result as any).affectedRows > 0;
+    const success = (result as any).affectedRows > 0;
+
+    if (success && website) {
+      clearUserCache(website.userId);
+    }
+
+    return success;
   } catch (error) {
     console.error('Failed to delete website:', error);
     return false;
@@ -233,17 +305,67 @@ export async function getProjectById(id: string): Promise<Project | null> {
 }
 
 // Get all user projects
-export async function getUserProjects(userId: string): Promise<Project[]> {
+export async function getUserProjects(
+  userId: string,
+  page: number = 1,
+  pageSize: number = 12,
+  searchTerm: string = ''
+): Promise<{ projects: Project[], total: number }> {
   const pool = getPool();
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM projects WHERE userId = ? AND status != ? ORDER BY updatedAt DESC',
-      [userId, 'deleted']
-    );
-    return rows as Project[];
+    const offset = (page - 1) * pageSize;
+    const searchPattern = `%${searchTerm}%`;
+
+    // 先获取总数
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM projects 
+      WHERE userId = ? 
+        AND status != ? 
+        AND (title LIKE ? OR description LIKE ?)
+    `;
+    const [countRows] = await pool.query(countQuery, [
+      userId,
+      'deleted',
+      searchPattern,
+      searchPattern
+    ]);
+    const total = (countRows as any)[0].total;
+
+    // 获取分页数据
+    const query = `
+      SELECT *
+      FROM projects 
+      WHERE userId = ? 
+        AND status != ? 
+        AND (title LIKE ? OR description LIKE ?)
+      ORDER BY updatedAt DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await pool.query(query, [
+      userId,
+      'deleted',
+      searchPattern,
+      searchPattern,
+      pageSize,
+      offset
+    ]);
+
+    console.log('Database query results:', {
+      total,
+      pageSize,
+      offset,
+      resultsCount: (rows as any[]).length
+    });
+
+    return {
+      projects: rows as Project[],
+      total: Number(total)
+    };
   } catch (error) {
     console.error('Error fetching user projects:', error);
-    return [];
+    return { projects: [], total: 0 };
   }
 }
 
