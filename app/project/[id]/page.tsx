@@ -51,6 +51,11 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ userId: string; username: string } | null>(null);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [currentPrompt, setCurrentPrompt] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedCode, setGeneratedCode] = useState<string>("");
+  const [thinkingOutput, setThinkingOutput] = useState<string>("");
+  const [isThinking, setIsThinking] = useState(false);
 
   useEffect(() => {
     fetchUser();
@@ -134,8 +139,128 @@ export default function ProjectDetailPage() {
   };
 
   const handleRegenerateWithNewPrompt = async (newPrompt: string) => {
-    // Regeneration logic can be implemented here
-    toast.info('Regeneration feature is under development');
+    if (!newPrompt.trim() || !currentVersion || !user || !project) {
+      toast.error('Unable to regenerate: missing requirements');
+      return;
+    }
+
+    try {
+      // 设置生成状态
+      setIsGenerating(true);
+      setGeneratedCode(""); // 清空当前生成的代码
+      setThinkingOutput("");
+      setIsThinking(false);
+      
+      toast.info('Starting code generation...');
+      
+      // 更新当前prompt状态，这样PREVIOUS PROMPT会显示最新的prompt
+      setCurrentPrompt(newPrompt);
+      
+      // 调用生成API
+      const response = await fetch('/api/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: `基于以下现有代码，按照新的要求进行修改：
+
+现有代码：
+${currentVersion.code}
+
+新的要求：
+${newPrompt}
+
+请保持代码结构的完整性，只修改必要的部分。返回完整的修改后的代码。`,
+          model: project.model || 'claude-3-5-sonnet-20241022',
+          provider: project.provider || 'anthropic',
+          maxTokens: 8000,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Generation failed: ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('Unable to read response stream');
+      }
+
+      let receivedText = "";
+      let thinkingText = "";
+      let isInThinkingBlock = false;
+      
+      // 读取流式响应
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = new TextDecoder().decode(value);
+        receivedText += chunk;
+
+        let cleanedCode = receivedText;
+
+        // 处理thinking标签
+        const thinkingStartIndex = cleanedCode.indexOf("<think>");
+        const thinkingEndIndex = cleanedCode.indexOf("</think>");
+
+        if (thinkingStartIndex !== -1) {
+          if (!isInThinkingBlock) {
+            setIsThinking(true);
+          }
+
+          isInThinkingBlock = true;
+
+          if (thinkingEndIndex !== -1) {
+            thinkingText = cleanedCode.substring(thinkingStartIndex + 7, thinkingEndIndex);
+            cleanedCode = cleanedCode.substring(0, thinkingStartIndex) +
+                         cleanedCode.substring(thinkingEndIndex + 8);
+            isInThinkingBlock = false;
+            setIsThinking(false);
+          } else {
+            thinkingText = cleanedCode.substring(thinkingStartIndex + 7);
+            cleanedCode = cleanedCode.substring(0, thinkingStartIndex);
+          }
+
+          setThinkingOutput(thinkingText);
+        }
+
+        // 实时更新生成的代码
+        setGeneratedCode(cleanedCode);
+      }
+
+      // 创建新版本
+      const versionResponse = await fetch(`/api/projects/${projectId}/versions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: receivedText.replace(/<think>[\s\S]*?<\/think>/g, '').trim(),
+          type: 'ai',
+          title: `Modified: ${newPrompt.substring(0, 50)}${newPrompt.length > 50 ? '...' : ''}`,
+        }),
+      });
+
+      if (!versionResponse.ok) {
+        throw new Error('Failed to save new version');
+      }
+
+      const newVersion = await versionResponse.json();
+      
+      // 刷新页面数据
+      await fetchProjectAndVersions();
+      
+      toast.success('New version created successfully!');
+      
+    } catch (error) {
+      console.error('Error in regeneration:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to regenerate code');
+    } finally {
+      setIsGenerating(false);
+      setIsThinking(false);
+    }
   };
 
   if (loading) {
@@ -221,14 +346,16 @@ export default function ProjectDetailPage() {
       {/* Main content area */}
       {currentVersion ? (
         <GenerationView
-          prompt={project.prompt || ''}
-          setPrompt={() => {}}
+          prompt={currentPrompt || project.prompt || ''}
+          setPrompt={setCurrentPrompt}
           model={project.model || ''}
           provider={project.provider}
-          generatedCode={currentVersion.code}
-          isGenerating={false}
-          generationComplete={true}
+          generatedCode={isGenerating ? generatedCode : currentVersion.code}
+          isGenerating={isGenerating}
+          generationComplete={!isGenerating}
           onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}
+          thinkingOutput={thinkingOutput}
+          isThinking={isThinking}
           projectId={projectId}
           initialVersions={convertToHistoryVersions()}
         />

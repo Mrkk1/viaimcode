@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2, Settings } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2, Settings, X } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -422,6 +422,8 @@ export function GenerationView({
   const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>(initialVersions)
   const [currentVersionId, setCurrentVersionId] = useState<string>("")
   const [isElementSelectMode, setIsElementSelectMode] = useState(false)
+  const [hasSelectedElementContext, setHasSelectedElementContext] = useState(false)
+  const [selectedElementContext, setSelectedElementContext] = useState("")
   const [showImageReplaceDialog, setShowImageReplaceDialog] = useState(false)
   const [selectedImageSrc, setSelectedImageSrc] = useState("")
   const [selectedImageFingerprint, setSelectedImageFingerprint] = useState<any>(null)
@@ -1160,10 +1162,46 @@ export function GenerationView({
   // Function to handle sending a new prompt
   const handleSendNewPrompt = () => {
     if (!newPrompt.trim() || isGenerating) return
-    onRegenerateWithNewPrompt(newPrompt)
+    
+    // 如果有选中元素的上下文，智能组合用户输入和上下文
+    let finalPrompt = newPrompt.trim();
+    if (hasSelectedElementContext && selectedElementContext) {
+      // 检查用户输入是否已经包含了对元素的引用
+      const userInput = newPrompt.trim();
+      const hasElementReference = userInput.toLowerCase().includes('this') || 
+                                 userInput.toLowerCase().includes('element') ||
+                                 userInput.toLowerCase().includes('selected');
+      
+      if (hasElementReference) {
+        // 如果用户已经引用了元素，直接组合
+        finalPrompt = `${selectedElementContext}\n\nUser request: ${userInput}`;
+      } else {
+        // 如果用户没有引用元素，添加连接词
+        finalPrompt = `${selectedElementContext}\n\nSpecifically: ${userInput}`;
+      }
+    }
+    
+    // 更新PREVIOUS PROMPT显示
+    setPrompt(finalPrompt);
+    
+    onRegenerateWithNewPrompt(finalPrompt)
     setNewPrompt("") // Reset input field
     setHasChanges(false)
+    setHasSelectedElementContext(false) // Reset context state
+    setSelectedElementContext("") // Reset context
   }
+
+  // Handle NEW PROMPT input changes
+  const handleNewPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setNewPrompt(value);
+    
+    // 如果用户清空了输入框，重置上下文状态
+    if (hasSelectedElementContext && !value.trim()) {
+      setHasSelectedElementContext(false);
+      setSelectedElementContext("");
+    }
+  };
 
   // 复制分享链接
   const copyShareUrl = async () => {
@@ -2916,6 +2954,54 @@ export function GenerationView({
     try {
       console.log('选中的元素:', element.tagName, element);
       
+      // 生成元素的描述信息用于NEW PROMPT
+      const generateElementDescription = (el: HTMLElement): string => {
+        const tagName = el.tagName.toLowerCase();
+        const text = el.textContent?.trim();
+        
+        // 生成简洁的元素描述用于小标签显示
+        if (tagName === 'img') {
+          const alt = el.getAttribute('alt');
+          return alt ? `image: ${alt}` : 'image';
+        } else if (tagName === 'button') {
+          return text ? `button: ${text.substring(0, 15)}${text.length > 15 ? '...' : ''}` : 'button';
+        } else if (tagName === 'a') {
+          return text ? `link: ${text.substring(0, 15)}${text.length > 15 ? '...' : ''}` : 'link';
+        } else if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+          return text ? `${tagName}: ${text.substring(0, 20)}${text.length > 20 ? '...' : ''}` : tagName;
+        } else if (tagName === 'p') {
+          return text ? `p: ${text.substring(0, 20)}${text.length > 20 ? '...' : ''}` : 'paragraph';
+        } else if (tagName === 'div') {
+          const className = el.className;
+          if (className.includes('card')) return 'card';
+          if (className.includes('header')) return 'header';
+          if (className.includes('footer')) return 'footer';
+          if (className.includes('nav')) return 'nav';
+          return text ? `div: ${text.substring(0, 15)}${text.length > 15 ? '...' : ''}` : 'div';
+        } else if (tagName === 'span') {
+          return text ? `span: ${text.substring(0, 15)}${text.length > 15 ? '...' : ''}` : 'span';
+        } else if (tagName === 'input') {
+          const type = el.getAttribute('type') || 'text';
+          const placeholder = el.getAttribute('placeholder');
+          return placeholder ? `${type}: ${placeholder.substring(0, 15)}${placeholder.length > 15 ? '...' : ''}` : type;
+        } else {
+          return text ? `${tagName}: ${text.substring(0, 15)}${text.length > 15 ? '...' : ''}` : tagName;
+        }
+      };
+      
+      const elementDescription = generateElementDescription(element);
+      
+      // 存储选中元素的上下文信息（用于后台处理）
+      const contextForAI = `Please modify the selected element: ${elementDescription}`;
+      setSelectedElementContext(contextForAI);
+      
+      // 保持用户现有的输入，不清空
+      // 如果输入框为空，可以提供一个友好的提示
+      if (!newPrompt.trim()) {
+        setNewPrompt("");
+      }
+      setHasSelectedElementContext(true);
+      
       // 检查是否为图片元素
       const isImage = element.tagName.toLowerCase() === 'img';
       
@@ -3057,7 +3143,7 @@ export function GenerationView({
             y: buttonY
           });
           
-          toast.success('已选中图片，点击替换按钮进行替换');
+          // toast.success('已选中图片并填充提示，可以在NEW PROMPT中描述修改需求');
           // return;
           
           // 对于图片，也执行代码跳转逻辑，但使用已生成的指纹
@@ -3117,12 +3203,10 @@ export function GenerationView({
         window.dispatchEvent(event);
         
         // 显示成功提示
-        // toast.success(`已定位到第 ${targetLineNumber} 行`, {
-        //   duration: 2000,
-        // });
+        // toast.success(`已选中元素并填充提示，代码已定位到第 ${targetLineNumber} 行`);
       } else {
         console.warn('未找到匹配的代码行');
-        toast.error('未能在代码中找到对应的元素');
+        // toast.success('已选中元素并填充提示，但未能在代码中找到对应的元素');
       }
       
       // 高亮选中的元素
@@ -3139,7 +3223,7 @@ export function GenerationView({
       console.error('元素选择处理失败:', error);
       toast.error('元素选择失败');
     }
-  }, [isElementSelectMode, generateElementFingerprint, findElementInCode]);
+  }, [isElementSelectMode, generateElementFingerprint, findElementInCode, setNewPrompt]);
 
   // 设置iframe的元素选择事件监听
   const setupElementSelection = useCallback(() => {
@@ -3517,104 +3601,41 @@ export function GenerationView({
     }
   }, [isElementSelectMode, hideImageReplaceButton]);
 
+  // 当开始生成时，退出元素选择模式
+  useEffect(() => {
+    if (isGenerating) {
+      setIsElementSelectMode(false);
+      setHasSelectedElementContext(false);
+      setSelectedElementContext("");
+    }
+  }, [isGenerating]);
+
   return (
     <div className="h-[calc(100vh-61px)] bg-black text-white flex flex-col overflow-hidden">
       {/* Header - Kompakter gestaltet */}
       <header className="border-b border-gray-800 py-2 px-4"  >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-white">
-              {provider === 'deepseek' ? 'DEEPSEEK' :
-               provider === 'openai_compatible' ? 'CUSTOM API' :
-               provider === 'ollama' ? 'OLLAMA' :
-               provider === 'lm_studio' ? 'LM STUDIO' : 'AI'}
-            </h1>
-            <Badge variant="outline" className="bg-gray-900 text-white border-white">
-              {model}
-            </Badge>
-            {thinkingOutput && (
-              <div className="ml-2">
-                <ThinkingIndicator
-                  thinkingOutput={thinkingOutput}
-                  isThinking={isThinking}
-                  position="top-left"
-                />
-              </div>
-            )}
-
-            {/* 切换模式 */}
-            {generationComplete && (
-              
-              <div  style={{display: 'none'}} className="ml-3 flex items-center space-x-3 px-2 py-1 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
-                <div className="flex items-center space-x-1">
-                  {/* 代码编辑模式 */}
-                  <button
-                    onClick={() => {
-                      if (isVisualMode) {
-                        setIsVisualMode(false);
-                        
-                        // 切换模式时，取消元素选择模式
-                        setIsElementSelectMode(false);
-                        
-                        // 切换到代码编辑模式时，清理可视化编辑相关状态
-                        setSelectedElement(null);
-                        
-                        // 清理图片替换相关状态
-                        setImageReplaceButton({ show: false, x: 0, y: 0 });
-                        setSelectedImageSrc("");
-                        setSelectedImageFingerprint(null);
-                        setSelectedImageElement(null);
-                      }
-                    }}
-                    disabled={isGenerating || !isVisualMode}
-                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
-                      !isVisualMode 
-                        ? 'bg-blue-500/80 text-white shadow-lg shadow-blue-500/25 border border-blue-400/30' 
-                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
-                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-xs font-medium">Code</span>
-                  </button>
-                  
-                  {/* 可视化编辑模式 */}
-                  <button
-                    onClick={() => {
-                      if (!isVisualMode) {
-                        setIsVisualMode(true);
-                        
-                        // 切换模式时，取消元素选择模式
-                        setIsElementSelectMode(false);
-                        
-                        // 切换到可视化模式时，自动启用编辑模式
-                        if (!isEditable) {
-                          setIsEditable(true);
-                        }
-                        
-                        // 清理图片替换相关状态
-                        setImageReplaceButton({ show: false, x: 0, y: 0 });
-                        setSelectedImageSrc("");
-                        setSelectedImageFingerprint(null);
-                        setSelectedImageElement(null);
-                      }
-                    }}
-                    disabled={isGenerating || isVisualMode}
-                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
-                      isVisualMode 
-                        ? 'bg-green-500/80 text-white shadow-lg shadow-green-500/25 border border-green-400/30' 
-                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
-                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" ><path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h2"/><path d="M14 3h1"/><path d="M3 9v1"/><path d="M21 9v2"/><path d="M3 14v1"/></svg>
-                    <span className="text-xs font-medium">No Code</span>
-                  </button>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold text-white">
+                {provider === 'deepseek' ? 'DEEPSEEK' :
+                 provider === 'openai_compatible' ? 'CUSTOM API' :
+                 provider === 'ollama' ? 'OLLAMA' :
+                 provider === 'lm_studio' ? 'LM STUDIO' : 'AI'}
+              </h1>
+              <Badge variant="outline" className="bg-gray-900 text-white border-white">
+                {model}
+              </Badge>
+              {thinkingOutput && (
+                <div className="ml-2">
+                  <ThinkingIndicator
+                    thinkingOutput={thinkingOutput}
+                    isThinking={isThinking}
+                    position="top-left"
+                  />
                 </div>
-                
-          
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -3772,13 +3793,42 @@ export function GenerationView({
               {/* Prompt und Work Steps Bereich */}
               <div className="h-[35%] p-3 flex flex-col overflow-hidden">
                 <div className="mb-2 flex-shrink-0">
-                  <h3 className="text-xs font-medium text-gray-400 mb-1">NEW PROMPT</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-xs font-medium text-gray-400">NEW PROMPT</h3>
+                    {hasSelectedElementContext && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                        <span className="text-xs text-blue-300 font-medium">Selected</span>
+                        <div className="w-px h-3 bg-blue-500/30 mx-1"></div>
+                        <span className="text-xs text-blue-200/80 font-mono">
+                          {selectedElementContext.replace("Please modify the selected element: ", "")}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="ml-1 h-4 w-4 p-0 text-blue-400/60 hover:text-blue-300 hover:bg-blue-500/20"
+                          onClick={() => {
+                            setHasSelectedElementContext(false);
+                            setSelectedElementContext("");
+                          }}
+                          title="Clear selection"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+             
                   <div className="relative">
                     <Textarea
                       value={newPrompt}
-                      onChange={(e) => setNewPrompt(e.target.value)}
-                      placeholder="Enter a new prompt..."
-                      className="min-h-[60px] w-full rounded-md border border-gray-800 bg-gray-900/50 p-2 pr-10 text-sm text-gray-300 focus:border-white focus:ring-white"
+                      onChange={handleNewPromptChange}
+                      placeholder={hasSelectedElementContext ? "make this bigger, change color to red, etc..." : "Enter a new prompt..."}
+                      className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-white ${
+                        hasSelectedElementContext 
+                          ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
+                          : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-white'
+                      }`}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault()
@@ -3796,6 +3846,22 @@ export function GenerationView({
                       <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
                       <span className="sr-only">Send</span>
                     </Button>
+                    {hasSelectedElementContext && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="absolute bottom-2 right-9 h-6 w-6 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                        onClick={() => {
+                          setNewPrompt("");
+                          setHasSelectedElementContext(false);
+                          setSelectedElementContext("");
+                        }}
+                        title="Clear selected element context"
+                      >
+                        <X className="h-3 w-3" />
+                        <span className="sr-only">Clear</span>
+                      </Button>
+                    )}
                   </div>
                   {prompt && (
                     <div className="mt-2">
@@ -4055,13 +4121,42 @@ export function GenerationView({
                 {/* Prompt und Work Steps Bereich */}
                 <div className="h-[35%] p-3 flex flex-col overflow-hidden">
                   <div className="mb-2 flex-shrink-0">
-                    <h3 className="text-xs font-medium text-gray-400 mb-1">NEW PROMPT</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xs font-medium text-gray-400">NEW PROMPT</h3>
+                      {hasSelectedElementContext && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <span className="text-xs text-blue-300 font-medium">Selected</span>
+                          <div className="w-px h-3 bg-blue-500/30 mx-1"></div>
+                          <span className="text-xs text-blue-200/80 font-mono">
+                            {selectedElementContext.replace("Please modify the selected element: ", "")}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-1 h-4 w-4 p-0 text-blue-400/60 hover:text-blue-300 hover:bg-blue-500/20"
+                            onClick={() => {
+                              setHasSelectedElementContext(false);
+                              setSelectedElementContext("");
+                            }}
+                            title="Clear selection"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                 
                     <div className="relative">
                       <Textarea
                         value={newPrompt}
-                        onChange={(e) => setNewPrompt(e.target.value)}
-                        placeholder="Enter a new prompt..."
-                        className="min-h-[60px] w-full rounded-md border border-gray-800 bg-gray-900/50 p-2 pr-10 text-sm text-gray-300 focus:border-white focus:ring-white"
+                        onChange={handleNewPromptChange}
+                        placeholder={hasSelectedElementContext ? "make this bigger, change color to red, etc..." : "Enter a new prompt..."}
+                        className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-white ${
+                          hasSelectedElementContext 
+                            ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
+                            : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-white'
+                        }`}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault()
@@ -4079,6 +4174,22 @@ export function GenerationView({
                         <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
                         <span className="sr-only">Send</span>
                       </Button>
+                      {hasSelectedElementContext && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="absolute bottom-2 right-9 h-6 w-6 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                          onClick={() => {
+                            setNewPrompt("");
+                            setHasSelectedElementContext(false);
+                            setSelectedElementContext("");
+                          }}
+                          title="Clear selected element context"
+                        >
+                          <X className="h-3 w-3" />
+                          <span className="sr-only">Clear</span>
+                        </Button>
+                      )}
                     </div>
                     {prompt && (
                       <div className="mt-2">
