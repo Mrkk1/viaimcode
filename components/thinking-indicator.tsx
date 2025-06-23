@@ -2,17 +2,19 @@
 
 import { useState, useEffect, useRef } from "react"
 // Import only the icons that are actually used
-import { Loader2, Brain, ChevronDown } from "lucide-react"
+import { Loader2, Brain, ChevronDown, Code } from "lucide-react"
 
 interface ThinkingIndicatorProps {
   thinkingOutput: string
   isThinking: boolean
+  mode?: "thinking" | "coding"  // 新增模式参数
   position?: "top-left" | "top-right" | "bottom-left" | "bottom-right"
 }
 
 export function ThinkingIndicator({
   thinkingOutput,
   isThinking,
+  mode = "thinking",  // 默认为thinking模式
   position = "top-left"
 }: ThinkingIndicatorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -42,7 +44,7 @@ export function ThinkingIndicator({
   // Animation for the dots
   const [dots, setDots] = useState("")
 
-  // Animated dots for "Thinking..."
+  // Animated dots for "Thinking..." or "Coding..."
   useEffect(() => {
     if (!isThinking) return
 
@@ -58,17 +60,42 @@ export function ThinkingIndicator({
     return () => clearInterval(interval)
   }, [isThinking])
 
-  // Status for "Finished thinking"
+  // Status for finished state
   const [hasFinished, setHasFinished] = useState(false)
 
   useEffect(() => {
     if (isThinking) {
       setHasFinished(false)
     } else if (thinkingOutput && !hasFinished) {
-      // When the thinking process is complete, set hasFinished to true
+      // When the process is complete, set hasFinished to true
       setHasFinished(true)
     }
   }, [isThinking, thinkingOutput, hasFinished])
+
+  // 根据模式确定显示文本和图标
+  const getDisplayText = () => {
+    if (isThinking) {
+      return mode === "coding" ? `Coding${dots}` : `Thinking${dots}`
+    }
+    if (hasFinished) {
+      return mode === "coding" ? "Code generated" : "Finished thinking"
+    }
+    return mode === "coding" ? "Coding" : "Thinking"
+  }
+
+  const getIcon = () => {
+    if (isThinking) {
+      return <Loader2 className="w-3 h-3 animate-spin" />
+    }
+    if (mode === "coding") {
+      return <Code className="w-3 h-3 text-green-400" />
+    }
+    return <Brain className="w-3 h-3 text-green-400" />
+  }
+
+  const getProcessTitle = () => {
+    return mode === "coding" ? "CODING PROCESS:" : "THINKING PROCESS:"
+  }
 
   return (
     <div className="relative" ref={indicatorRef}>
@@ -76,18 +103,15 @@ export function ThinkingIndicator({
         className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs cursor-pointer transition-colors ${isOpen ? 'bg-gray-700 text-white' : 'text-gray-300 hover:text-white hover:bg-gray-800'}`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        {isThinking ? (
-          <div className="w-3 h-3 flex items-center justify-center">
-            <Loader2 className="w-3 h-3 animate-spin" />
-          </div>
-        ) : (
-          <Brain className="w-3 h-3 text-green-400" />
-        )}
+        <div className="w-3 h-3 flex items-center justify-center">
+          {getIcon()}
+        </div>
         <span className="min-w-[90px] transition-all duration-300">
-          {isThinking ? `Thinking${dots}` :
-           hasFinished ? (
-             <span className="text-green-400 transition-all duration-300">Finished thinking</span>
-           ) : "Thinking"}
+          {hasFinished ? (
+            <span className="text-green-400 transition-all duration-300">{getDisplayText()}</span>
+          ) : (
+            getDisplayText()
+          )}
         </span>
         <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
@@ -97,12 +121,14 @@ export function ThinkingIndicator({
           ref={dropdownRef}
           className={`absolute ${dropdownPosition} mt-1 p-3 bg-gray-900 border border-gray-800 rounded-md z-50 max-h-[300px] w-[400px] overflow-y-auto`}
         >
-          <h4 className="text-xs font-medium text-gray-400 mb-2">THINKING PROCESS:</h4>
+          <h4 className="text-xs font-medium text-gray-400 mb-2">{getProcessTitle()}</h4>
           <div className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
             {formattedThinking.length > 0 ? (
               formattedThinking
             ) : (
-              <div className="text-gray-500 italic">Waiting for thinking output...</div>
+              <div className="text-gray-500 italic">
+                {mode === "coding" ? "Waiting for coding output..." : "Waiting for thinking output..."}
+              </div>
             )}
           </div>
         </div>

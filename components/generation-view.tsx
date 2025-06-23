@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, memo } from "react"
 import { debounce } from "lodash"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2, Settings, X } from "lucide-react"
+import { Laptop, Smartphone, Tablet, Copy, Download, RefreshCw, Loader2, Save, ArrowRight, Share2, History, Clock, Undo2, MousePointer2, Settings, X, Trash2, Send } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,8 @@ import Image from "next/image"
 import { formatDistanceToNow } from "date-fns"
 import { zhCN } from "date-fns/locale"
 import { VisualEditor } from "@/components/visual-editor"
+import { ChatInterface, ChatMessage } from "@/components/chat-interface"
+import { PreviewPanel } from "@/components/preview-panel"
 
 interface GenerationViewProps {
   prompt: string
@@ -73,6 +75,8 @@ interface ExtendedHistoryVersion extends HistoryVersion {
   isPublished?: boolean;
   shareUrl?: string;
 }
+
+
 
 const SaveDialog = ({ isOpen, onClose, onSave, thumbnailUrl }: SaveDialogProps) => {
   const [title, setTitle] = useState("");
@@ -444,6 +448,12 @@ export function GenerationView({
   const isVisualCodeUpdateRef = useRef(false)
   // 添加保存加载状态
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Chat模式相关状态
+  const [isChatMode, setIsChatMode] = useState(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [currentChatInput, setCurrentChatInput] = useState("")
+  const [previewMode, setPreviewMode] = useState<'render' | 'code'>('render') // 右侧预览模式
 
   // 同步更新 versionHistoryRef
   useEffect(() => {
@@ -1202,6 +1212,112 @@ export function GenerationView({
       setSelectedElementContext("");
     }
   };
+
+  // Chat模式处理函数
+  const handleSendChatMessage = async () => {
+    if (!currentChatInput.trim() || isGenerating) return;
+
+    // 构建完整的用户消息内容，包含选中元素上下文
+    let fullUserMessage = currentChatInput.trim();
+    if (hasSelectedElementContext && selectedElementContext) {
+      // 智能组合选中元素上下文和用户输入
+      if (!fullUserMessage.toLowerCase().includes('selected') && 
+          !fullUserMessage.toLowerCase().includes('element') &&
+          !fullUserMessage.toLowerCase().includes('this')) {
+        // 如果用户输入没有明确引用选中元素，则添加上下文
+        fullUserMessage = `${selectedElementContext} ${fullUserMessage}`;
+      } else {
+        // 如果用户输入已经引用了元素，则只需要添加选中元素的描述
+        fullUserMessage = `${fullUserMessage} (referring to: ${selectedElementContext.replace("Please modify the selected element: ", "")})`;
+      }
+    }
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: fullUserMessage,
+      timestamp: new Date()
+    };
+
+    const assistantMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      type: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isGenerating: true
+    };
+
+    // 添加用户消息和正在生成的助手消息
+    setChatMessages(prev => [...prev, userMessage, assistantMessage]);
+    setCurrentChatInput("");
+    
+    // 清理选中元素状态
+    if (hasSelectedElementContext) {
+      setHasSelectedElementContext(false);
+      setSelectedElementContext("");
+    }
+
+    try {
+      // 构建对话上下文
+      const conversationContext = chatMessages.map(msg => 
+        `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
+      ).join('\n');
+
+      const fullPrompt = `基于以下现有代码和对话历史，按照用户的最新要求进行修改：
+
+现有代码：
+${isEditable ? editedCode : originalCode}
+
+对话历史：
+${conversationContext}
+
+用户最新要求：
+${fullUserMessage}
+
+请保持代码结构的完整性，只修改必要的部分。返回完整的修改后的代码。`;
+
+      // 更新PREVIOUS PROMPT显示
+      setPrompt(fullPrompt);
+      
+      // 调用生成函数
+      onRegenerateWithNewPrompt(fullPrompt);
+
+    } catch (error) {
+      console.error('Chat message error:', error);
+      // 移除失败的助手消息
+      setChatMessages(prev => prev.slice(0, -1));
+    }
+  };
+
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCurrentChatInput(e.target.value);
+  };
+
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendChatMessage();
+    }
+  };
+
+  // 监听生成状态变化，更新聊天消息
+  useEffect(() => {
+    if (isChatMode && !isGenerating && generationComplete) {
+      // 当代码生成完成时，更新最后一条助手消息
+      setChatMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.type === 'assistant' && lastMessage.isGenerating) {
+          const updatedMessage = {
+            ...lastMessage,
+            content: '代码已成功生成并更新！您可以继续提出修改要求。',
+            isGenerating: false
+          };
+          return [...prev.slice(0, -1), updatedMessage];
+        }
+        return prev;
+      });
+    }
+  }, [isGenerating, generationComplete, isChatMode]);
 
   // 复制分享链接
   const copyShareUrl = async () => {
@@ -3615,6 +3731,134 @@ export function GenerationView({
       {/* Header - Kompakter gestaltet */}
       <header className="border-b border-gray-800 py-2 px-4"  >
         <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-white">
+              {provider === 'deepseek' ? 'DEEPSEEK' :
+               provider === 'openai_compatible' ? 'CUSTOM API' :
+               provider === 'ollama' ? 'OLLAMA' :
+               provider === 'lm_studio' ? 'LM STUDIO' : 'AI'}
+            </h1>
+            <Badge variant="outline" className="bg-gray-900 text-white border-white">
+              {model}
+            </Badge>
+            {thinkingOutput && (
+              <div className="ml-2">
+                <ThinkingIndicator
+                  thinkingOutput={thinkingOutput}
+                  isThinking={isThinking}
+                  mode="coding"
+                  position="top-left"
+                />
+              </div>
+            )}
+
+            {/* 切换模式 */}
+            {generationComplete && (
+              
+              <div  className="ml-3 flex items-center space-x-3 px-2 py-1 backdrop-blur-md bg-white/10 rounded-xl border border-white/20">
+                <div className="flex items-center space-x-1">
+                  {/* 代码编辑模式 */}
+                  <button
+                    onClick={() => {
+                      if (isVisualMode || isChatMode) {
+                        setIsVisualMode(false);
+                        setIsChatMode(false);
+                        
+                        // 切换模式时，取消元素选择模式
+                        setIsElementSelectMode(false);
+                        
+                        // 切换到代码编辑模式时，清理可视化编辑相关状态
+                        setSelectedElement(null);
+                        
+                        // 清理图片替换相关状态
+                        setImageReplaceButton({ show: false, x: 0, y: 0 });
+                        setSelectedImageSrc("");
+                        setSelectedImageFingerprint(null);
+                        setSelectedImageElement(null);
+                      }
+                    }}
+                    disabled={isGenerating || (!isVisualMode && !isChatMode)}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
+                      !isVisualMode && !isChatMode
+                        ? 'bg-blue-500/80 text-white shadow-lg shadow-blue-500/25 border border-blue-400/30' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium">Code</span>
+                  </button>
+                    {/* Chat模式 */}
+                    <button
+                    onClick={() => {
+                      if (!isChatMode) {
+                        setIsChatMode(true);
+                        setIsVisualMode(false);
+                        
+                        // 切换模式时，取消元素选择模式
+                        setIsElementSelectMode(false);
+                        
+                        // 清理图片替换相关状态
+                        setImageReplaceButton({ show: false, x: 0, y: 0 });
+                        setSelectedImageSrc("");
+                        setSelectedImageFingerprint(null);
+                        setSelectedImageElement(null);
+                      }
+                    }}
+                    disabled={isGenerating || isChatMode}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
+                      isChatMode 
+                        ? 'bg-purple-500/80 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-xs font-medium">Chat</span>
+                  </button>
+                  {/* 可视化编辑模式 */}
+                  <button
+                    onClick={() => {
+                      if (!isVisualMode) {
+                        setIsVisualMode(true);
+                        setIsChatMode(false);
+                        
+                        // 切换模式时，取消元素选择模式
+                        setIsElementSelectMode(false);
+                        
+                        // 切换到可视化模式时，自动启用编辑模式
+                        if (!isEditable) {
+                          setIsEditable(true);
+                        }
+                        
+                        // 清理图片替换相关状态
+                        setImageReplaceButton({ show: false, x: 0, y: 0 });
+                        setSelectedImageSrc("");
+                        setSelectedImageFingerprint(null);
+                        setSelectedImageElement(null);
+                      }
+                    }}
+                    disabled={isGenerating || isVisualMode}
+                    className={`flex items-center space-x-1 px-3 py-1.5 rounded-md transition-all cursor-pointer backdrop-blur-sm ${
+                      isVisualMode 
+                        ? 'bg-green-500/80 text-white shadow-lg shadow-green-500/25 border border-green-400/30' 
+                        : 'text-gray-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/20'
+                    } ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" ><path d="M12.034 12.681a.498.498 0 0 1 .647-.647l9 3.5a.5.5 0 0 1-.033.943l-3.444 1.068a1 1 0 0 0-.66.66l-1.067 3.443a.5.5 0 0 1-.943.033z"/><path d="M5 3a2 2 0 0 0-2 2"/><path d="M19 3a2 2 0 0 1 2 2"/><path d="M5 21a2 2 0 0 1-2-2"/><path d="M9 3h1"/><path d="M9 21h2"/><path d="M14 3h1"/><path d="M3 9v1"/><path d="M21 9v2"/><path d="M3 14v1"/></svg>
+                    <span className="text-xs font-medium">Edit</span>
+                  </button>
+
+                
+                </div>
+                
+          
+              </div>
+            )}
+          </div>
+          
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white">
@@ -3631,6 +3875,7 @@ export function GenerationView({
                   <ThinkingIndicator
                     thinkingOutput={thinkingOutput}
                     isThinking={isThinking}
+                    mode="coding"
                     position="top-left"
                   />
                 </div>
@@ -3791,6 +4036,7 @@ export function GenerationView({
               </div>
 
               {/* Prompt und Work Steps Bereich */}
+              {!isVisualMode && (
               <div className="h-[35%] p-3 flex flex-col overflow-hidden">
                 <div className="mb-2 flex-shrink-0">
                   <div className="flex items-center gap-2 mb-1">
@@ -3884,6 +4130,7 @@ export function GenerationView({
                   </div>
                 </div>
               </div>
+)}
             </>
           ) : (
             <>
@@ -3903,7 +4150,7 @@ export function GenerationView({
                       <span className="text-xs hidden sm:inline">Refresh</span>
                     </Button>
                   )}
-                  {generationComplete && (
+                  {generationComplete && (!isChatMode || (isChatMode && previewMode === 'render')) && (
                     <Button
                       variant={isElementSelectMode ? "secondary" : "ghost"}
                       size="sm"
@@ -3954,31 +4201,44 @@ export function GenerationView({
               </div>
 
               <div className={`flex-1 ${showHistory ? 'max-h-[calc(100%-160px)]' : ''} p-3 flex items-center justify-center overflow-hidden`}>
-                <div
-                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
-                    viewportSize === "desktop"
-                      ? "w-full h-[calc(100%-190px)]"
-                      : viewportSize === "tablet"
-                        ? "w-[768px] h-[1024px] max-h-[90%]"
-                        : "w-[375px] h-[667px] max-h-[90%]"
-                  }`}
-                  style={{
-                    transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
-                  }}
-                >
-                  {!originalCode && !editedCode ? (
-                    <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
-                      {isGenerating ? (
-                        <div className="text-center">
-                          <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
-                          <p>Generating preview...</p>
-                        </div>
-                      ) : (
-                        <p>No preview available yet</p>
-                      )}
+                {isChatMode && previewMode === 'code' ? (
+                  /* Chat模式下的代码显示 */
+                  <div className="w-full h-full bg-gray-950 rounded-md border border-gray-800 overflow-hidden">
+                    <div className="h-full">
+                      <CodeEditor
+                        code={isEditable ? editedCode : originalCode}
+                        isEditable={false}
+                        onChange={() => {}}
+                      />
                     </div>
-                  ) : (
-                                          <div className="w-full h-full relative bg-white">
+                  </div>
+                ) : (
+                  /* 渲染预览模式 */
+                  <div
+                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
+                      viewportSize === "desktop"
+                        ? "w-full h-full"
+                        : viewportSize === "tablet"
+                          ? "w-[768px] h-[1024px] max-h-[90%]"
+                          : "w-[375px] h-[667px] max-h-[90%]"
+                    }`}
+                    style={{
+                      transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                    }}
+                  >
+                    {!originalCode && !editedCode ? (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+                        {isGenerating ? (
+                          <div className="text-center">
+                            <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
+                            <p>Generating preview...</p>
+                          </div>
+                        ) : (
+                          <p>No preview available yet</p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-full h-full relative bg-white">
                         <iframe
                           ref={iframeRef}
                           key={previewKey}
@@ -4006,12 +4266,13 @@ export function GenerationView({
                         {isElementSelectMode && (
                           <div className="absolute top-4 left-4 z-20 bg-blue-600/90 text-white px-3 py-2 rounded-lg text-sm flex items-center shadow-lg">
                             <MousePointer2 className="w-4 h-4 mr-2" />
-                            <span>Click element to code</span>
+                            <span>Click to modify elements</span>
                           </div>
                         )}
                       </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -4026,192 +4287,334 @@ export function GenerationView({
             {/* Linke Spalte - Code-Editor und Steuerelemente */}
             <ResizablePanel defaultSize={65} minSize={30}>
               <div className="h-full flex flex-col border-r border-gray-800">
-                {/* Code-Editor-Bereich */}
-                <div className="h-[65%] border-b border-gray-800 flex flex-col">
-                  <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-sm font-medium">GENERATED HTML</h2>
-                      {generationComplete && !isVisualMode && (
-                        <div className="ml-3 flex items-center space-x-2">
-                          <span className="text-xs text-gray-400">
-                            {isEditable ? 'Edit' : 'Read Only'}
-                          </span>
-                          <Switch
-                            checked={isEditable}
-                            onCheckedChange={(checked) => {
-                              if (!checked && hasChanges) {
-                                handleShowSaveDialog();
-                              } else {
-                                setIsEditable(checked);
+                {isChatMode ? (
+                  /* Chat模式界面 */
+                  <div className="h-full flex flex-col">
+                    {/* Chat标题栏 */}
+                    <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-medium">CHAT CONVERSATION</h2>
+                        <Badge variant="outline" className="text-xs bg-purple-900/20 text-purple-300 border-purple-500/20">
+                          {chatMessages.length} messages
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                          onClick={() => setChatMessages([])}
+                          disabled={isGenerating || chatMessages.length === 0}
+                        >
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Chat消息区域 */}
+                    <div className="flex-1 overflow-hidden flex flex-col">
+                      <ScrollArea className="flex-1 p-3">
+                        <div className="space-y-4">
+                          {chatMessages.length === 0 ? (
+                            <div className="text-center text-gray-500 py-8">
+                              <svg className="w-12 h-12 mx-auto mb-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+                              </svg>
+                              <p className="text-sm">Start a conversation to modify your project</p>
+                              <p className="text-xs text-gray-600 mt-1">Ask questions or request changes to your code</p>
+                              <p className="text-xs text-gray-600 mt-2 flex items-center justify-center gap-1">
+                                <MousePointer2 className="w-3 h-3" />
+                                Click "Select" in preview to choose elements
+                              </p>
+                            </div>
+                          ) : (
+                            chatMessages.map((message) => (
+                              <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                                  message.type === 'user' 
+                                    ? 'bg-blue-600 text-white' 
+                                    : 'bg-gray-800 text-gray-200 border border-gray-700'
+                                }`}>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-medium opacity-80">
+                                      {message.type === 'user' ? 'You' : 'AI Assistant'}
+                                    </span>
+                                    <span className="text-xs opacity-60">
+                                      {message.timestamp.toLocaleTimeString()}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm">
+                                    {message.isGenerating ? (
+                                      <div className="flex items-center gap-2">
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>Coding...</span>
+                                      </div>
+                                    ) : (
+                                      <p className="whitespace-pre-wrap">{message.content}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </ScrollArea>
+
+                      {/* Chat输入区域 */}
+                      <div className="border-t border-gray-800 p-3">
+                        {/* 选中元素上下文显示 */}
+                        {hasSelectedElementContext && selectedElementContext && (
+                          <div className="mb-3">
+                            <div className="flex items-center gap-1.5 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                              <span className="text-xs text-blue-300 font-medium">Selected Element</span>
+                              <div className="w-px h-3 bg-blue-500/30 mx-1"></div>
+                              <span className="text-xs text-blue-200/80 font-mono flex-1">
+                                {selectedElementContext.replace("Please modify the selected element: ", "")}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="ml-1 h-4 w-4 p-0 text-blue-400/60 hover:text-blue-300 hover:bg-blue-500/20"
+                                onClick={() => {
+                                  setHasSelectedElementContext(false);
+                                  setSelectedElementContext("");
+                                }}
+                                title="Clear selection"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="relative">
+                          <Textarea
+                            value={currentChatInput}
+                            onChange={handleChatInputChange}
+                            onKeyDown={handleChatKeyDown}
+                            placeholder={hasSelectedElementContext 
+                              ? "Describe how to modify the selected element... (e.g., make it bigger, change color to red)" 
+                              : "Type your message... (Shift+Enter for new line)"
+                            }
+                            className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-purple-400 resize-none ${
+                              hasSelectedElementContext 
+                                ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
+                                : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-purple-400'
+                            }`}
+                            disabled={isGenerating}
+                          />
+                          <Button
+                            size="sm"
+                            className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${
+                              currentChatInput.trim() ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-800 hover:bg-gray-700'
+                            }`}
+                            onClick={handleSendChatMessage}
+                            disabled={!currentChatInput.trim() || isGenerating}
+                          >
+                            <Send className={`h-3 w-3 ${currentChatInput.trim() ? 'text-white' : 'text-gray-400'}`} />
+                            <span className="sr-only">Send message</span>
+                          </Button>
+                        </div>
+                        
+                     
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* 原有的代码编辑器界面 */
+                  <>
+                    {/* Code-Editor-Bereich */}
+                    <div className="h-[65%] border-b border-gray-800 flex flex-col">
+                      <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-sm font-medium">GENERATED HTML</h2>
+                          {generationComplete && !isVisualMode && (
+                            <div className="ml-3 flex items-center space-x-2">
+                              <span className="text-xs text-gray-400">
+                                {isEditable ? 'Edit' : 'Read Only'}
+                              </span>
+                              <Switch
+                                checked={isEditable}
+                                onCheckedChange={(checked) => {
+                                  if (!checked && hasChanges) {
+                                    handleShowSaveDialog();
+                                  } else {
+                                    setIsEditable(checked);
+                                  }
+                                }}
+                                disabled={isGenerating}
+                                className="data-[state=checked]:bg-blue-600"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isEditable && hasChanges && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
+                              onClick={saveChanges}
+                              disabled={isSaving}
+                            >
+                              {isSaving ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                                  Saving...
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-4 h-4 mr-1" />
+                                  Save
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {!isVisualMode && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                              onClick={copyToClipboard}
+                              disabled={!generatedCode || isGenerating}
+                            >
+                              <Copy className="w-4 h-4 mr-1" />
+                              {copySuccess ? "Copied!" : "Copy"}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        {isGenerating && !generatedCode ? (
+                          <div className="h-full w-full flex items-center justify-center bg-gray-950">
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 mb-4 mx-auto animate-spin text-white" />
+                              <p className="text-gray-400">Generating code...</p>
+                            </div>
+                          </div>
+                        ) : isVisualMode ? (
+                          <VisualEditor
+                            selectedElement={selectedElement}
+                            onStyleChange={handleStyleChange}
+                            onRefreshPreview={() => {
+                              console.log('手动刷新预览');
+                              debouncedUpdatePreview.flush();
+                              const currentCode = isEditable ? editedCode : originalCode;
+                              const preparedHtml = prepareHtmlContent(currentCode);
+                              setPreviewContent(preparedHtml);
+                              setPreviewKey(prev => prev + 1);
+                            }}
+                          />
+                        ) : (
+                          <CodeEditor
+                            code={isEditable ? editedCode : originalCode}
+                            isEditable={isEditable && generationComplete}
+                            onChange={(newCode) => setEditedCode(newCode)}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Prompt und Work Steps Bereich */}
+                    {!isVisualMode && (
+                    <div className="h-[35%] p-3 flex flex-col overflow-hidden">
+                      <div className="mb-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xs font-medium text-gray-400">NEW PROMPT</h3>
+                          {hasSelectedElementContext && (
+                            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                              <span className="text-xs text-blue-300 font-medium">Selected</span>
+                              <div className="w-px h-3 bg-blue-500/30 mx-1"></div>
+                              <span className="text-xs text-blue-200/80 font-mono">
+                                {selectedElementContext.replace("Please modify the selected element: ", "")}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="ml-1 h-4 w-4 p-0 text-blue-400/60 hover:text-blue-300 hover:bg-blue-500/20"
+                                onClick={() => {
+                                  setHasSelectedElementContext(false);
+                                  setSelectedElementContext("");
+                                }}
+                                title="Clear selection"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                     
+                        <div className="relative">
+                          <Textarea
+                            value={newPrompt}
+                            onChange={handleNewPromptChange}
+                            placeholder={hasSelectedElementContext ? "make this bigger, change color to red, etc..." : "Enter a new prompt..."}
+                            className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-white ${
+                              hasSelectedElementContext 
+                                ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
+                                : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-white'
+                            }`}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                handleSendNewPrompt()
                               }
                             }}
                             disabled={isGenerating}
-                            className="data-[state=checked]:bg-blue-600"
                           />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isEditable && hasChanges && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
-                          onClick={saveChanges}
-                          disabled={isSaving}
-                        >
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="w-4 h-4 mr-1" />
-                              Save
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {!isVisualMode && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
-                          onClick={copyToClipboard}
-                          disabled={!generatedCode || isGenerating}
-                        >
-                          <Copy className="w-4 h-4 mr-1" />
-                          {copySuccess ? "Copied!" : "Copy"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    {isGenerating && !generatedCode ? (
-                      <div className="h-full w-full flex items-center justify-center bg-gray-950">
-                        <div className="text-center">
-                          <Loader2 className="w-8 h-8 mb-4 mx-auto animate-spin text-white" />
-                          <p className="text-gray-400">Generating code...</p>
-                        </div>
-                      </div>
-                    ) : isVisualMode ? (
-                      <VisualEditor
-                        selectedElement={selectedElement}
-                        onStyleChange={handleStyleChange}
-                        onRefreshPreview={() => {
-                          console.log('手动刷新预览');
-                          debouncedUpdatePreview.flush();
-                          const currentCode = isEditable ? editedCode : originalCode;
-                          const preparedHtml = prepareHtmlContent(currentCode);
-                          setPreviewContent(preparedHtml);
-                          setPreviewKey(prev => prev + 1);
-                        }}
-                      />
-                    ) : (
-                      <CodeEditor
-                        code={isEditable ? editedCode : originalCode}
-                        isEditable={isEditable && generationComplete}
-                        onChange={(newCode) => setEditedCode(newCode)}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                {/* Prompt und Work Steps Bereich */}
-                <div className="h-[35%] p-3 flex flex-col overflow-hidden">
-                  <div className="mb-2 flex-shrink-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-xs font-medium text-gray-400">NEW PROMPT</h3>
-                      {hasSelectedElementContext && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 border border-blue-500/20 rounded-full">
-                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                          <span className="text-xs text-blue-300 font-medium">Selected</span>
-                          <div className="w-px h-3 bg-blue-500/30 mx-1"></div>
-                          <span className="text-xs text-blue-200/80 font-mono">
-                            {selectedElementContext.replace("Please modify the selected element: ", "")}
-                          </span>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className="ml-1 h-4 w-4 p-0 text-blue-400/60 hover:text-blue-300 hover:bg-blue-500/20"
-                            onClick={() => {
-                              setHasSelectedElementContext(false);
-                              setSelectedElementContext("");
-                            }}
-                            title="Clear selection"
+                            className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                            onClick={handleSendNewPrompt}
+                            disabled={!newPrompt.trim() || isGenerating}
                           >
-                            <X className="h-3 w-3" />
+                            <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
+                            <span className="sr-only">Send</span>
                           </Button>
+                          {hasSelectedElementContext && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="absolute bottom-2 right-9 h-6 w-6 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                              onClick={() => {
+                                setNewPrompt("");
+                                setHasSelectedElementContext(false);
+                                setSelectedElementContext("");
+                              }}
+                              title="Clear selected element context"
+                            >
+                              <X className="h-3 w-3" />
+                              <span className="sr-only">Clear</span>
+                            </Button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                 
-                    <div className="relative">
-                      <Textarea
-                        value={newPrompt}
-                        onChange={handleNewPromptChange}
-                        placeholder={hasSelectedElementContext ? "make this bigger, change color to red, etc..." : "Enter a new prompt..."}
-                        className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-white ${
-                          hasSelectedElementContext 
-                            ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
-                            : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-white'
-                        }`}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendNewPrompt()
-                          }
-                        }}
-                        disabled={isGenerating}
-                      />
-                      <Button
-                        size="sm"
-                        className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
-                        onClick={handleSendNewPrompt}
-                        disabled={!newPrompt.trim() || isGenerating}
-                      >
-                        <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
-                        <span className="sr-only">Send</span>
-                      </Button>
-                      {hasSelectedElementContext && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="absolute bottom-2 right-9 h-6 w-6 p-0 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                          onClick={() => {
-                            setNewPrompt("");
-                            setHasSelectedElementContext(false);
-                            setSelectedElementContext("");
-                          }}
-                          title="Clear selected element context"
-                        >
-                          <X className="h-3 w-3" />
-                          <span className="sr-only">Clear</span>
-                        </Button>
-                      )}
-                    </div>
-                    {prompt && (
-                      <div className="mt-2">
-                        <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
-                        <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
-                          <p className="text-xs text-gray-400">{prompt}</p>
-                        </ScrollArea>
+                        {prompt && (
+                          <div className="mt-2">
+                            <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
+                            <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
+                              <p className="text-xs text-gray-400">{prompt}</p>
+                            </ScrollArea>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  <div className="flex-1 overflow-hidden">
-                    <h3 className="text-xs font-medium text-gray-400 mb-1">AI WORK STEPS</h3>
-                    <div className="h-[calc(100%-20px)] overflow-hidden">
-                      <WorkSteps
-                        isGenerating={isGenerating}
-                        generationComplete={generationComplete}
-                        generatedCode={isEditable ? editedCode : generatedCode}
-                      />
+                      <div className="flex-1 overflow-hidden">
+                        <h3 className="text-xs font-medium text-gray-400 mb-1">AI WORK STEPS</h3>
+                        <div className="h-[calc(100%-20px)] overflow-hidden">
+                          <WorkSteps
+                            isGenerating={isGenerating}
+                            generationComplete={generationComplete}
+                            generatedCode={isEditable ? editedCode : generatedCode}
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                    )}
+                  </>
+                )}
               </div>
             </ResizablePanel>
 
@@ -4222,7 +4625,36 @@ export function GenerationView({
             <ResizablePanel defaultSize={35} minSize={25}>
               <div className="h-full flex flex-col">
                 <div className="p-2 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between">
-                  <h2 className="text-sm font-medium">LIVE PREVIEW</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-medium">LIVE PREVIEW</h2>
+                    {isChatMode && (
+                      <div className="flex items-center space-x-1 ml-3">
+                        <Button
+                          variant={previewMode === 'render' ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setPreviewMode('render')}
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          Render
+                        </Button>
+                        <Button
+                          variant={previewMode === 'code' ? "secondary" : "ghost"}
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setPreviewMode('code')}
+                        >
+                          <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                          Code
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     {generationComplete && (
                       <Button
@@ -4236,7 +4668,7 @@ export function GenerationView({
                         <span className="text-xs hidden sm:inline">Refresh</span>
                       </Button>
                     )}
-                    {generationComplete && (
+                    {generationComplete && (!isChatMode || (isChatMode && previewMode === 'render')) && (
                       <Button
                         variant={isElementSelectMode ? "secondary" : "ghost"}
                         size="sm"
@@ -4287,31 +4719,44 @@ export function GenerationView({
                 </div>
 
                 <div className={`flex-1 ${showHistory ? 'max-h-[calc(100%-160px)]' : ''} p-3 flex items-center justify-center overflow-hidden`}>
-                  <div
-                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
-                      viewportSize === "desktop"
-                        ? "w-full h-full"
-                        : viewportSize === "tablet"
-                          ? "w-[768px] h-[1024px] max-h-[90%]"
-                          : "w-[375px] h-[667px] max-h-[90%]"
-                    }`}
-                    style={{
-                      transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
-                    }}
-                  >
-                    {!originalCode && !editedCode ? (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
-                        {isGenerating ? (
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
-                            <p>Generating preview...</p>
-                          </div>
-                        ) : (
-                          <p>No preview available yet</p>
-                        )}
+                  {isChatMode && previewMode === 'code' ? (
+                    /* Chat模式下的代码显示 */
+                    <div className="w-full h-full bg-gray-950 rounded-md border border-gray-800 overflow-hidden">
+                      <div className="h-full">
+                        <CodeEditor
+                          code={isEditable ? editedCode : originalCode}
+                          isEditable={false}
+                          onChange={() => {}}
+                        />
                       </div>
-                    ) : (
-                                              <div className="w-full h-full relative bg-white">
+                    </div>
+                  ) : (
+                    /* 渲染预览模式 */
+                    <div
+                      className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
+                        viewportSize === "desktop"
+                          ? "w-full h-full"
+                          : viewportSize === "tablet"
+                            ? "w-[768px] h-[1024px] max-h-[90%]"
+                            : "w-[375px] h-[667px] max-h-[90%]"
+                      }`}
+                      style={{
+                        transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                      }}
+                    >
+                      {!originalCode && !editedCode ? (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+                          {isGenerating ? (
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
+                              <p>Generating preview...</p>
+                            </div>
+                          ) : (
+                            <p>No preview available yet</p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-full h-full relative bg-white">
                           <iframe
                             ref={iframeRef}
                             key={previewKey}
@@ -4344,8 +4789,9 @@ export function GenerationView({
                             </div>
                           )}
                         </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 {/* 只在桌面视图显示历史编辑组件 */}
                 <EditHistory

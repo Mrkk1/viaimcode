@@ -510,7 +510,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
         <div className="  ">
           
           {isThinking && thinkingOutput && (
-            <ThinkingIndicator thinkingOutput={thinkingOutput} isThinking={isThinking} />
+            <ThinkingIndicator thinkingOutput={thinkingOutput} isThinking={isThinking} mode="coding" />
           )}
           
           {useIncrementalMode && generationComplete ? (
