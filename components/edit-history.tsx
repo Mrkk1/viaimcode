@@ -153,7 +153,7 @@ export const EditHistory = function EditHistory({
                                 </span>
                               )}
                               
-                              <span className="text-xs text-gray-500 ml-1">
+                              <span className="text-xs text-gray-500 ">
                                 {formatDistanceToNow(new Date(version.timestamp), { 
                                   addSuffix: true, 
                                   locale: zhCN 
@@ -210,6 +210,8 @@ export const EditHistory = function EditHistory({
                       )}
                       {version.isPublished && (
                         <span className="ml-1 text-blue-400">• Published</span>
+                      )||(
+                        <span className="ml-1 text-gray-400"></span>
                       )}
                     </p>
                   </TooltipContent>

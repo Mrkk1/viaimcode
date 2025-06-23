@@ -2736,8 +2736,8 @@ ${fullUserMessage}
       
       let current = el;
       
-      // 从目标元素向上遍历到body
-      while (current && current !== document.body && current.parentElement) {
+      // 从目标元素向上遍历，包含body但不包含html
+      while (current && current.tagName.toLowerCase() !== 'html' && current.parentElement) {
         const parent = current.parentElement;
         const allChildren = Array.from(parent.children); // 父元素的所有子元素
         const sameTagChildren = allChildren.filter(child => 
@@ -2772,6 +2772,7 @@ ${fullUserMessage}
         current = parent;
       }
       
+      console.log('生成的完整树路径:', path);
       return path;
     };
     
@@ -2917,6 +2918,205 @@ ${fullUserMessage}
       
       console.log('目标元素路径节点:', targetElement);
       
+      // 方法0: 完整树路径匹配 - 最精确的匹配方式
+      if (fingerprint.treePath && fingerprint.treePath.length > 1) {
+        console.log('🔍 尝试完整树路径匹配');
+        
+        // 分析HTML结构，构建DOM树映射
+        const buildDOMStructure = (htmlLines: string[]) => {
+          const structure: Array<{
+            lineIndex: number;
+            tagName: string;
+            level: number;
+            attributes: Record<string, string>;
+            children: number[];
+            parent: number | null;
+          }> = [];
+          
+          const tagStack: number[] = []; // 存储标签索引的栈
+          
+          htmlLines.forEach((line, lineIndex) => {
+            const trimmedLine = line.trim();
+            
+            // 匹配开始标签
+            const openTagMatch = trimmedLine.match(/<(\w+)([^>]*)>/);
+            if (openTagMatch) {
+              const tagName = openTagMatch[1].toLowerCase();
+              const attributesStr = openTagMatch[2];
+              
+              // 解析属性
+              const attributes: Record<string, string> = {};
+              const attrMatches = attributesStr.matchAll(/(\w+)=["']([^"']*)["']/g);
+              for (const match of attrMatches) {
+                attributes[match[1]] = match[2];
+              }
+              
+              const elementInfo = {
+                lineIndex,
+                tagName,
+                level: tagStack.length,
+                attributes,
+                children: [] as number[],
+                parent: tagStack.length > 0 ? tagStack[tagStack.length - 1] : null
+              };
+              
+              const currentIndex = structure.length;
+              structure.push(elementInfo);
+              
+              // 如果有父元素，将当前元素添加到父元素的children中
+              if (elementInfo.parent !== null) {
+                structure[elementInfo.parent].children.push(currentIndex);
+              }
+              
+              // 如果不是自闭合标签，推入栈
+              if (!trimmedLine.includes('/>') && !['img', 'br', 'hr', 'input', 'meta', 'link'].includes(tagName)) {
+                tagStack.push(currentIndex);
+              }
+            }
+            
+            // 匹配结束标签
+            const closeTagMatch = trimmedLine.match(/<\/(\w+)>/);
+            if (closeTagMatch) {
+              const tagName = closeTagMatch[1].toLowerCase();
+              // 从栈中弹出对应的开始标签
+              for (let i = tagStack.length - 1; i >= 0; i--) {
+                if (structure[tagStack[i]].tagName === tagName) {
+                  tagStack.splice(i, 1);
+                  break;
+                }
+              }
+            }
+          });
+          
+          return structure;
+        };
+        
+        const domStructure = buildDOMStructure(lines);
+        
+        // 通过树路径查找匹配的元素
+        const findByTreePath = (treePath: typeof fingerprint.treePath) => {
+        
+          
+          // 策略1: 直接匹配完整路径
+          let currentCandidates = domStructure; // 从所有元素开始
+          
+          for (let pathIndex = 0; pathIndex < treePath.length; pathIndex++) {
+            const pathNode = treePath[pathIndex];
+            
+            // 在当前层级中查找匹配的元素
+            const matchingCandidates = currentCandidates.filter(candidate => {
+              return candidate.tagName === pathNode.tagName;
+            });
+            
+            
+            if (matchingCandidates.length === 0) {
+          
+              
+              // 如果是第一层失败，尝试跳过body层级
+              if (pathIndex === 0 && pathNode.tagName === 'body') {
+                continue;
+              }
+              
+              // 如果不是最后几层，尝试跳过当前层级
+              if (pathIndex < treePath.length - 2) {
+                continue;
+              }
+              
+              return null;
+            }
+            
+            // 如果只有一个候选，直接使用
+            if (matchingCandidates.length === 1) {
+              const candidate = matchingCandidates[0];
+              
+              if (pathIndex === treePath.length - 1) {
+                // 这是最后一层，找到目标元素
+                return candidate;
+              } else {
+                // 继续到下一层，使用该元素的子元素作为候选
+                currentCandidates = candidate.children.map(childIndex => domStructure[childIndex]);
+              }
+            } else {
+              // 多个候选，需要通过tagChildIndex精确定位
+              
+              // 对于多个候选，我们需要找到它们的共同父元素，然后在该父元素的子元素中按tagChildIndex选择
+              const candidatesWithParent = matchingCandidates.map(candidate => {
+                const parent = candidate.parent !== null ? domStructure[candidate.parent] : null;
+                const siblings = parent ? 
+                  parent.children.map(childIndex => domStructure[childIndex]) : 
+                  domStructure.filter(el => el.parent === null);
+                
+                const sameTagSiblings = siblings.filter(el => el.tagName === pathNode.tagName);
+                const tagChildIndex = sameTagSiblings.findIndex(el => el.lineIndex === candidate.lineIndex);
+                
+                return {
+                  candidate,
+                  tagChildIndex,
+                  totalSameTagSiblings: sameTagSiblings.length
+                };
+              });
+              
+              console.log('候选元素的tagChildIndex信息:', candidatesWithParent.map(c => ({
+                lineIndex: c.candidate.lineIndex + 1,
+                tagChildIndex: c.tagChildIndex,
+                expected: pathNode.tagChildIndex
+              })));
+              
+              // 查找tagChildIndex匹配的候选
+              const matchedCandidate = candidatesWithParent.find(c => 
+                c.tagChildIndex === pathNode.tagChildIndex
+              );
+              
+              if (matchedCandidate) {
+                const candidate = matchedCandidate.candidate;
+                
+                if (pathIndex === treePath.length - 1) {
+                  // 这是最后一层，找到目标元素
+                  return candidate;
+                } else {
+                  // 继续到下一层
+                  currentCandidates = candidate.children.map(childIndex => domStructure[childIndex]);
+                }
+              } else {
+                
+                // 如果不是最后几层，尝试使用第一个候选继续
+                if (pathIndex < treePath.length - 2 && candidatesWithParent.length > 0) {
+                  const candidate = candidatesWithParent[0].candidate;
+                  currentCandidates = candidate.children.map(childIndex => domStructure[childIndex]);
+                  continue;
+                }
+                
+                return null;
+              }
+            }
+          }
+          
+          // 策略2: 如果完整路径匹配失败，尝试只匹配最后几层
+          console.log('🔄 完整路径匹配失败，尝试部分路径匹配');
+          
+          // 尝试只匹配最后3层
+          if (treePath.length >= 3) {
+            const lastThreeLayers = treePath.slice(-3);
+            console.log('🔍 尝试匹配最后3层:', lastThreeLayers);
+            
+            return findByTreePath(lastThreeLayers);
+          }
+          
+          return null;
+        };
+        
+        const treePathMatch = findByTreePath(fingerprint.treePath);
+        if (treePathMatch) {
+          return {
+            lineIndex: treePathMatch.lineIndex,
+            score: 100,
+            confidence: '绝对精确（树路径）'
+          };
+        } else {
+          console.log('❌ 完整树路径匹配失败');
+        }
+      }
+      
       // 方法1: 通过ID精确匹配
       if (targetElement.id) {
         const exactMatch = candidateLines.find(({line}) => 
@@ -2949,14 +3149,38 @@ ${fullUserMessage}
                 confidence: '绝对精确'
               };
             } else if (matchingLines.length > 1) {
-              // 如果有多个匹配，使用tagChildIndex来选择正确的一个
+              // 如果有多个匹配，优先使用文本内容匹配
+              if (fingerprint.uniqueFeatures.directText && fingerprint.uniqueFeatures.directText.length > 2) {
+                const textMatch = matchingLines.find(({line, lineIndex}) => {
+                  // 检查当前行或下几行是否包含目标文本
+                  const currentLine = lines[lineIndex];
+                  const nextLine = lines[lineIndex + 1] || '';
+                  const nextNextLine = lines[lineIndex + 2] || '';
+                  return currentLine.includes(fingerprint.uniqueFeatures.directText) || 
+                         nextLine.includes(fingerprint.uniqueFeatures.directText) ||
+                         nextNextLine.includes(fingerprint.uniqueFeatures.directText);
+                });
+                
+                if (textMatch) {
+                  console.log(`✅ 通过类名+文本内容精确匹配，行号:`, textMatch.lineIndex + 1, '文本:', fingerprint.uniqueFeatures.directText);
+                  return {
+                    lineIndex: textMatch.lineIndex,
+                    score: 95,
+                    confidence: '高精确'
+                  };
+                }
+              }
+              
+              // 如果文本匹配失败，再使用tagChildIndex
               if (targetElement.tagChildIndex !== undefined && targetElement.tagChildIndex < matchingLines.length) {
-                console.log(`✅ 通过属性${attrName}+tagChildIndex精确匹配，行号:`, matchingLines[targetElement.tagChildIndex].lineIndex + 1);
+                console.log(`✅ 通过类名+tagChildIndex精确匹配，行号:`, matchingLines[targetElement.tagChildIndex].lineIndex + 1);
                 return {
                   lineIndex: matchingLines[targetElement.tagChildIndex].lineIndex,
-                  score: 95,
+                  score: 85,
                   confidence: '高精确'
                 };
+              } else {
+                console.log(`⚠️ 类名匹配到多个元素但tagChildIndex超出范围，匹配数: ${matchingLines.length}，tagChildIndex: ${targetElement.tagChildIndex}`);
               }
             }
           }
@@ -2994,16 +3218,40 @@ ${fullUserMessage}
       
       // 方法4: 通过直接文本内容匹配
       if (fingerprint.uniqueFeatures.directText && fingerprint.uniqueFeatures.directText.length > 2) {
-        const exactMatch = candidateLines.find(({line}) => 
-          line.includes(fingerprint.uniqueFeatures.directText)
-        );
+        console.log('🔍 尝试文本内容匹配，目标文本:', fingerprint.uniqueFeatures.directText);
+        console.log('🔍 候选行数:', candidateLines.length);
+        
+        // 遍历每个候选行，检查当前行及其后续行是否包含目标文本
+        const exactMatch = candidateLines.find(({line, lineIndex}) => {
+          const currentLine = lines[lineIndex];
+          const nextLine = lines[lineIndex + 1] || '';
+          const nextNextLine = lines[lineIndex + 2] || '';
+          
+          const hasTextInCurrentLine = currentLine.includes(fingerprint.uniqueFeatures.directText);
+          const hasTextInNextLine = nextLine.includes(fingerprint.uniqueFeatures.directText);
+          const hasTextInNextNextLine = nextNextLine.includes(fingerprint.uniqueFeatures.directText);
+          
+          console.log(`检查行 ${lineIndex + 1}:`, {
+            currentLine: currentLine.trim(),
+            nextLine: nextLine.trim(),
+            nextNextLine: nextNextLine.trim(),
+            hasTextInCurrentLine,
+            hasTextInNextLine,
+            hasTextInNextNextLine
+          });
+          
+          return hasTextInCurrentLine || hasTextInNextLine || hasTextInNextNextLine;
+        });
+        
         if (exactMatch) {
           console.log('✅ 通过直接文本内容绝对精确匹配，行号:', exactMatch.lineIndex + 1);
           return {
             lineIndex: exactMatch.lineIndex,
-            score: 80,
-            confidence: '精确'
+            score: 95,
+            confidence: '高精确'
           };
+        } else {
+          console.log('❌ 文本内容匹配失败，未找到包含目标文本的行');
         }
       }
       
@@ -3859,29 +4107,7 @@ ${fullUserMessage}
             )}
           </div>
           
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-white">
-                {provider === 'deepseek' ? 'DEEPSEEK' :
-                 provider === 'openai_compatible' ? 'CUSTOM API' :
-                 provider === 'ollama' ? 'OLLAMA' :
-                 provider === 'lm_studio' ? 'LM STUDIO' : 'AI'}
-              </h1>
-              <Badge variant="outline" className="bg-gray-900 text-white border-white">
-                {model}
-              </Badge>
-              {thinkingOutput && (
-                <div className="ml-2">
-                  <ThinkingIndicator
-                    thinkingOutput={thinkingOutput}
-                    isThinking={isThinking}
-                    mode="coding"
-                    position="top-left"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
+   
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
