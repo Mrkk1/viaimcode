@@ -1041,10 +1041,10 @@ export function GenerationView({
         duration: 10000, // 10秒超时
       });
       
-      setOriginalCode(editedCode)
-      setHasChanges(false)
-      
-      // 保存时创建新版本，标记为手动保存类型，等待完成
+    setOriginalCode(editedCode)
+    setHasChanges(false)
+    
+    // 保存时创建新版本，标记为手动保存类型，等待完成
       // 使用 versionHistoryRef 获取最新的版本数量
       const currentVersionCount = versionHistoryRef.current.length;
       console.log('保存前版本数量:', currentVersionCount);
@@ -2781,10 +2781,10 @@ ${fullUserMessage}
       // 获取直接文本内容（不包括子元素）
       const getDirectText = (element: HTMLElement): string => {
         return Array.from(element.childNodes)
-          .filter(node => node.nodeType === Node.TEXT_NODE)
-          .map(node => node.textContent?.trim())
-          .filter(text => text && text.length > 0)
-          .join(' ');
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent?.trim())
+        .filter(text => text && text.length > 0)
+        .join(' ');
       };
       
       // 获取所有文本内容
@@ -3032,7 +3032,7 @@ ${fullUserMessage}
               if (pathIndex === treePath.length - 1) {
                 // 这是最后一层，找到目标元素
                 return candidate;
-              } else {
+            } else {
                 // 继续到下一层，使用该元素的子元素作为候选
                 currentCandidates = candidate.children.map(childIndex => domStructure[childIndex]);
               }
@@ -3107,7 +3107,7 @@ ${fullUserMessage}
         
         const treePathMatch = findByTreePath(fingerprint.treePath);
         if (treePathMatch) {
-          return {
+      return {
             lineIndex: treePathMatch.lineIndex,
             score: 100,
             confidence: '绝对精确（树路径）'
@@ -3124,7 +3124,7 @@ ${fullUserMessage}
         );
         if (exactMatch) {
           console.log('✅ 通过ID绝对精确匹配，行号:', exactMatch.lineIndex + 1);
-          return {
+        return {
             lineIndex: exactMatch.lineIndex,
             score: 100,
             confidence: '绝对精确'
@@ -3196,7 +3196,7 @@ ${fullUserMessage}
         if (matchingLines.length === 1) {
           // 如果只有一个匹配，直接返回
           console.log('✅ 通过类名唯一匹配，行号:', matchingLines[0].lineIndex + 1);
-          return {
+      return {
             lineIndex: matchingLines[0].lineIndex,
             score: 90,
             confidence: '高精确'
@@ -3207,7 +3207,7 @@ ${fullUserMessage}
             console.log(`✅ 通过类名+tagChildIndex精确匹配，行号:`, matchingLines[targetElement.tagChildIndex].lineIndex + 1);
             return {
               lineIndex: matchingLines[targetElement.tagChildIndex].lineIndex,
-              score: 85,
+        score: 85,
               confidence: '高精确'
             };
           } else {
@@ -3245,7 +3245,7 @@ ${fullUserMessage}
         
         if (exactMatch) {
           console.log('✅ 通过直接文本内容绝对精确匹配，行号:', exactMatch.lineIndex + 1);
-          return {
+            return {
             lineIndex: exactMatch.lineIndex,
             score: 95,
             confidence: '高精确'
@@ -3767,7 +3767,7 @@ ${fullUserMessage}
         console.error('删除版本失败:', error);
         toast.error('删除失败，请重试');
       }
-          } else {
+    } else {
       // 如果没有projectId，只从前端状态中删除（临时版本）
       setVersionHistory(prev => {
         const newHistory = prev.filter(v => v.id !== versionId);
@@ -3979,7 +3979,7 @@ ${fullUserMessage}
       {/* Header - Kompakter gestaltet */}
       <header className="border-b border-gray-800 py-2 px-4"  >
         <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold text-white">
               {provider === 'deepseek' ? 'DEEPSEEK' :
                provider === 'openai_compatible' ? 'CUSTOM API' :
@@ -4210,8 +4210,8 @@ ${fullUserMessage}
                           </>
                         ) : (
                           <>
-                            <Save className="w-4 h-4 mr-1" />
-                            Save
+                        <Save className="w-4 h-4 mr-1" />
+                        Save
                           </>
                         )}
                       </Button>
@@ -4440,31 +4440,31 @@ ${fullUserMessage}
                   </div>
                 ) : (
                   /* 渲染预览模式 */
-                  <div
-                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
-                      viewportSize === "desktop"
+                <div
+                  className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
+                    viewportSize === "desktop"
                         ? "w-full h-full"
-                        : viewportSize === "tablet"
-                          ? "w-[768px] h-[1024px] max-h-[90%]"
-                          : "w-[375px] h-[667px] max-h-[90%]"
-                    }`}
-                    style={{
-                      transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
-                    }}
-                  >
-                    {!originalCode && !editedCode ? (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
-                        {isGenerating ? (
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
-                            <p>Generating preview...</p>
-                          </div>
-                        ) : (
-                          <p>No preview available yet</p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="w-full h-full relative bg-white">
+                      : viewportSize === "tablet"
+                        ? "w-[768px] h-[1024px] max-h-[90%]"
+                        : "w-[375px] h-[667px] max-h-[90%]"
+                  }`}
+                  style={{
+                    transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                  }}
+                >
+                  {!originalCode && !editedCode ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+                      {isGenerating ? (
+                        <div className="text-center">
+                          <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
+                          <p>Generating preview...</p>
+                        </div>
+                      ) : (
+                        <p>No preview available yet</p>
+                      )}
+                    </div>
+                  ) : (
+                                          <div className="w-full h-full relative bg-white">
                         <iframe
                           ref={iframeRef}
                           key={previewKey}
@@ -4496,8 +4496,8 @@ ${fullUserMessage}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                  )}
+                </div>
                 )}
               </div>
             </>
@@ -4651,38 +4651,38 @@ ${fullUserMessage}
                 ) : (
                   /* 原有的代码编辑器界面 */
                   <>
-                    {/* Code-Editor-Bereich */}
-                    <div className="h-[65%] border-b border-gray-800 flex flex-col">
-                      <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-sm font-medium">GENERATED HTML</h2>
-                          {generationComplete && !isVisualMode && (
-                            <div className="ml-3 flex items-center space-x-2">
-                              <span className="text-xs text-gray-400">
-                                {isEditable ? 'Edit' : 'Read Only'}
-                              </span>
-                              <Switch
-                                checked={isEditable}
-                                onCheckedChange={(checked) => {
-                                  if (!checked && hasChanges) {
-                                    handleShowSaveDialog();
-                                  } else {
-                                    setIsEditable(checked);
-                                  }
-                                }}
-                                disabled={isGenerating}
-                                className="data-[state=checked]:bg-blue-600"
-                              />
-                            </div>
-                          )}
+                {/* Code-Editor-Bereich */}
+                <div className="h-[65%] border-b border-gray-800 flex flex-col">
+                  <div className="flex items-center justify-between p-2 border-b border-gray-800 bg-gray-900/50">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-medium">GENERATED HTML</h2>
+                      {generationComplete && !isVisualMode && (
+                        <div className="ml-3 flex items-center space-x-2">
+                          <span className="text-xs text-gray-400">
+                            {isEditable ? 'Edit' : 'Read Only'}
+                          </span>
+                          <Switch
+                            checked={isEditable}
+                            onCheckedChange={(checked) => {
+                              if (!checked && hasChanges) {
+                                handleShowSaveDialog();
+                              } else {
+                                setIsEditable(checked);
+                              }
+                            }}
+                            disabled={isGenerating}
+                            className="data-[state=checked]:bg-blue-600"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isEditable && hasChanges && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
-                              onClick={saveChanges}
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isEditable && hasChanges && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-green-500 hover:text-green-400 hover:bg-green-900/20"
+                          onClick={saveChanges}
                               disabled={isSaving}
                             >
                               {isSaving ? (
@@ -4692,61 +4692,61 @@ ${fullUserMessage}
                                 </>
                               ) : (
                                 <>
-                                  <Save className="w-4 h-4 mr-1" />
-                                  Save
+                          <Save className="w-4 h-4 mr-1" />
+                          Save
                                 </>
                               )}
-                            </Button>
-                          )}
-                          {!isVisualMode && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
-                              onClick={copyToClipboard}
-                              disabled={!generatedCode || isGenerating}
-                            >
-                              <Copy className="w-4 h-4 mr-1" />
-                              {copySuccess ? "Copied!" : "Copy"}
-                            </Button>
-                          )}
+                        </Button>
+                      )}
+                      {!isVisualMode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-gray-400 hover:text-gray-900 hover:bg-white"
+                          onClick={copyToClipboard}
+                          disabled={!generatedCode || isGenerating}
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          {copySuccess ? "Copied!" : "Copy"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    {isGenerating && !generatedCode ? (
+                      <div className="h-full w-full flex items-center justify-center bg-gray-950">
+                        <div className="text-center">
+                          <Loader2 className="w-8 h-8 mb-4 mx-auto animate-spin text-white" />
+                          <p className="text-gray-400">Generating code...</p>
                         </div>
                       </div>
-                      <div className="flex-1 overflow-hidden">
-                        {isGenerating && !generatedCode ? (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-950">
-                            <div className="text-center">
-                              <Loader2 className="w-8 h-8 mb-4 mx-auto animate-spin text-white" />
-                              <p className="text-gray-400">Generating code...</p>
-                            </div>
-                          </div>
-                        ) : isVisualMode ? (
-                          <VisualEditor
-                            selectedElement={selectedElement}
-                            onStyleChange={handleStyleChange}
-                            onRefreshPreview={() => {
-                              console.log('手动刷新预览');
-                              debouncedUpdatePreview.flush();
-                              const currentCode = isEditable ? editedCode : originalCode;
-                              const preparedHtml = prepareHtmlContent(currentCode);
-                              setPreviewContent(preparedHtml);
-                              setPreviewKey(prev => prev + 1);
-                            }}
-                          />
-                        ) : (
-                          <CodeEditor
-                            code={isEditable ? editedCode : originalCode}
-                            isEditable={isEditable && generationComplete}
-                            onChange={(newCode) => setEditedCode(newCode)}
-                          />
-                        )}
-                      </div>
-                    </div>
+                    ) : isVisualMode ? (
+                      <VisualEditor
+                        selectedElement={selectedElement}
+                        onStyleChange={handleStyleChange}
+                        onRefreshPreview={() => {
+                          console.log('手动刷新预览');
+                          debouncedUpdatePreview.flush();
+                          const currentCode = isEditable ? editedCode : originalCode;
+                          const preparedHtml = prepareHtmlContent(currentCode);
+                          setPreviewContent(preparedHtml);
+                          setPreviewKey(prev => prev + 1);
+                        }}
+                      />
+                    ) : (
+                      <CodeEditor
+                        code={isEditable ? editedCode : originalCode}
+                        isEditable={isEditable && generationComplete}
+                        onChange={(newCode) => setEditedCode(newCode)}
+                      />
+                    )}
+                  </div>
+                </div>
 
-                    {/* Prompt und Work Steps Bereich */}
+                {/* Prompt und Work Steps Bereich */}
                     {!isVisualMode && (
-                    <div className="h-[35%] p-3 flex flex-col overflow-hidden">
-                      <div className="mb-2 flex-shrink-0">
+                <div className="h-[35%] p-3 flex flex-col overflow-hidden">
+                  <div className="mb-2 flex-shrink-0">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="text-xs font-medium text-gray-400">NEW PROMPT</h3>
                           {hasSelectedElementContext && (
@@ -4773,9 +4773,9 @@ ${fullUserMessage}
                           )}
                         </div>
                      
-                        <div className="relative">
-                          <Textarea
-                            value={newPrompt}
+                    <div className="relative">
+                      <Textarea
+                        value={newPrompt}
                             onChange={handleNewPromptChange}
                             placeholder={hasSelectedElementContext ? "make this bigger, change color to red, etc..." : "Enter a new prompt..."}
                             className={`min-h-[60px] w-full rounded-md border p-2 pr-10 text-sm focus:ring-white ${
@@ -4783,23 +4783,23 @@ ${fullUserMessage}
                                 ? 'border-blue-600/50 bg-blue-950/30 text-blue-100 focus:border-blue-400' 
                                 : 'border-gray-800 bg-gray-900/50 text-gray-300 focus:border-white'
                             }`}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault()
-                                handleSendNewPrompt()
-                              }
-                            }}
-                            disabled={isGenerating}
-                          />
-                          <Button
-                            size="sm"
-                            className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
-                            onClick={handleSendNewPrompt}
-                            disabled={!newPrompt.trim() || isGenerating}
-                          >
-                            <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
-                            <span className="sr-only">Send</span>
-                          </Button>
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSendNewPrompt()
+                          }
+                        }}
+                        disabled={isGenerating}
+                      />
+                      <Button
+                        size="sm"
+                        className={`absolute bottom-2 right-2 h-6 w-6 p-0 ${newPrompt.trim() ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                        onClick={handleSendNewPrompt}
+                        disabled={!newPrompt.trim() || isGenerating}
+                      >
+                        <ArrowRight className={`h-3 w-3 ${newPrompt.trim() ? 'text-white' : 'text-gray-400'}`} />
+                        <span className="sr-only">Send</span>
+                      </Button>
                           {hasSelectedElementContext && (
                             <Button
                               size="sm"
@@ -4816,28 +4816,28 @@ ${fullUserMessage}
                               <span className="sr-only">Clear</span>
                             </Button>
                           )}
-                        </div>
-                        {prompt && (
-                          <div className="mt-2">
-                            <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
-                            <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
-                              <p className="text-xs text-gray-400">{prompt}</p>
-                            </ScrollArea>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 overflow-hidden">
-                        <h3 className="text-xs font-medium text-gray-400 mb-1">AI WORK STEPS</h3>
-                        <div className="h-[calc(100%-20px)] overflow-hidden">
-                          <WorkSteps
-                            isGenerating={isGenerating}
-                            generationComplete={generationComplete}
-                            generatedCode={isEditable ? editedCode : generatedCode}
-                          />
-                        </div>
-                      </div>
                     </div>
+                    {prompt && (
+                      <div className="mt-2">
+                        <h4 className="text-xs font-medium text-gray-400">PREVIOUS PROMPT:</h4>
+                        <ScrollArea className="h-12 w-full rounded-md border border-gray-800 bg-gray-900/30 p-2 mt-1">
+                          <p className="text-xs text-gray-400">{prompt}</p>
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-hidden">
+                    <h3 className="text-xs font-medium text-gray-400 mb-1">AI WORK STEPS</h3>
+                    <div className="h-[calc(100%-20px)] overflow-hidden">
+                      <WorkSteps
+                        isGenerating={isGenerating}
+                        generationComplete={generationComplete}
+                        generatedCode={isEditable ? editedCode : generatedCode}
+                      />
+                    </div>
+                  </div>
+                </div>
                     )}
                   </>
                 )}
@@ -4852,7 +4852,7 @@ ${fullUserMessage}
               <div className="h-full flex flex-col">
                 <div className="p-2 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-medium">LIVE PREVIEW</h2>
+                  <h2 className="text-sm font-medium">LIVE PREVIEW</h2>
                     {isChatMode && (
                       <div className="flex items-center space-x-1 ml-3">
                         <Button
@@ -4958,31 +4958,31 @@ ${fullUserMessage}
                     </div>
                   ) : (
                     /* 渲染预览模式 */
-                    <div
-                      className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
-                        viewportSize === "desktop"
-                          ? "w-full h-full"
-                          : viewportSize === "tablet"
-                            ? "w-[768px] h-[1024px] max-h-[90%]"
-                            : "w-[375px] h-[667px] max-h-[90%]"
-                      }`}
-                      style={{
-                        transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
-                      }}
-                    >
-                      {!originalCode && !editedCode ? (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
-                          {isGenerating ? (
-                            <div className="text-center">
-                              <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
-                              <p>Generating preview...</p>
-                            </div>
-                          ) : (
-                            <p>No preview available yet</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-full h-full relative bg-white">
+                  <div
+                    className={`bg-gray-900 rounded-md border border-gray-800 overflow-hidden transition-all duration-300 flex items-center justify-center preview-container ${
+                      viewportSize === "desktop"
+                        ? "w-full h-full"
+                        : viewportSize === "tablet"
+                          ? "w-[768px] h-[1024px] max-h-[90%]"
+                          : "w-[375px] h-[667px] max-h-[90%]"
+                    }`}
+                    style={{
+                      transform: viewportSize !== "desktop" ? 'scale(0.9)' : 'none',
+                    }}
+                  >
+                    {!originalCode && !editedCode ? (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-900 text-gray-400">
+                        {isGenerating ? (
+                          <div className="text-center">
+                            <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin" />
+                            <p>Generating preview...</p>
+                          </div>
+                        ) : (
+                          <p>No preview available yet</p>
+                        )}
+                      </div>
+                    ) : (
+                                              <div className="w-full h-full relative bg-white">
                           <iframe
                             ref={iframeRef}
                             key={previewKey}
@@ -5015,8 +5015,8 @@ ${fullUserMessage}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
+                    )}
+                  </div>
                   )}
                 </div>
                 {/* 只在桌面视图显示历史编辑组件 */}

@@ -37,6 +37,7 @@ interface WelcomeViewProps {
   maxTokens: number | undefined
   setMaxTokens: (value: number | undefined) => void
   onGenerate: () => void
+  onGeneratePPT?: () => void
 }
 
 export function WelcomeView({
@@ -52,13 +53,15 @@ export function WelcomeView({
   setCustomSystemPrompt,
   maxTokens,
   setMaxTokens,
-  onGenerate
+  onGenerate,
+  onGeneratePPT
 }: WelcomeViewProps) {
   const [titleClass, setTitleClass] = useState("pre-animation")
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [selectedMode, setSelectedMode] = useState<'website' | 'ppt'>('website')
   const router = useRouter()
 
   useEffect(() => {
@@ -156,7 +159,11 @@ export function WelcomeView({
 
   const handleButtonClick = () => {
     if (isLoggedIn) {
-      onGenerate()
+      if (selectedMode === 'ppt' && onGeneratePPT) {
+        onGeneratePPT()
+      } else {
+        onGenerate()
+      }
     } else {
       router.push('/login')
     }
@@ -176,19 +183,53 @@ export function WelcomeView({
           WHAT ARE WE BUILDING?
         </h1>
 
+        {/* Mode Selection */}
+        <div className="flex gap-4 mb-6">
+          <Button
+            onClick={() => setSelectedMode('website')}
+            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
+              selectedMode === 'website'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
+                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
+            } border rounded-md`}
+          >
+            🌐 WEBSITE
+          </Button>
+          <Button
+            onClick={() => setSelectedMode('ppt')}
+            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
+              selectedMode === 'ppt'
+                ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500'
+                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
+            } border rounded-md`}
+          >
+            📊 PPT
+          </Button>
+        </div>
+
         <div className="relative w-full mb-6">
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the website you want to create..."
+            placeholder={selectedMode === 'website' 
+              ? "Describe the website you want to create..." 
+              : "Describe the PPT content or upload a document to convert..."
+            }
             className="min-h-[150px] w-full bg-gray-900/80 border-gray-800 focus:border-white focus:ring-white text-white placeholder:text-gray-500 pr-[120px] transition-all duration-300"
           />
           <Button
             onClick={handleButtonClick}
             disabled={!prompt.trim() && isLoggedIn}
-            className="absolute bottom-4 right-4 bg-gray-900/90 hover:bg-gray-800 text-white font-medium tracking-wider py-3 px-12 text-base rounded-md transition-all duration-300 border border-gray-800 hover:border-gray-700 focus:border-white focus:ring-white"
+            className={`absolute bottom-4 right-4 font-medium tracking-wider py-3 px-12 text-base rounded-md transition-all duration-300 border focus:border-white focus:ring-white ${
+              selectedMode === 'ppt'
+                ? 'bg-purple-600/90 hover:bg-purple-700 text-white border-purple-500 hover:border-purple-400'
+                : 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-800 hover:border-gray-700'
+            }`}
           >
-            {isLoggedIn ? 'GENERATE' : 'LOGIN TO GENERATE'}
+            {isLoggedIn 
+              ? (selectedMode === 'ppt' ? 'GENERATE PPT' : 'GENERATE') 
+              : 'LOGIN TO GENERATE'
+            }
           </Button>
         </div>
 

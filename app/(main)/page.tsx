@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { LoadingScreen } from "@/components/loading-screen"
 import { WelcomeView } from "@/components/welcome-view"
 import { GenerationView } from "@/components/generation-view"
+import { PPTGenerationView } from "@/components/ppt-generation-view"
 import { ThinkingIndicator } from "@/components/thinking-indicator"
 import { toast } from "sonner"
 import { getCurrentUser } from "@/lib/auth"
@@ -17,6 +18,7 @@ import { FeaturedWebsites } from "@/components/featured-websites"
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [showGenerationView, setShowGenerationView] = useState(false)
+  const [showPPTView, setShowPPTView] = useState(false)
   const [prompt, setPrompt] = useState("")
   const [selectedProvider, setSelectedProvider] = useState("")
   const [selectedModel, setSelectedModel] = useState("")
@@ -356,6 +358,18 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
     }
   };
 
+  const handleGeneratePPT = async () => {
+    if (!prompt.trim()) return;
+
+    setShowPPTView(true);
+    setShowGenerationView(false);
+  };
+
+  const handleBackFromPPT = () => {
+    setShowPPTView(false);
+    setShowGenerationView(false);
+  };
+
   useEffect(() => {
     // 获取用户信息
     const fetchUser = async () => {
@@ -453,6 +467,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
                 maxTokens={maxTokens}
                 setMaxTokens={setMaxTokens}
                 onGenerate={handleGenerate}
+                onGeneratePPT={handleGeneratePPT}
               />
               
               {/* Featured Websites Section */}
@@ -501,6 +516,17 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
           }
         `}</style>
       </div>
+    )
+  }
+
+  if (showPPTView) {
+    return (
+      <PPTGenerationView
+        prompt={prompt}
+        model={selectedModel}
+        provider={selectedProvider}
+        onBack={handleBackFromPPT}
+      />
     )
   }
 
@@ -562,6 +588,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
           maxTokens={maxTokens}
           setMaxTokens={setMaxTokens}
           onGenerate={handleGenerate}
+          onGeneratePPT={handleGeneratePPT}
         />
         
           {/* Featured Websites Section */}
