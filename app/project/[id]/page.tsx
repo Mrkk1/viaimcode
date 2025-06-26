@@ -334,7 +334,7 @@ ${newPrompt}
           setPrompt={setCurrentPrompt}
           model={project.model || 'claude-3-5-sonnet-20241022'}
           provider={project.provider || 'anthropic'}
-          generatedCode={generatedCode || currentVersion.code}
+          generatedCode={generatedCode}
           isGenerating={isGenerating}
           generationComplete={!isGenerating}
           onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}

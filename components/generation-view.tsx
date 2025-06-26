@@ -791,18 +791,26 @@ export function GenerationView({
         debouncedUpdatePreview(generatedCode)
       }
       
-      // 在代码生成完成时直接创建版本，使用之前保存的 isCodeChanged
-      if (generationComplete && !isGenerating && generatedCode.trim() !== '' && isCodeChanged && generatedCode !== lastVersionCreatedForCode) {
-        console.log('✅ 生成已完成，直接创建新版本');
-        
-        // 简化版本创建逻辑，直接创建版本
-        console.log('⏰ 准备延迟创建版本...');
+      // 在代码生成完成时直接创建版本
+      // 对于AI生成的代码，强制认为代码已经变更
+      const forceCreateVersion = generationComplete && !isGenerating && generatedCode.trim() !== '';
+      const shouldCreateVersion = forceCreateVersion && generatedCode !== lastVersionCreatedForCode;
+      
+      if (shouldCreateVersion) {
+        console.log('✅ 生成已完成，强制创建新版本（AI生成）');
         
         // 立即标记为已创建版本，避免重复
         setLastVersionCreatedForCode(generatedCode);
         
         setTimeout(() => {
           console.log('🚀 开始创建AI生成版本，代码长度:', generatedCode.length);
+          
+          // 显示保存版本的加载提示
+          toast.loading('Saving Version...', {
+            id: 'ai-saving-toast',
+            duration: 10000,
+          });
+          
           // 生成更好的版本标题
           const versionTitle = prompt ? 
             `AI Generated: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}` : 
@@ -815,7 +823,8 @@ export function GenerationView({
           isGenerating,
           codeNotEmpty: generatedCode.trim() !== '',
           codeChanged: isCodeChanged,
-          notAlreadyCreated: generatedCode !== lastVersionCreatedForCode
+          notAlreadyCreated: generatedCode !== lastVersionCreatedForCode,
+          forceCreateVersion
         });
       }
       
@@ -1054,9 +1063,28 @@ export function GenerationView({
         console.log('⚠️ 没有版本创建回调');
       }
       
+      // 添加成功提示，特别是对于AI生成的版本
+      if (type === 'ai') {
+        toast.success('AI generated version saved successfully!', {
+          id: 'ai-saving-toast',
+          duration: 3000,
+        });
+      } else if (type === 'manual') {
+        // 手动保存的提示在 saveChanges 函数中处理
+      }
+      
       return newVersion;
     } catch (error) {
       console.error('❌ 创建历史版本失败:', error);
+      
+      // 如果是AI生成版本，更新对应的toast
+      if (type === 'ai') {
+        toast.error('Failed to save AI generated version', {
+          id: 'ai-saving-toast',
+          duration: 5000,
+        });
+      }
+      
       return null;
     }
   }, [projectId, prompt, onVersionCreated]);
@@ -4160,7 +4188,7 @@ ${fullUserMessage}
               variant="outline"
               size="sm"
               className="border-gray-800 text-gray-400 hover:text-gray-900 hover:bg-white h-8"
-              disabled={!generatedCode || isGenerating}
+              disabled={(!generatedCode && !editedCode && !originalCode) || isGenerating}
               onClick={() => handleDownloadOrShare('download')}
             >
               <Download className="w-4 h-4 mr-1" />
@@ -4170,7 +4198,7 @@ ${fullUserMessage}
               variant="outline"
               size="sm"
               className="border-gray-800 text-gray-400 hover:text-gray-900 hover:bg-white h-8"
-              disabled={!generatedCode || isGenerating}
+              disabled={(!generatedCode && !editedCode && !originalCode) || isGenerating}
               onClick={() => handleDownloadOrShare('share')}
             >
               <Share2 className="w-4 h-4 mr-1" />
