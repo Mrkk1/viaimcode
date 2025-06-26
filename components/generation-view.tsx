@@ -50,6 +50,7 @@ interface GenerationViewProps {
   isThinking?: boolean
   projectId?: string | null
   initialVersions?: HistoryVersion[]
+  onVersionCreated?: () => void  // 添加版本创建回调
 }
 
 interface SaveDialogProps {
@@ -407,7 +408,8 @@ export function GenerationView({
   thinkingOutput = "",
   isThinking = false,
   projectId,
-  initialVersions = []
+  initialVersions = [],
+  onVersionCreated
 }: GenerationViewProps) {
   const [viewportSize, setViewportSize] = useState<"desktop" | "tablet" | "mobile">("desktop")
   const [copySuccess, setCopySuccess] = useState(false)
@@ -454,11 +456,31 @@ export function GenerationView({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [currentChatInput, setCurrentChatInput] = useState("")
   const [previewMode, setPreviewMode] = useState<'render' | 'code'>('render') // 右侧预览模式
+  
+  // 版本创建跟踪状态
+  const [lastVersionCreatedForCode, setLastVersionCreatedForCode] = useState<string>("")
 
   // 同步更新 versionHistoryRef
   useEffect(() => {
     versionHistoryRef.current = versionHistory;
   }, [versionHistory]);
+
+  // 监听 initialVersions 变化，确保与父组件数据同步
+  useEffect(() => {
+    console.log('🔄 initialVersions 发生变化:', {
+      newLength: initialVersions.length,
+      currentLength: versionHistory.length,
+      newVersions: initialVersions.map(v => ({ id: v.id, title: v.title, type: v.type })),
+      currentVersions: versionHistory.map(v => ({ id: v.id, title: v.title, type: v.type }))
+    });
+    
+    // 如果 initialVersions 有变化，更新本地状态
+    if (initialVersions.length !== versionHistory.length || 
+        !initialVersions.every(iv => versionHistory.some(v => v.id === iv.id))) {
+      console.log('📥 更新 versionHistory 状态以同步 initialVersions');
+      setVersionHistory(initialVersions);
+    }
+  }, [initialVersions]);
 
   // Previous preview content for transition effect
   const prevContentRef = useRef<string>("")
@@ -745,69 +767,71 @@ export function GenerationView({
 
   // 监听生成的代码变化，并在生成完成时创建新版本
   useEffect(() => {
-    console.log('useEffect triggered:', {
+    console.log('🔥 版本创建 useEffect triggered:', {
       hasGeneratedCode: !!generatedCode,
       generatedCodeLength: generatedCode?.length || 0,
       isGenerating,
       generationComplete,
       isInitialMount: isInitialMount.current,
-      previousCodeLength: previousGeneratedCode.current?.length || 0
+      previousCodeLength: previousGeneratedCode.current?.length || 0,
+      versionHistoryLength: versionHistory.length
     });
     
     if (generatedCode) {
+      // 检查是否是新代码（在更新引用之前）
+      const isCodeChanged = generatedCode !== previousGeneratedCode.current;
+      
       // 只有在代码真正改变时才更新 originalCode 和 editedCode
       // 避免在手动保存时重复设置
-      if (generatedCode !== previousGeneratedCode.current) {
-        console.log('代码发生变化，更新 originalCode 和 editedCode');
+      if (isCodeChanged) {
+        console.log('📝 代码发生变化，更新 originalCode 和 editedCode');
         setOriginalCode(generatedCode)
         setEditedCode(generatedCode)
         // 对于AI生成的代码，使用传统更新方式确保完整加载
         debouncedUpdatePreview(generatedCode)
       }
       
-      // 只在生成完成且代码不为空时创建版本
-      if (generationComplete && !isGenerating && generatedCode.trim() !== '') {
-        console.log('生成已完成，检查是否需要创建版本');
+      // 在代码生成完成时直接创建版本，使用之前保存的 isCodeChanged
+      if (generationComplete && !isGenerating && generatedCode.trim() !== '' && isCodeChanged && generatedCode !== lastVersionCreatedForCode) {
+        console.log('✅ 生成已完成，直接创建新版本');
         
-        // 检查是否是新生成的代码（不在现有版本历史中）
-        const isNewCode = !versionHistory.some(v => v.code === generatedCode);
-        console.log('是否是新代码:', isNewCode);
+        // 简化版本创建逻辑，直接创建版本
+        console.log('⏰ 准备延迟创建版本...');
         
-        if (isNewCode) {
-          // 如果是从项目详情页加载的，且已有初始版本，则不创建新版本
-          const shouldSkip = isInitialMount.current && initialVersions.length > 0;
-          console.log('是否应该跳过创建:', shouldSkip, {
-            isInitialMount: isInitialMount.current,
-            initialVersionsLength: initialVersions.length
-          });
-          
-          if (!shouldSkip) {
-            // 延迟创建版本，确保所有状态都已更新
-            setTimeout(() => {
-              console.log('准备创建AI生成版本，代码长度:', generatedCode.length);
-              createNewVersion(generatedCode, "AI Generated Version", 'ai');
-            }, 1000); // 延迟1秒
-          }
-        }
-      } else if (generatedCode !== previousGeneratedCode.current) {
-        console.log('代码已更改但不满足创建版本的条件:', {
+        // 立即标记为已创建版本，避免重复
+        setLastVersionCreatedForCode(generatedCode);
+        
+        setTimeout(() => {
+          console.log('🚀 开始创建AI生成版本，代码长度:', generatedCode.length);
+          // 生成更好的版本标题
+          const versionTitle = prompt ? 
+            `AI Generated: ${prompt.substring(0, 50)}${prompt.length > 50 ? '...' : ''}` : 
+            "AI Generated Version";
+          createNewVersion(generatedCode, versionTitle, 'ai');
+        }, 500); // 减少延迟时间
+      } else {
+        console.log('❌ 不满足版本创建条件:', {
           generationComplete,
           isGenerating,
-          codeNotEmpty: generatedCode.trim() !== ''
+          codeNotEmpty: generatedCode.trim() !== '',
+          codeChanged: isCodeChanged,
+          notAlreadyCreated: generatedCode !== lastVersionCreatedForCode
         });
       }
       
-      // 更新之前的代码引用
-      previousGeneratedCode.current = generatedCode;
+      // 在版本创建检查之后更新之前的代码引用
+      if (isCodeChanged) {
+        previousGeneratedCode.current = generatedCode;
+      }
     }
     
     // 标记初始加载已完成
     if (isInitialMount.current && generatedCode && generationComplete) {
-      console.log('初始加载完成，设置isInitialMount为false');
+      console.log('✅ 初始加载完成，设置isInitialMount为false');
       isInitialMount.current = false;
     }
-  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, initialVersions])
-  // 移除 versionHistory 依赖，避免在手动保存时重复触发
+  }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, prompt, lastVersionCreatedForCode])
+  // 移除 versionHistory 和 initialVersions 依赖，避免循环触发
 
   // Check if changes have been made and update preview content
   useEffect(() => {
@@ -829,14 +853,15 @@ export function GenerationView({
     // 在可视化模式下不自动更新预览，避免刷新iframe
     // 在代码编辑模式下使用智能更新，避免闪烁
     // 如果是通过可视化编辑器更新的代码，也不触发预览更新（因为DOM已经直接更新了）
-    if (editedCode && !isVisualMode && !isVisualCodeUpdateRef.current) {
+    if (editedCode && !isVisualMode && !isVisualCodeUpdateRef.current && editedCode !== originalCode) {
       console.log('📝 触发智能预览更新，原因: 代码编辑');
       debouncedSmartUpdatePreview(editedCode);
     } else {
       console.log('⏸️ 跳过预览更新，原因:', {
         noEditedCode: !editedCode,
         isVisualMode,
-        isVisualCodeUpdate: isVisualCodeUpdateRef.current
+        isVisualCodeUpdate: isVisualCodeUpdateRef.current,
+        noChanges: editedCode === originalCode
       });
     }
   }, [editedCode, originalCode, debouncedSmartUpdatePreview, isVisualMode])
@@ -915,11 +940,12 @@ export function GenerationView({
   
   // 创建新的历史版本
   const createNewVersion = useCallback(async (code: string, title?: string, type: string = 'manual') => {
-    console.log('createNewVersion 被调用:', { 
+    console.log('🚀 createNewVersion 被调用:', { 
       codeLength: code.length, 
       title, 
       type,
       hasProjectId: !!projectId,
+      projectId: projectId,
       currentVersionCount: versionHistoryRef.current.length
     });
     
@@ -927,10 +953,10 @@ export function GenerationView({
       // 生成缩略图
       let thumbnail = '';
       
-      console.log('需要生成新的缩略图');
+      console.log('📸 需要生成新的缩略图');
       // 检查 generateThumbnail 是否存在
       if (typeof generateThumbnail !== 'function') {
-        console.error('generateThumbnail 函数未定义！');
+        console.error('❌ generateThumbnail 函数未定义！');
         // 使用默认缩略图
         const canvas = document.createElement('canvas');
         canvas.width = 1200;
@@ -948,11 +974,12 @@ export function GenerationView({
       } else {
         // 直接使用generateThumbnail函数，传入当前要保存的代码
         thumbnail = await generateThumbnail(code);
-        console.log('缩略图生成完成，大小:', thumbnail.length);
+        console.log('✅ 缩略图生成完成，大小:', thumbnail.length);
       }
       
       // 如果有projectId，创建项目版本
       if (projectId) {
+        console.log('💾 有projectId，创建项目版本到数据库');
         try {
           const versionCount = versionHistoryRef.current.length;
           const response = await fetch(`/api/projects/${projectId}/versions`, {
@@ -971,15 +998,17 @@ export function GenerationView({
 
           if (response.ok) {
             const versionData = await response.json();
-            console.log('项目版本创建成功:', versionData.id);
+            console.log('✅ 项目版本创建成功:', versionData.id);
           } else {
-            console.error('创建项目版本失败，状态码:', response.status);
+            console.error('❌ 创建项目版本失败，状态码:', response.status);
+            const errorText = await response.text();
+            console.error('错误详情:', errorText);
           }
         } catch (error) {
-          console.error('创建项目版本失败:', error);
+          console.error('❌ 创建项目版本失败:', error);
         }
       } else {
-        console.log('没有projectId，只在前端创建版本');
+        console.log('⚠️ 没有projectId，只在前端创建版本');
       }
       
       // 创建新版本对象
@@ -994,35 +1023,43 @@ export function GenerationView({
         type: type as 'ai' | 'manual'
       };
       
-      console.log('创建新版本对象:', newVersion.id, newVersion.title);
+      console.log('📦 创建新版本对象:', newVersion.id, newVersion.title);
       
       // 添加到历史版本列表
       setVersionHistory(prev => {
-        console.log('当前版本历史数量:', prev.length);
-        console.log('准备添加新版本:', newVersion.title);
+        console.log('📋 当前版本历史数量:', prev.length);
+        console.log('📋 准备添加新版本:', newVersion.title);
         
         // 只过滤掉完全相同的版本（ID相同），而不是代码相同的版本
         // 允许用户保存多个具有相同代码但不同时间戳的版本
         const filtered = prev.filter(v => v.id !== newVersion.id);
         const newHistory = [...filtered, newVersion];
         
-        console.log('过滤后版本数量:', filtered.length);
-        console.log('添加新版本后数量:', newHistory.length);
-        console.log('新版本历史:', newHistory.map(v => ({ id: v.id, title: v.title, type: v.type })));
+        console.log('📋 过滤后版本数量:', filtered.length);
+        console.log('📋 添加新版本后数量:', newHistory.length);
+        console.log('📋 新版本历史:', newHistory.map(v => ({ id: v.id, title: v.title, type: v.type })));
         
         return newHistory;
       });
       
       // 设置当前版本ID
       setCurrentVersionId(newVersion.id);
-      console.log('设置当前版本ID:', newVersion.id);
+      console.log('🎯 设置当前版本ID:', newVersion.id);
+      
+      // 如果有版本创建回调，调用它来通知父组件刷新数据
+      if (onVersionCreated) {
+        console.log('📞 调用版本创建回调');
+        onVersionCreated();
+      } else {
+        console.log('⚠️ 没有版本创建回调');
+      }
       
       return newVersion;
     } catch (error) {
-      console.error('创建历史版本失败:', error);
+      console.error('❌ 创建历史版本失败:', error);
       return null;
     }
-  }, [projectId, prompt]);
+  }, [projectId, prompt, onVersionCreated]);
 
   // Function to save changes
   const saveChanges = async () => {

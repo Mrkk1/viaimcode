@@ -229,30 +229,14 @@ ${newPrompt}
         // 实时更新生成的代码
         setGeneratedCode(cleanedCode);
       }
-
-      // 创建新版本
-      const versionResponse = await fetch(`/api/projects/${projectId}/versions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code: receivedText.replace(/<think>[\s\S]*?<\/think>/g, '').trim(),
-          type: 'ai',
-          title: `Modified: ${newPrompt.substring(0, 50)}${newPrompt.length > 50 ? '...' : ''}`,
-        }),
-      });
-
-      if (!versionResponse.ok) {
-        throw new Error('Failed to save new version');
-      }
-
-      const newVersion = await versionResponse.json();
       
-      // 刷新页面数据
-      await fetchProjectAndVersions();
+      // 移除版本创建逻辑，让 generation-view.tsx 统一管理
+      // 版本创建现在由 GenerationView 组件的 useEffect 处理
       
-      toast.success('New version created successfully!');
+      // 刷新页面数据（在版本创建后由 GenerationView 触发）
+      // await fetchProjectAndVersions();
+      
+      toast.success('Code generation completed!');
       
     } catch (error) {
       console.error('Error in regeneration:', error);
@@ -346,11 +330,11 @@ ${newPrompt}
       {/* Main content area */}
       {currentVersion ? (
         <GenerationView
-          prompt={currentPrompt || project.prompt || ''}
+          prompt={currentPrompt}
           setPrompt={setCurrentPrompt}
-          model={project.model || ''}
-          provider={project.provider}
-          generatedCode={isGenerating ? generatedCode : currentVersion.code}
+          model={project.model || 'claude-3-5-sonnet-20241022'}
+          provider={project.provider || 'anthropic'}
+          generatedCode={generatedCode || currentVersion.code}
           isGenerating={isGenerating}
           generationComplete={!isGenerating}
           onRegenerateWithNewPrompt={handleRegenerateWithNewPrompt}
@@ -358,6 +342,7 @@ ${newPrompt}
           isThinking={isThinking}
           projectId={projectId}
           initialVersions={convertToHistoryVersions()}
+          onVersionCreated={fetchProjectAndVersions}
         />
       ) : (
         <div className="flex items-center justify-center h-[calc(100vh-200px)]">
