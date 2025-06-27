@@ -144,7 +144,7 @@ export const EditHistory = function EditHistory({
                             <div className="flex items-center gap-1">
                               {/* 显示版本类型标签 */}
                               {version.type && (
-                                <span className={`text-[10px] px-1 py-0.5 rounded ${
+                                <span className={`text-[8px] px-1 py-0.5 rounded ${
                                   version.type === 'ai' 
                                     ? 'bg-purple-900/30 text-purple-400' 
                                     : 'bg-green-900/30 text-green-400'

@@ -767,15 +767,15 @@ export function GenerationView({
 
   // 监听生成的代码变化，并在生成完成时创建新版本
   useEffect(() => {
-    console.log('🔥 版本创建 useEffect triggered:', {
-      hasGeneratedCode: !!generatedCode,
-      generatedCodeLength: generatedCode?.length || 0,
-      isGenerating,
-      generationComplete,
-      isInitialMount: isInitialMount.current,
-      previousCodeLength: previousGeneratedCode.current?.length || 0,
-      versionHistoryLength: versionHistory.length
-    });
+    // console.log('🔥 版本创建 useEffect triggered:', {
+    //   hasGeneratedCode: !!generatedCode,
+    //   generatedCodeLength: generatedCode?.length || 0,
+    //   isGenerating,
+    //   generationComplete,
+    //   isInitialMount: isInitialMount.current,
+    //   previousCodeLength: previousGeneratedCode.current?.length || 0,
+    //   versionHistoryLength: versionHistory.length
+    // });
     
     if (generatedCode) {
       // 检查是否是新代码（在更新引用之前）
@@ -784,7 +784,7 @@ export function GenerationView({
       // 只有在代码真正改变时才更新 originalCode 和 editedCode
       // 避免在手动保存时重复设置
       if (isCodeChanged) {
-        console.log('📝 代码发生变化，更新 originalCode 和 editedCode');
+        // console.log('📝 代码发生变化，更新 originalCode 和 editedCode');
         setOriginalCode(generatedCode)
         setEditedCode(generatedCode)
         // 对于AI生成的代码，使用传统更新方式确保完整加载
@@ -818,14 +818,14 @@ export function GenerationView({
           createNewVersion(generatedCode, versionTitle, 'ai');
         }, 500); // 减少延迟时间
       } else {
-        console.log('❌ 不满足版本创建条件:', {
-          generationComplete,
-          isGenerating,
-          codeNotEmpty: generatedCode.trim() !== '',
-          codeChanged: isCodeChanged,
-          notAlreadyCreated: generatedCode !== lastVersionCreatedForCode,
-          forceCreateVersion
-        });
+        // console.log('❌ 不满足版本创建条件:', {
+        //   generationComplete,
+        //   isGenerating,
+        //   codeNotEmpty: generatedCode.trim() !== '',
+        //   codeChanged: isCodeChanged,
+        //   notAlreadyCreated: generatedCode !== lastVersionCreatedForCode,
+        //   forceCreateVersion
+        // });
       }
       
       // 在版本创建检查之后更新之前的代码引用
@@ -836,7 +836,7 @@ export function GenerationView({
     
     // 标记初始加载已完成
     if (isInitialMount.current && generatedCode && generationComplete) {
-      console.log('✅ 初始加载完成，设置isInitialMount为false');
+      // console.log('✅ 初始加载完成，设置isInitialMount为false');
       isInitialMount.current = false;
     }
   }, [generatedCode, debouncedUpdatePreview, isGenerating, generationComplete, prompt, lastVersionCreatedForCode])
@@ -844,13 +844,13 @@ export function GenerationView({
 
   // Check if changes have been made and update preview content
   useEffect(() => {
-    console.log('🔍 useEffect触发检查:', {
-      editedCode: editedCode?.length || 0,
-      originalCode: originalCode?.length || 0,
-      isVisualMode,
-      isVisualCodeUpdate: isVisualCodeUpdateRef.current,
-      hasChanges: editedCode !== originalCode
-    });
+    // console.log('🔍 useEffect触发检查:', {
+    //   editedCode: editedCode?.length || 0,
+    //   originalCode: originalCode?.length || 0,
+    //   isVisualMode,
+    //   isVisualCodeUpdate: isVisualCodeUpdateRef.current,
+    //   hasChanges: editedCode !== originalCode
+    // });
     
     if (editedCode !== originalCode) {
       setHasChanges(true)
@@ -863,15 +863,15 @@ export function GenerationView({
     // 在代码编辑模式下使用智能更新，避免闪烁
     // 如果是通过可视化编辑器更新的代码，也不触发预览更新（因为DOM已经直接更新了）
     if (editedCode && !isVisualMode && !isVisualCodeUpdateRef.current && editedCode !== originalCode) {
-      console.log('📝 触发智能预览更新，原因: 代码编辑');
+      // console.log('📝 触发智能预览更新，原因: 代码编辑');
       debouncedSmartUpdatePreview(editedCode);
     } else {
-      console.log('⏸️ 跳过预览更新，原因:', {
-        noEditedCode: !editedCode,
-        isVisualMode,
-        isVisualCodeUpdate: isVisualCodeUpdateRef.current,
-        noChanges: editedCode === originalCode
-      });
+      // console.log('⏸️ 跳过预览更新，原因:', {
+      //   noEditedCode: !editedCode,
+      //   isVisualMode,
+      //   isVisualCodeUpdate: isVisualCodeUpdateRef.current,
+      //   noChanges: editedCode === originalCode
+      // });
     }
   }, [editedCode, originalCode, debouncedSmartUpdatePreview, isVisualMode])
 
@@ -1058,7 +1058,10 @@ export function GenerationView({
       // 如果有版本创建回调，调用它来通知父组件刷新数据
       if (onVersionCreated) {
         console.log('📞 调用版本创建回调');
-        onVersionCreated();
+        // 添加小延迟确保数据库操作完成
+        setTimeout(() => {
+          onVersionCreated();
+        }, 100);
       } else {
         console.log('⚠️ 没有版本创建回调');
       }
@@ -3846,6 +3849,9 @@ ${fullUserMessage}
   // 当initialVersions变化时，更新versionHistory
   useEffect(() => {
     if (initialVersions && initialVersions.length > 0) {
+      // 记录之前的版本数量
+      const prevVersionCount = versionHistory.length;
+      
       // 只在初始化时设置版本历史，避免覆盖用户手动保存的版本
       setVersionHistory(prev => {
         // 如果当前版本历史为空或者长度小于初始版本，则使用初始版本
@@ -3858,22 +3864,29 @@ ${fullUserMessage}
         return prev;
       });
       
-      // 如果还没有设置当前版本ID，设置为最新的版本（数组中的最后一个）
-      if (!currentVersionId && initialVersions.length > 0) {
+      // 检查是否有新版本添加
+      const hasNewVersions = initialVersions.length > prevVersionCount;
+      
+      // 如果还没有设置当前版本ID，或者有新版本添加，设置为最新的版本（数组中的最后一个）
+      if (!currentVersionId || hasNewVersions) {
         const latestVersion = initialVersions[initialVersions.length - 1];
-        setCurrentVersionId(latestVersion.id);
-        console.log('设置默认当前版本为最新版本:', latestVersion.id, latestVersion.title);
         
-        // 同时更新编辑器内容为最新版本的代码
-        if (latestVersion.code) {
-          setEditedCode(latestVersion.code);
-          setOriginalCode(latestVersion.code);
-          // 更新预览内容
-          updatePreviewAfterVersionChange(latestVersion.code);
+        // 只有在最新版本与当前版本不同时才更新
+        if (latestVersion.id !== currentVersionId) {
+          setCurrentVersionId(latestVersion.id);
+          console.log('🔄 同步到最新版本:', latestVersion.id, latestVersion.title, hasNewVersions ? '(检测到新版本)' : '(初始化)');
+          
+          // 同时更新编辑器内容为最新版本的代码
+          if (latestVersion.code) {
+            setEditedCode(latestVersion.code);
+            setOriginalCode(latestVersion.code);
+            // 更新预览内容
+            updatePreviewAfterVersionChange(latestVersion.code);
+          }
         }
       }
     }
-  }, [initialVersions, updatePreviewAfterVersionChange]);
+  }, [initialVersions, currentVersionId, versionHistory.length, updatePreviewAfterVersionChange]);
   // 移除 currentVersionId 依赖，避免在版本切换时重置版本历史
 
   // 处理图片替换

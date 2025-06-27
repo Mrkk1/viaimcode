@@ -93,19 +93,26 @@ export default function ProjectDetailPage() {
           const versionsData = await versionsResponse.json();
           setVersions(versionsData);
           
-          // Set current version
+          // Set current version - 优先选择数据库中的currentVersionId，没有则选择最新版本
           if (projectData.currentVersionId) {
             const currentIndex = versionsData.findIndex((v: Version) => v.id === projectData.currentVersionId);
             if (currentIndex !== -1) {
               setCurrentVersion(versionsData[currentIndex]);
               setCurrentVersionIndex(currentIndex);
+              console.log('📌 选中数据库指定的当前版本:', projectData.currentVersionId, versionsData[currentIndex].title);
             } else if (versionsData.length > 0) {
-              setCurrentVersion(versionsData[0]);
-              setCurrentVersionIndex(0);
+              // 如果数据库中的currentVersionId找不到，选择最新版本
+              const latestVersion = versionsData[versionsData.length - 1];
+              setCurrentVersion(latestVersion);
+              setCurrentVersionIndex(versionsData.length - 1);
+              console.log('📌 数据库版本ID未找到，选中最新版本:', latestVersion.id, latestVersion.title);
             }
           } else if (versionsData.length > 0) {
-            setCurrentVersion(versionsData[0]);
-            setCurrentVersionIndex(0);
+            // 如果数据库没有设置currentVersionId，选择最新版本
+            const latestVersion = versionsData[versionsData.length - 1];
+            setCurrentVersion(latestVersion);
+            setCurrentVersionIndex(versionsData.length - 1);
+            console.log('📌 数据库无当前版本ID，选中最新版本:', latestVersion.id, latestVersion.title);
           }
         } else {
           toast.error('Failed to get version list');
