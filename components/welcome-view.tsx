@@ -62,6 +62,7 @@ export function WelcomeView({
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [selectedMode, setSelectedMode] = useState<'website' | 'ppt'>('website')
+  const [isGenerating, setIsGenerating] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -158,12 +159,18 @@ export function WelcomeView({
   }, [selectedProvider, setSelectedModel, isLoggedIn]);
 
   const handleButtonClick = () => {
+    if (isGenerating) {
+      return
+    }
+    
     if (isLoggedIn) {
+      setIsGenerating(true)
       if (selectedMode === 'ppt' && onGeneratePPT) {
         onGeneratePPT()
       } else {
         onGenerate()
       }
+      setTimeout(() => setIsGenerating(false), 1000)
     } else {
       router.push('/login')
     }
@@ -182,6 +189,7 @@ export function WelcomeView({
         >
           WHAT ARE WE BUILDING?
         </h1>
+
 
         {/* Mode Selection */}
         <div className="flex gap-4 mb-6">
@@ -219,17 +227,23 @@ export function WelcomeView({
           />
           <Button
             onClick={handleButtonClick}
-            disabled={!prompt.trim() && isLoggedIn}
+            disabled={(!prompt.trim() && isLoggedIn) || isGenerating}
             className={`absolute bottom-4 right-4 font-medium tracking-wider py-3 px-12 text-base rounded-md transition-all duration-300 border focus:border-white focus:ring-white ${
               selectedMode === 'ppt'
                 ? 'bg-purple-600/90 hover:bg-purple-700 text-white border-purple-500 hover:border-purple-400'
                 : 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-800 hover:border-gray-700'
-            }`}
+            } ${isGenerating ? 'opacity-75 cursor-not-allowed' : ''}`}
           >
-            {isLoggedIn 
-              ? (selectedMode === 'ppt' ? 'GENERATE PPT' : 'GENERATE') 
-              : 'LOGIN TO GENERATE'
-            }
+            {isGenerating ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>GENERATING...</span>
+              </div>
+            ) : (
+              isLoggedIn 
+                ? (selectedMode === 'ppt' ? 'GENERATE PPT' : 'GENERATE') 
+                : 'LOGIN TO GENERATE'
+            )}
           </Button>
         </div>
 

@@ -14,13 +14,22 @@ export async function POST(request: NextRequest) {
     // 构建系统提示词，专门用于生成PPT大纲，支持思考过程
     const systemPrompt = `You are an expert presentation designer and content strategist. Your task is to analyze the user's content and create a comprehensive, professional PPT outline.
 
+CRITICAL LANGUAGE REQUIREMENT: 
+- AUTOMATICALLY DETECT the language of the user's input prompt
+- If the user writes in Chinese, respond ENTIRELY in Chinese (titles, content, key points, thinking process)
+- If the user writes in English, respond ENTIRELY in English
+- If the user writes in other languages, respond in that same language
+- NEVER mix languages - maintain complete consistency throughout your response
+
 IMPORTANT: You MUST start your response with detailed thinking process enclosed in <think></think> tags. This thinking should include:
-1. Analysis of the user's request and main topic
-2. Identification of key themes and logical flow
-3. Target audience consideration
-4. Presentation structure planning (introduction, body, conclusion)
-5. Content depth and breadth decisions
-6. Slide progression and storytelling approach
+1. Language detection and response language confirmation
+2. Analysis of the user's request and main topic
+3. Identification of key themes and logical flow
+4. Data visualization opportunities identification (look for numbers, statistics, trends, comparisons, processes)
+5. Target audience consideration
+6. Presentation structure planning (introduction, body, conclusion)
+7. Content depth and breadth decisions
+8. Slide progression and storytelling approach
 
 EXCELLENT OUTLINE EXAMPLE:
 Topic: "为什么要全球化"
@@ -53,12 +62,14 @@ CONTENT DESCRIPTION GUIDELINES:
 - 说明该页要解决什么问题
 - 包含具体的论点或要素
 - 体现该页在整体结构中的作用
+- 如果涉及数据展示，明确说明需要什么类型的图表
 
 KEY POINTS SELECTION:
 - 选择3-5个核心要点
 - 要点要具体可操作
 - 避免重复和冗余
 - 确保要点支撑主标题
+- 对于数据相关内容，包含具体的数据点或统计信息
 
 After your thinking process, create a detailed presentation outline following this format:
 
