@@ -1892,7 +1892,7 @@ export function PPTGenerationView({
               </Button>
               
               {/* 分享按钮 */}
-              <Button
+              {/* <Button
                 onClick={handleSharePPT}
                 disabled={slides.length === 0 || !projectId}
                 className="bg-green-600 hover:bg-green-700 text-white"
@@ -1900,7 +1900,9 @@ export function PPTGenerationView({
               >
                 <Share className="w-4 h-4 mr-2" />
                 分享
-              </Button>
+              </Button> */}
+
+              {/* 注释掉了 */}
             </div>
           </div>
 
