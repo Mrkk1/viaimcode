@@ -470,10 +470,51 @@ export default function PPTShareClient({ project, outline, slides, chatMessages 
 
   const currentSlide = slides[currentSlideIndex];
 
+  // 添加全局样式重置
+  useEffect(() => {
+    // 重置body和html的默认样式
+    const originalBodyStyle = {
+      margin: document.body.style.margin,
+      padding: document.body.style.padding,
+      overflow: document.body.style.overflow
+    };
+    
+    const originalHtmlStyle = {
+      margin: document.documentElement.style.margin,
+      padding: document.documentElement.style.padding
+    };
+
+    // 应用重置样式
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+
+    // 清理函数：恢复原始样式
+    return () => {
+      document.body.style.margin = originalBodyStyle.margin;
+      document.body.style.padding = originalBodyStyle.padding;
+      document.body.style.overflow = originalBodyStyle.overflow;
+      document.documentElement.style.margin = originalHtmlStyle.margin;
+      document.documentElement.style.padding = originalHtmlStyle.padding;
+    };
+  }, []);
+
   return (
     <div 
       ref={containerRef}
-      className={`min-h-screen bg-black ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}
+      className={`bg-black ${isFullscreen ? 'fixed inset-0 z-50' : ''}`} 
+      style={{
+        height: '100vh', 
+        width: '100vw',
+        margin: 0,
+        padding: 0,
+        position: isFullscreen ? 'fixed' : 'relative',
+        top: 0,
+        left: 0,
+        overflow: 'hidden'
+      }}
     >
       {/* 顶部信息栏 */}
       {!isFullscreen && (
@@ -644,7 +685,7 @@ export default function PPTShareClient({ project, outline, slides, chatMessages 
                   disabled={slides.length === 0}
                   variant="outline"
                   size="sm"
-                  className="text-gray-300 border-gray-600 hover:bg-gray-800"
+                  className="text-gray-300 border-gray-600 hover:bg-gray-800 hover:text-white"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -654,7 +695,7 @@ export default function PPTShareClient({ project, outline, slides, chatMessages 
                   disabled={slides.length === 0}
                   variant="outline"
                   size="sm"
-                  className="text-gray-300 border-gray-600 hover:bg-gray-800"
+                  className="text-gray-300 border-gray-600 hover:bg-gray-800 hover:text-white"
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </Button>
@@ -664,7 +705,7 @@ export default function PPTShareClient({ project, outline, slides, chatMessages 
                   disabled={slides.length === 0}
                   variant="outline"
                   size="sm"
-                  className="text-gray-300 border-gray-600 hover:bg-gray-800"
+                  className="text-gray-300 border-gray-600 hover:bg-gray-800 hover:text-white"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -674,7 +715,7 @@ export default function PPTShareClient({ project, outline, slides, chatMessages 
                   disabled={slides.length === 0}
                   variant="outline"
                   size="sm"
-                  className="text-gray-300 border-gray-600 hover:bg-gray-800"
+                  className="text-gray-300 border-gray-600 hover:bg-gray-800 hover:text-white"
                 >
                   <RotateCcw className="w-4 h-4" />
                 </Button>
