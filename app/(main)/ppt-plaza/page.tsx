@@ -338,19 +338,7 @@ export default function PPTPlazaPage() {
                 </div>
               )}
             </div>
-            <Button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              variant="outline"
-              className="backdrop-blur-sm bg-white/10 text-gray-200 border-white/20 hover:bg-white/20 whitespace-nowrap"
-            >
-              {refreshing ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              )}
-              Refresh
-            </Button>
+          
             <Button 
               onClick={() => router.push('/')}
               className="bg-white text-black hover:bg-gray-200 whitespace-nowrap"

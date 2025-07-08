@@ -45,7 +45,7 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
     await pptDb.updateProjectStatus(projectId, 'generating_outline', 10);
     
     // 添加AI思考消息
-    const thinkingMsgId = await pptDb.addChatMessage(projectId, 'ai', '🧠 开始思考PPT结构...', true);
+    const thinkingMsgId = await pptDb.addChatMessage(projectId, 'ai', '开始思考PPT结构...', true);
 
     // 第一步：生成大纲
     console.log(`任务 ${projectId} - 开始生成大纲`);

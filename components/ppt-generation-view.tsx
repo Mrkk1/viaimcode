@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
-import { ChevronLeft, Download, FileText, Presentation, Loader2, Send, Code, Eye, Trash2, ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronLeft, Download, FileText, Presentation, Loader2, Send, Code, Eye, Trash2, ChevronDown, ChevronRight, Share } from "lucide-react"
 import { toast } from "sonner"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -202,7 +202,7 @@ export function PPTGenerationView({
     const thinkingMessage: ChatMessage = {
       id: thinkingMsgId,
       type: 'ai',
-      content: '🧠 开始思考PPT结构...',
+      content: '开始思考PPT结构...',
       timestamp: new Date(),
       isGenerating: true
     }
@@ -219,7 +219,7 @@ export function PPTGenerationView({
           body: JSON.stringify({
             action: 'add_chat_message',
             messageType: 'ai',
-            content: '🧠 开始思考PPT结构...'
+            content: '开始思考PPT结构...'
           }),
         });
 
@@ -1565,6 +1565,77 @@ export function PPTGenerationView({
     }, 100) // 增加延迟确保DOM完全更新
   }
 
+  const handleSharePPT = async () => {
+    if (!projectId) {
+      toast.error('项目ID不存在，无法分享')
+      return
+    }
+
+    try {
+      // 调用分享API
+      const response = await fetch('/api/ppt-share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, isPublic: true })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '分享失败')
+      }
+
+      const data = await response.json()
+      
+      // 复制分享链接到剪贴板
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(data.shareUrl)
+          toast.success('分享链接已复制到剪贴板')
+        } else {
+          // 回退到传统方法
+          const textArea = document.createElement('textarea')
+          textArea.value = data.shareUrl
+          textArea.style.position = 'fixed'
+          textArea.style.left = '0'
+          textArea.style.top = '0'
+          textArea.style.width = '2em'
+          textArea.style.height = '2em'
+          textArea.style.padding = '0'
+          textArea.style.border = 'none'
+          textArea.style.outline = 'none'
+          textArea.style.boxShadow = 'none'
+          textArea.style.background = 'transparent'
+          document.body.appendChild(textArea)
+          textArea.focus()
+          textArea.select()
+          
+          try {
+            const successful = document.execCommand('copy')
+            document.body.removeChild(textArea)
+            
+            if (successful) {
+              toast.success('分享链接已复制到剪贴板')
+            } else {
+              toast.info(`分享链接: ${data.shareUrl}`)
+            }
+          } catch (err) {
+            document.body.removeChild(textArea)
+            console.error('复制失败:', err)
+            toast.error('复制失败，请手动复制链接')
+            toast.info(data.shareUrl)
+          }
+        }
+      } catch (clipboardError) {
+        console.error('复制到剪贴板失败:', clipboardError)
+        toast.info(`分享链接: ${data.shareUrl}`)
+      }
+      
+    } catch (error) {
+      console.error('分享PPT失败:', error)
+      toast.error(error instanceof Error ? error.message : '分享失败')
+    }
+  }
+
   return (
     <div className="bg-gray-900 flex flex-col" style={{height: 'calc(100vh - 64px)'}}>
       {/* Header */}
@@ -1587,7 +1658,7 @@ export function PPTGenerationView({
                 onClick={clearChat}
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-white"
+                className="text-gray-400 hover:text-white hover:bg-white/10"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
@@ -1726,7 +1797,7 @@ export function PPTGenerationView({
                     onClick={() => setShowOutline(!showOutline)}
                     variant="ghost"
                     size="sm"
-                    className="text-gray-400 hover:text-white"
+                    className="text-gray-400 hover:text-white hover:bg-white/10"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform ${showOutline ? 'rotate-180' : ''}`} />
                   </Button>
@@ -1808,8 +1879,29 @@ export function PPTGenerationView({
               )}
             
             </div>
-            <div>分享</div>
-          
+            <div className="flex items-center space-x-2">
+              {/* 下载按钮 */}
+              <Button
+                onClick={downloadPPT}
+                disabled={slides.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                下载
+              </Button>
+              
+              {/* 分享按钮 */}
+              <Button
+                onClick={handleSharePPT}
+                disabled={slides.length === 0 || !projectId}
+                className="bg-green-600 hover:bg-green-700 text-white"
+                size="sm"
+              >
+                <Share className="w-4 h-4 mr-2" />
+                分享
+              </Button>
+            </div>
           </div>
 
           {/* All Slides Display */}

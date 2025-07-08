@@ -223,9 +223,9 @@ export function getPool() {
       ...dbConfig,
       database: DATABASE_NAME,
       waitForConnections: true,
-      connectionLimit: 10,
-      maxIdle: 10, // max idle connections, the default value is the same as `connectionLimit`
-      idleTimeout: 60000, // idle connections timeout, in milliseconds, the default value 60000
+      connectionLimit: 20, // 增加连接池大小
+      maxIdle: 5, // 减少空闲连接数
+      idleTimeout: 30000, // 减少空闲超时时间
       queueLimit: 0,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0
@@ -240,6 +240,22 @@ export async function closePool() {
     await poolInstance.end();
     poolInstance = null;
   }
+}
+
+// 获取连接池状态（用于监控）
+export function getPoolStatus() {
+  if (!poolInstance) {
+    return { status: 'not_initialized' };
+  }
+  
+  return {
+    status: 'active',
+    // 注意：mysql2 的连接池没有直接暴露这些统计信息
+    // 这里只是提供一个监控的接口
+    connectionLimit: 20,
+    activeConnections: 'unknown', // mysql2 不提供这个信息
+    idleConnections: 'unknown'    // mysql2 不提供这个信息
+  };
 }
 
 // Graceful shutdown handling

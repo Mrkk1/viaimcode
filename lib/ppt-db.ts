@@ -219,6 +219,25 @@ export class PPTDatabase {
     }
   }
 
+  // 获取公开项目
+  async getPublicProjects(limit: number = 20, offset: number = 0): Promise<PPTProject[]> {
+    const connection = await this.pool.getConnection();
+    
+    try {
+      // 确保limit和offset是整数
+      const limitInt = parseInt(limit.toString());
+      const offsetInt = parseInt(offset.toString());
+      
+      const [rows] = await connection.execute(
+        `SELECT * FROM ppt_projects WHERE isPublic = 1 AND status = 'completed' AND deletedAt IS NULL ORDER BY createdAt DESC LIMIT ${limitInt} OFFSET ${offsetInt}`
+      );
+      
+      return rows as PPTProject[];
+    } finally {
+      connection.release();
+    }
+  }
+
   // 保存大纲
   async saveOutline(projectId: string, title: string, content: any): Promise<void> {
     const connection = await this.pool.getConnection();
@@ -511,26 +530,43 @@ export class PPTDatabase {
     }
   }
 
-  // 获取项目的完整数据
+  // 获取项目的完整数据（优化版：使用单个连接）
   async getProjectWithDetails(projectId: string): Promise<{
     project: PPTProject | null;
     outline: PPTOutline | null;
     slides: PPTSlide[];
     chatMessages: PPTChatMessage[];
   }> {
-    const [project, outline, slides, chatMessages] = await Promise.all([
-      this.getProject(projectId),
-      this.getOutline(projectId),
-      this.getSlides(projectId),
-      this.getChatMessages(projectId)
-    ]);
+    const connection = await this.pool.getConnection();
+    
+    try {
+      // 使用单个连接并行执行所有查询
+      const [
+        [projectRows],
+        [outlineRows], 
+        [slideRows],
+        [messageRows]
+      ] = await Promise.all([
+        connection.execute('SELECT * FROM ppt_projects WHERE id = ? AND deletedAt IS NULL', [projectId]),
+        connection.execute('SELECT * FROM ppt_outlines WHERE projectId = ?', [projectId]),
+        connection.execute('SELECT * FROM ppt_slides WHERE projectId = ? ORDER BY slideIndex', [projectId]),
+        connection.execute('SELECT * FROM ppt_chat_messages WHERE projectId = ? ORDER BY createdAt', [projectId])
+      ]);
 
-    return {
-      project,
-      outline,
-      slides,
-      chatMessages
-    };
+      const projects = projectRows as PPTProject[];
+      const outlines = outlineRows as PPTOutline[];
+      const slides = slideRows as PPTSlide[];
+      const messages = messageRows as PPTChatMessage[];
+
+      return {
+        project: projects.length > 0 ? projects[0] : null,
+        outline: outlines.length > 0 ? outlines[0] : null,
+        slides,
+        chatMessages: messages
+      };
+    } finally {
+      connection.release();
+    }
   }
 
   // 设置项目为精选
@@ -541,6 +577,20 @@ export class PPTDatabase {
       await connection.execute(
         'UPDATE ppt_projects SET isFeatured = ? WHERE id = ?',
         [isFeatured, projectId]
+      );
+    } finally {
+      connection.release();
+    }
+  }
+
+  // 更新项目公开状态
+  async updateProjectPublicStatus(projectId: string, isPublic: boolean): Promise<void> {
+    const connection = await this.pool.getConnection();
+    
+    try {
+      await connection.execute(
+        'UPDATE ppt_projects SET isPublic = ? WHERE id = ?',
+        [isPublic, projectId]
       );
     } finally {
       connection.release();
