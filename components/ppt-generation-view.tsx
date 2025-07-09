@@ -558,7 +558,7 @@ export function PPTGenerationView({
         
         // 添加开始生成单页的消息
         const singleSlideMsgId = generateUniqueId(`slide-${index}`)
-        const slideStartContent = `🎨 开始生成第${index + 1}页：「${slide.title}」`
+        const slideStartContent = `开始生成第${index + 1}页：「${slide.title}」`
         const slideStartMessage: ChatMessage = {
           id: singleSlideMsgId,
           type: 'ai',
@@ -1859,7 +1859,7 @@ export function PPTGenerationView({
                 disabled={!currentChatInput.trim() || isGenerating}
                 className="bg-purple-600 hover:bg-purple-700 px-3"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4 text-white" />
               </Button>
             </div>
             <p className="text-xs text-gray-500 mt-2">

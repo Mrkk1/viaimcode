@@ -62,7 +62,7 @@ export function NavBar({ user }: NavBarProps) {
                   className="relative px-4 py-2 text-sm font-medium text-gray-300 rounded-md transition-all duration-200 hover:text-white hover:bg-gray-800/50 group bg-gray-800/30"
                 >
                   <span className="relative z-10 flex items-center gap-2">
-                    <span>Projects</span>
+                    <span>Web Projects</span>
                   </span>
                   <span className="absolute inset-0 transform scale-x-0 origin-left bg-gradient-to-r from-gray-700/50 to-transparent rounded-md transition-transform group-hover:scale-x-100 duration-200" />
                 </Link>

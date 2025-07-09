@@ -14,8 +14,10 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { HistoryVersion } from "@/components/generation-view"
 import { FeaturedWebsites } from "@/components/featured-websites"
+import { useSearchParams } from "next/navigation"
 
 export default function Home() {
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(true)
   const [showGenerationView, setShowGenerationView] = useState(false)
   const [showPPTView, setShowPPTView] = useState(false)
@@ -36,6 +38,9 @@ export default function Home() {
   const [useIncrementalMode, setUseIncrementalMode] = useState(false)
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
   const [versionHistory, setVersionHistory] = useState<HistoryVersion[]>([])
+  
+  // 从URL参数获取初始模式
+  const initialMode = searchParams?.get('mode') === 'ppt' ? 'ppt' : 'website'
 
   // 检查生成的代码是否完整
   const isCodeComplete = (code: string) => {
@@ -468,6 +473,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
                 setMaxTokens={setMaxTokens}
                 onGenerate={handleGenerate}
                 onGeneratePPT={handleGeneratePPT}
+                initialMode={initialMode}
               />
               
               {/* Featured Websites Section */}
@@ -589,6 +595,7 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
           setMaxTokens={setMaxTokens}
           onGenerate={handleGenerate}
           onGeneratePPT={handleGeneratePPT}
+          initialMode={initialMode}
         />
         
           {/* Featured Websites Section */}

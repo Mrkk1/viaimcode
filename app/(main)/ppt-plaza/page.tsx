@@ -291,7 +291,7 @@ export default function PPTPlazaPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 flex items-center justify-center" style={{'--tw-gradient-to': '#091d4a'} as React.CSSProperties}>
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-white" />
-          <p className="text-white">Loading PPT Plaza...</p>
+          <p className="text-white">Loading PPT Projects...</p>
         </div>
       </div>
     );
@@ -340,10 +340,10 @@ export default function PPTPlazaPage() {
             </div>
           
             <Button 
-              onClick={() => router.push('/')}
+              onClick={() => router.push('/?mode=ppt')}
               className="bg-white text-black hover:bg-gray-200 whitespace-nowrap"
             >
-              <Plus className="w-4 h-4 mr-2" />
+              <Plus className="" />
               Create New PPT
             </Button>
           </div>
@@ -364,10 +364,10 @@ export default function PPTPlazaPage() {
               </p>
               {!searchTerm && (
                 <Button 
-                  onClick={() => router.push('/')}
+                  onClick={() => router.push('/?mode=ppt')}
                   className="bg-white text-black hover:bg-gray-200"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
+                  <Plus className=" " />
                   Create New PPT
                 </Button>
               )}

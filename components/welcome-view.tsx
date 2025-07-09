@@ -38,6 +38,7 @@ interface WelcomeViewProps {
   setMaxTokens: (value: number | undefined) => void
   onGenerate: () => void
   onGeneratePPT?: () => void
+  initialMode?: 'website' | 'ppt'
 }
 
 export function WelcomeView({
@@ -54,14 +55,15 @@ export function WelcomeView({
   maxTokens,
   setMaxTokens,
   onGenerate,
-  onGeneratePPT
+  onGeneratePPT,
+  initialMode = 'website'
 }: WelcomeViewProps) {
   const [titleClass, setTitleClass] = useState("pre-animation")
   const [models, setModels] = useState<Model[]>([])
   const [isLoadingModels, setIsLoadingModels] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [selectedMode, setSelectedMode] = useState<'website' | 'ppt'>('website')
+  const [selectedMode, setSelectedMode] = useState<'website' | 'ppt'>(initialMode)
   const [isGenerating, setIsGenerating] = useState(false)
   const router = useRouter()
 
@@ -191,29 +193,7 @@ export function WelcomeView({
         </h1>
 
 
-        {/* Mode Selection */}
-        <div className="flex gap-4 mb-6">
-          <Button
-            onClick={() => setSelectedMode('website')}
-            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
-              selectedMode === 'website'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
-                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
-            } border rounded-md`}
-          >
-            🌐 WEBSITE
-          </Button>
-          <Button
-            onClick={() => setSelectedMode('ppt')}
-            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
-              selectedMode === 'ppt'
-                ? 'bg-purple-600 hover:bg-purple-700 text-white border-purple-500'
-                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
-            } border rounded-md`}
-          >
-            📊 PPT
-          </Button>
-        </div>
+     
 
         <div className="relative w-full mb-6">
           <Textarea
@@ -230,9 +210,9 @@ export function WelcomeView({
             disabled={(!prompt.trim() && isLoggedIn) || isGenerating}
             className={`absolute bottom-4 right-4 font-medium tracking-wider py-3 px-12 text-base rounded-md transition-all duration-300 border focus:border-white focus:ring-white ${
               selectedMode === 'ppt'
-                ? 'bg-purple-600/90 hover:bg-purple-700 text-white border-purple-500 hover:border-purple-400'
+                ? 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-800 hover:border-gray-700'
                 : 'bg-gray-900/90 hover:bg-gray-800 text-white border-gray-800 hover:border-gray-700'
-            } ${isGenerating ? 'opacity-75 cursor-not-allowed' : ''}`}
+            } ${isGenerating ? 'opacity-75 cursor-not-allowed' : 'border-white'}`}
           >
             {isGenerating ? (
               <div className="flex items-center gap-2">
@@ -241,16 +221,57 @@ export function WelcomeView({
               </div>
             ) : (
               isLoggedIn 
-                ? (selectedMode === 'ppt' ? 'GENERATE PPT' : 'GENERATE') 
+                ? (selectedMode === 'ppt' ? 'GENERATE PPT' : 'GENERATE Web') 
                 : 'LOGIN TO GENERATE'
             )}
           </Button>
         </div>
-
+   {/* Mode Selection */}
+   <div className="flex gap-4 mb-6 flex-row justify-start w-full">
+          <Button
+            onClick={() => setSelectedMode('website')}
+            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
+              selectedMode === 'website'
+                ? 'bg-white  text-black border-gray-700'
+                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
+            } border rounded-md`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className=" " viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            Web
+          </Button>
+          <Button
+            onClick={() => setSelectedMode('ppt')}
+            className={`px-6 py-3 font-medium tracking-wider transition-all duration-300 ${
+              selectedMode === 'ppt'
+                ? 'bg-white  text-black border-gray-700'
+                : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 border-gray-700'
+            } border rounded-md`}
+          >
+       <svg
+         viewBox="0 0 1024 1024"
+         version="1.1"
+         xmlns="http://www.w3.org/2000/svg"
+         p-id="6755"
+         width="48"
+         height="48"
+       >
+         <path
+           d="M144 80v80h640v487.632L568.24 864H224V528H144v416h457.488L864 680.656V80H144z m48 320h39.52c98.4 0 89.872-160 4.592-160H144v208h48v-48z m0-112h31.36c33.984 0 37.2 64-3.312 64H192v-64z m432 160V288h48v-48H512v48h48v160h64zM428.848 240H336v208h48v-48h40.272c41.824 0 71.424-32.128 71.424-79.968 0-28.208-17.344-80.032-66.848-80.032z m-16.064 112H384v-64h32.096c34 0 37.2 64-3.312 64zM480 800h80V640h160v-80H480v240z"
+           fill={selectedMode === 'ppt' ? "#565D64" : "#e9ecef"}
+           p-id="6756"
+         ></path>
+       </svg>
+       PPT
+          </Button>
+        </div>
         {isLoggedIn && (
           <>
             {/* Settings Toggle Button */}
-            <div className="w-full mb-4">
+            {/* <div className="w-full mb-4">
               <Button
                 variant="ghost"
                 onClick={() => setShowSettings(!showSettings)}
@@ -262,7 +283,7 @@ export function WelcomeView({
                 </div>
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`} />
               </Button>
-            </div>
+            </div> */}
 
             {/* Collapsible Settings Section */}
             <div className={`w-full space-y-4 overflow-hidden transition-all duration-300 ${showSettings ? 'max-h-[1000px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>
