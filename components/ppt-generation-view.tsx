@@ -4,12 +4,15 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ChevronLeft, Download, FileText, Presentation, Loader2, Send, Code, Eye, Trash2, ChevronDown, ChevronRight, Share } from "lucide-react"
 import { toast } from "sonner"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface PPTSlide {
   id: string
@@ -1335,7 +1338,186 @@ export function PPTGenerationView({
     setChatMessages([])
   }
 
-  const downloadPPT = () => {
+  const downloadPPT = async () => {
+    if (slides.length === 0) return
+
+    try {
+      // 显示加载提示
+      toast.info('正在生成PDF，请稍候...')
+      
+      // 创建PDF文档 (自定义尺寸，完全匹配PPT的1280x720)
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'px',
+        format: [1280, 720]
+      })
+
+      // 自定义页面尺寸：1280px x 720px
+      const pageWidth = 1280
+      const pageHeight = 720
+
+      // 为每个幻灯片生成PDF页面
+      for (let i = 0; i < slides.length; i++) {
+        const slide = slides[i]
+        
+        if (!slide.htmlCode) {
+          console.warn(`第${i + 1}页没有HTML代码，跳过`)
+          continue
+        }
+
+        try {
+          // 创建一个临时的iframe来渲染HTML
+          const iframe = document.createElement('iframe')
+          iframe.style.position = 'absolute'
+          iframe.style.left = '-9999px'
+          iframe.style.top = '-9999px'
+          iframe.style.width = '1280px'
+          iframe.style.height = '720px'
+          iframe.style.border = 'none'
+          iframe.style.visibility = 'hidden'
+          iframe.style.pointerEvents = 'none'
+          document.body.appendChild(iframe)
+
+          // 等待iframe加载完成
+          await new Promise<void>((resolve) => {
+            iframe.onload = () => {
+              // 确保Tailwind CSS加载完成
+              setTimeout(() => {
+                // 检查iframe内容是否已渲染
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+                if (iframeDoc) {
+                  // 等待字体和样式加载完成
+                  setTimeout(resolve, 1500)
+                } else {
+                  resolve()
+                }
+              }, 500)
+            }
+            iframe.srcdoc = slide.htmlCode
+          })
+
+          // 获取iframe的文档
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+          if (!iframeDoc) {
+            throw new Error('无法访问iframe文档')
+          }
+
+          // 使用html2canvas截取iframe内容
+          const canvas = await html2canvas(iframeDoc.body, {
+            width: 1280,
+            height: 720,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            foreignObjectRendering: true,
+            logging: false,
+            x: 0,
+            y: 0,
+            scrollX: 0,
+            scrollY: 0
+          } as any)
+
+          // 移除临时iframe
+          document.body.removeChild(iframe)
+
+          // 如果不是第一页，添加新页面
+          if (i > 0) {
+            pdf.addPage()
+          }
+
+          // PDF页面尺寸完全匹配PPT尺寸，直接1:1放置
+          const imgWidth = pageWidth  // 1280px
+          const imgHeight = pageHeight // 720px
+          const x = 0
+          const y = 0
+
+          // 将canvas转换为图片并添加到PDF
+          const imgData = canvas.toDataURL('image/jpeg', 0.9)
+          pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight)
+
+          // 更新进度
+          toast.info(`正在生成PDF... (${i + 1}/${slides.length})`)
+
+        } catch (error) {
+          console.error(`生成第${i + 1}页PDF时出错:`, error)
+          toast.error(`第${i + 1}页转换失败，跳过`)
+          continue
+        }
+      }
+
+      // 保存PDF
+      const filename = `${outline?.title || 'generated-ppt'}.pdf`
+      pdf.save(filename)
+      
+      toast.success('PDF生成完成！')
+
+    } catch (error) {
+      console.error('生成PDF时出错:', error)
+      toast.error('PDF生成失败，请重试')
+    }
+  }
+
+  // 更新单个幻灯片的视图模式
+  const updateSlideViewMode = (slideId: string, newViewMode: 'render' | 'code' | 'thinking') => {
+    console.log(`用户手动切换第${slideId}页视图模式为: ${newViewMode}`)
+    
+    // 先重置当前视图的滚动位置
+    const currentSlideElement = document.querySelector(`[data-slide-id="${slideId}"]`)
+    if (currentSlideElement) {
+      const currentScrollableElement = currentSlideElement.querySelector('.slide-content-container') as HTMLElement
+      if (currentScrollableElement) {
+        console.log(`重置${slideId}页当前视图滚动位置`)
+        currentScrollableElement.scrollTop = 0
+        currentScrollableElement.scrollLeft = 0
+      }
+    }
+    
+    setSlides(prev => {
+      const updatedSlides = prev.map(slide => {
+        if (slide.id === slideId) {
+          console.log(`更新前 - slideId: ${slideId}, 当前viewMode: ${slide.viewMode}, userSelectedViewMode: ${slide.userSelectedViewMode}`)
+          const updated = { 
+            ...slide, 
+            viewMode: newViewMode,
+            userSelectedViewMode: newViewMode // 记录用户的手动选择
+          }
+          console.log(`更新后 - slideId: ${slideId}, 新viewMode: ${updated.viewMode}, 新userSelectedViewMode: ${updated.userSelectedViewMode}`)
+          return updated
+        }
+        return slide
+      })
+      return updatedSlides
+    })
+
+    // 切换视图模式后，再次确保新视图的滚动位置重置
+    setTimeout(() => {
+      const slideElement = document.querySelector(`[data-slide-id="${slideId}"]`)
+      if (slideElement) {
+        const scrollableElement = slideElement.querySelector('.slide-content-container') as HTMLElement
+        if (scrollableElement) {
+          console.log(`确保${slideId}页新视图滚动位置重置`)
+          scrollableElement.scrollTop = 0
+          scrollableElement.scrollLeft = 0
+          
+          // 添加短暂的视觉反馈
+          scrollableElement.style.transition = 'opacity 0.1s ease'
+          scrollableElement.style.opacity = '0.9'
+          setTimeout(() => {
+            scrollableElement.style.opacity = '1'
+            setTimeout(() => {
+              scrollableElement.style.transition = ''
+            }, 100)
+          }, 50)
+        } else {
+          console.warn(`未找到${slideId}页的滚动容器`)
+        }
+      } else {
+        console.warn(`未找到${slideId}页的DOM元素`)
+      }
+    }, 100) // 增加延迟确保DOM完全更新
+  }
+
+  const downloadHTML = () => {
     if (slides.length === 0) return
 
     const combinedHTML = `
@@ -1503,66 +1685,8 @@ export function PPTGenerationView({
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }
-
-  // 更新单个幻灯片的视图模式
-  const updateSlideViewMode = (slideId: string, newViewMode: 'render' | 'code' | 'thinking') => {
-    console.log(`用户手动切换第${slideId}页视图模式为: ${newViewMode}`)
     
-    // 先重置当前视图的滚动位置
-    const currentSlideElement = document.querySelector(`[data-slide-id="${slideId}"]`)
-    if (currentSlideElement) {
-      const currentScrollableElement = currentSlideElement.querySelector('.slide-content-container') as HTMLElement
-      if (currentScrollableElement) {
-        console.log(`重置${slideId}页当前视图滚动位置`)
-        currentScrollableElement.scrollTop = 0
-        currentScrollableElement.scrollLeft = 0
-      }
-    }
-    
-    setSlides(prev => {
-      const updatedSlides = prev.map(slide => {
-        if (slide.id === slideId) {
-          console.log(`更新前 - slideId: ${slideId}, 当前viewMode: ${slide.viewMode}, userSelectedViewMode: ${slide.userSelectedViewMode}`)
-          const updated = { 
-            ...slide, 
-            viewMode: newViewMode,
-            userSelectedViewMode: newViewMode // 记录用户的手动选择
-          }
-          console.log(`更新后 - slideId: ${slideId}, 新viewMode: ${updated.viewMode}, 新userSelectedViewMode: ${updated.userSelectedViewMode}`)
-          return updated
-        }
-        return slide
-      })
-      return updatedSlides
-    })
-
-    // 切换视图模式后，再次确保新视图的滚动位置重置
-    setTimeout(() => {
-      const slideElement = document.querySelector(`[data-slide-id="${slideId}"]`)
-      if (slideElement) {
-        const scrollableElement = slideElement.querySelector('.slide-content-container') as HTMLElement
-        if (scrollableElement) {
-          console.log(`确保${slideId}页新视图滚动位置重置`)
-          scrollableElement.scrollTop = 0
-          scrollableElement.scrollLeft = 0
-          
-          // 添加短暂的视觉反馈
-          scrollableElement.style.transition = 'opacity 0.1s ease'
-          scrollableElement.style.opacity = '0.9'
-          setTimeout(() => {
-            scrollableElement.style.opacity = '1'
-            setTimeout(() => {
-              scrollableElement.style.transition = ''
-            }, 100)
-          }, 50)
-        } else {
-          console.warn(`未找到${slideId}页的滚动容器`)
-        }
-      } else {
-        console.warn(`未找到${slideId}页的DOM元素`)
-      }
-    }, 100) // 增加延迟确保DOM完全更新
+    toast.success('HTML文件下载完成！')
   }
 
   const handleSharePPT = async () => {
@@ -1881,15 +2005,29 @@ export function PPTGenerationView({
             </div>
             <div className="flex items-center space-x-2">
               {/* 下载按钮 */}
-              <Button
-                onClick={downloadPPT}
-                disabled={slides.length === 0}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                size="sm"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                下载
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    disabled={slides.length === 0}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    下载
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={downloadPPT}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    下载为 PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadHTML}>
+                    <Code className="w-4 h-4 mr-2" />
+                    下载为 HTML
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               
               {/* 分享按钮 */}
               {/* <Button
