@@ -2009,16 +2009,16 @@ export function PPTGenerationView({
                 <DropdownMenuTrigger asChild>
                   <Button
                     disabled={slides.length === 0}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-white text-black hover:bg-white/90 border border-gray-700"
                     size="sm"
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                    <Download className="" />
                     下载
                     <ChevronDown className="w-4 h-4 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={downloadPPT}>
+                <DropdownMenuContent align="end"  style={{border: '1px solid white'}}>
+                  <DropdownMenuItem onClick={downloadPPT} >
                     <FileText className="w-4 h-4 mr-2" />
                     下载为 PDF
                   </DropdownMenuItem>
@@ -2030,15 +2030,15 @@ export function PPTGenerationView({
               </DropdownMenu>
               
               {/* 分享按钮 */}
-              {/* <Button
+              <Button
                 onClick={handleSharePPT}
                 disabled={slides.length === 0 || !projectId}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-white text-black hover:bg-white/90 border border-gray-700"
                 size="sm"
               >
-                <Share className="w-4 h-4 mr-2" />
-                分享
-              </Button> */}
+                <Share className="" />
+                Share
+              </Button>
 
               {/* 注释掉了 */}
             </div>
