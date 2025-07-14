@@ -74,17 +74,6 @@ MANDATORY SIZE REQUIREMENTS (ABSOLUTELY CRITICAL):
 - Ensure all text, images, charts fit completely within the boundaries
 - Test content overflow: make sure longest text lines don't exceed container width
 
-REQUIRED CSS STRUCTURE (must be included in your HTML):
-- body: margin: 0; padding: 0; width: 1280px; height: 720px; overflow: hidden; box-sizing: border-box;
-- .slide-container: width: 1280px; height: 720px; position: relative; overflow: hidden; display: flex; flex-direction: column;
-- .content-area: width: 100%; height: 100%; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column;
-- .main-content: flex: 1; overflow: hidden; margin-bottom: 20px;
-- .slide-footer: height: 40px; display: flex; justify-content: flex-end; align-items: center; padding-right: 20px;
-
-RESPONSIVE FONT CSS CLASSES (add these to <style> section):
-- .large-section { font-size: clamp(0.875rem, 1.5vw, 1.125rem); } /* for h-2/3 sections */
-- .medium-section { font-size: clamp(0.75rem, 1.3vw, 1rem); } /* for h-1/2 sections */
-- .small-section { font-size: clamp(0.625rem, 1.1vw, 0.875rem); } /* for h-1/3 sections */
 
 CRITICAL: Use fixed height sections with responsive font sizing!
 
@@ -171,15 +160,11 @@ HTML STRUCTURE REQUIREMENTS:
    - .slide-footer: height:40px，固定在底部
 
 3. **内容组织（简洁性优先）**:
-   - 标题区域：使用text-3xl，高度约80px，使用mb-4而不是mb-6
-   - 主内容区：可用高度约560px（720-80标题-40页脚-40边距）
    - CRITICAL: 内容简洁性原则：
-     * 每页最多3-4个要点，避免信息过载
+     * 每页最多2个要点，避免信息过载
      * 每个要点控制在1句话内，突出核心信息
      * 使用关键词和短语，避免长段落
      * 优先使用图表、图标等视觉元素代替文字
-   - 多区域布局：使用精确的高度分配，如h-2/3和h-1/3
-   - 文本内容：使用text-sm或text-base，行高适中
    - 图表容器：最大高度300px，确保在分配空间内
 
 4. **数据可视化集成（尺寸控制）**:
@@ -193,15 +178,7 @@ HTML STRUCTURE REQUIREMENTS:
    - 避免使用absolute定位可能被内容遮挡的元素
    - 静态视觉元素（禁用所有动画）
 
-6. **样式优化（响应式字体策略）**:
-   - 区块大小：使用固定的高度分配（h-2/3, h-1/3等）保持布局稳定
-   - 响应式字体：根据区块大小和内容量自动调整字体大小
-   - 字体大小策略：
-     * 大区块（h-2/3）：标题text-2xl，副标题text-lg，正文text-base
-     * 中等区块（h-1/2）：标题text-xl，副标题text-base，正文text-sm
-     * 小区块（h-1/3）：标题text-lg，副标题text-sm，正文text-xs
-   - 内容适配：使用overflow-hidden和适当的line-height确保文字在区块内完整显示
-   - 间距控制：padding和gap根据区块大小调整（大区块p-6，小区块p-3）
+
 
 ECHARTS INTEGRATION GUIDE (when data visualization is needed):
 1. **CDN引入**: Use script tag to include ECharts CDN
@@ -224,21 +201,10 @@ HTML structure must include:
 - .main-content: flex:1 for auto-sizing with margin-bottom:20px
 - .slide-footer: fixed 40px height for page numbers
 
-CRITICAL: Multi-section layout strategy:
-- For 2 vertical sections: use h-2/3 and h-1/3 classes (FIXED HEIGHTS)
-- For 3 vertical sections: use h-1/2, h-1/4, h-1/4 classes (FIXED HEIGHTS)
-- Use gap-4 instead of margin-top for vertical spacing
-- Each section should have overflow:hidden to prevent spillover
-- RESPONSIVE TEXT SIZING based on section height:
-  * Large sections (h-2/3): title=text-2xl, subtitle=text-lg, body=text-base
-  * Medium sections (h-1/2): title=text-xl, subtitle=text-base, body=text-sm  
-  * Small sections (h-1/3): title=text-lg, subtitle=text-sm, body=text-xs
-- ADAPTIVE PADDING: Large sections p-6, Medium sections p-4, Small sections p-3
+
 
 EXAMPLE MULTI-SECTION STRUCTURE:
-main-content should use: flex flex-col gap-4
-Section 1 (2/3 height): h-2/3 flex gap-4 for horizontal layout
-Section 2 (1/3 height): h-1/3 overflow-hidden for bottom content
+
 This ensures all content fits within allocated vertical space
 
 CRITICAL OUTPUT REQUIREMENT:
@@ -251,7 +217,6 @@ CRITICAL OUTPUT REQUIREMENT:
 - MUST use the flexbox layout structure and height allocation shown above
 - Body and containers MUST be exactly 1280x720px
 - Use .main-content with flex flex-col gap-4 for vertical sections
-- Use explicit height classes (h-2/3, h-1/3, etc.) for each major section
 - Use .slide-footer for page numbers (fixed 40px height)
 - If content involves data, MUST include ECharts visualization within size limits
 - DO NOT use margin-top, use gap spacing instead

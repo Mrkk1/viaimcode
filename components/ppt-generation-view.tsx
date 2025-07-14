@@ -319,7 +319,11 @@ export function PPTGenerationView({
 
   // 处理元素选择
   const handleElementSelect = useCallback((element: HTMLElement, slideId: string, slideIndex: number) => {
-    if (!isElementSelectMode) return;
+    console.log('handleElementSelect 被调用，当前 isElementSelectMode:', isElementSelectMode);
+    if (!isElementSelectMode) {
+      console.log('元素选择模式已关闭，忽略选择事件');
+      return;
+    }
     
     try {
       console.log('选中的元素:', element.tagName, element, '幻灯片:', slideId, '索引:', slideIndex);
@@ -496,7 +500,6 @@ export function PPTGenerationView({
         (iframeDoc as any).__elementSelectHandler = handleClick;
         iframeDoc.addEventListener('click', handleClick, true);
         
-        console.log('元素选择事件监听器已设置，幻灯片:', slideId);
         
         // 返回清理函数
         return () => {
@@ -512,7 +515,6 @@ export function PPTGenerationView({
             if (style && style.parentNode) {
               style.parentNode.removeChild(style);
             }
-            console.log('元素选择事件监听器已清理，幻灯片:', slideId);
           } catch (error) {
             console.error('清理元素选择监听器时出错:', error);
           }
@@ -547,11 +549,31 @@ export function PPTGenerationView({
     }
   }, [isGenerating]);
 
-  // 监听元素选择模式变化，为所有iframe设置监听器
+  // 调试：监听元素选择模式状态变化
   useEffect(() => {
+    console.log('元素选择模式状态变化:', isElementSelectMode);
+  }, [isElementSelectMode]);
+
+  // 使用 ref 来跟踪定时器，避免竞争条件
+  const setupTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 监听元素选择模式变化，为所有iframe设置或清理监听器
+  useEffect(() => {
+    // 先清理之前的定时器
+    if (setupTimerRef.current) {
+      clearTimeout(setupTimerRef.current);
+      setupTimerRef.current = null;
+    }
+
     if (isElementSelectMode) {
       // 延迟设置所有iframe的监听器
-      const timer = setTimeout(() => {
+      setupTimerRef.current = setTimeout(() => {
+        // 再次检查状态，防止在延迟期间状态已经改变
+        if (!isElementSelectMode) {
+          console.log('延迟期间状态已改变，取消设置监听器');
+          return;
+        }
+        
         slides.forEach((slide, index) => {
           if (slide.htmlCode && slide.viewMode === 'render') {
             const iframe = document.querySelector(`iframe[title="Slide ${index + 1}"]`) as HTMLIFrameElement;
@@ -560,9 +582,49 @@ export function PPTGenerationView({
             }
           }
         });
+        setupTimerRef.current = null;
       }, 1000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        if (setupTimerRef.current) {
+          clearTimeout(setupTimerRef.current);
+          setupTimerRef.current = null;
+        }
+      };
+    } else {
+      // 当关闭选择模式时，立即清理所有iframe的事件监听器
+      console.log('关闭选择模式，开始清理所有事件监听器');
+      slides.forEach((slide, index) => {
+        const iframe = document.querySelector(`iframe[title="Slide ${index + 1}"]`) as HTMLIFrameElement;
+        if (iframe) {
+          try {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (iframeDoc) {
+              // 移除事件监听器
+              const existingHandler = (iframeDoc as any).__elementSelectHandler;
+              if (existingHandler) {
+                iframeDoc.removeEventListener('click', existingHandler, true);
+                delete (iframeDoc as any).__elementSelectHandler;
+                console.log('已清理幻灯片事件监听器:', slide.id);
+              }
+              
+              // 移除选择模式样式
+              if (iframeDoc.body) {
+                iframeDoc.body.classList.remove('element-selectable');
+              }
+              
+              // 移除样式标签
+              const style = iframeDoc.querySelector('#element-selection-style');
+              if (style && style.parentNode) {
+                style.parentNode.removeChild(style);
+              }
+            }
+          } catch (error) {
+            console.error('清理iframe事件监听器时出错:', error);
+          }
+        }
+      });
+      console.log('清理完成');
     }
   }, [isElementSelectMode, slides, setupElementSelection]);
 
@@ -2555,8 +2617,17 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
       switch (analysis.intent.scope) {
         case 'single':
           if (analysis.intent.targetPages.length === 1) {
-            // 检查是否是选中元素的修改，如果是则使用快速修改模式
-            if (hasSelectedElementContext && analysis.intent.modificationType === 'content') {
+            // 检查是否是删除操作
+            if (analysis.extractedRequirements.specificChanges.some((change: string) => change.includes('删除'))) {
+              // 单页删除操作
+              await handleDeletePages(
+                analysis.intent.targetPages,
+                analysis,
+                userInput,
+                aiMessageId
+              )
+            } else if (hasSelectedElementContext && analysis.intent.modificationType === 'content') {
+              // 选中元素的快速修改
               await regenerateSinglePageDirectly(
                 analysis.intent.targetPages[0],
                 analysis,
@@ -2564,6 +2635,7 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
                 aiMessageId
               )
             } else {
+              // 单页重新生成
               await regenerateSinglePageWithAnalysis(
                 analysis.intent.targetPages[0],
                 analysis,
@@ -2946,13 +3018,448 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
     userInput: string, 
     aiMessageId: string
   ) => {
-    // TODO: 实现多页修改逻辑
-    console.log('多页修改功能待实现', targetPages, analysis)
+    console.log('开始多页修改功能', { targetPages, analysis, userInput })
+    
+    try {
+      // 更新AI消息
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === aiMessageId 
+          ? { ...msg, content: `🔄 正在处理多页修改：${analysis.suggestedAction.description}` }
+          : msg
+      ))
+
+      // 根据分析结果确定操作类型
+      const actionType = analysis.suggestedAction.actionType
+      
+      if (actionType === 'regenerate_multiple_pages' && analysis.extractedRequirements.specificChanges.some((change: string) => change.includes('删除'))) {
+        // 删除页面操作
+        await handleDeletePages(targetPages, analysis, userInput, aiMessageId)
+      } else {
+        // 重新生成多个页面
+        await handleRegenerateMultiplePages(targetPages, analysis, userInput, aiMessageId)
+      }
+
+    } catch (error) {
+      console.error('多页修改失败:', error)
+      setChatMessages(prev => prev.map(msg => 
+        msg.id === aiMessageId 
+          ? { ...msg, content: `❌ 多页修改失败：${error instanceof Error ? error.message : '未知错误'}`, isGenerating: false }
+          : msg
+      ))
+    }
+  }
+
+  // 删除页面处理
+  const handleDeletePages = async (
+    targetPages: number[], 
+    analysis: any, 
+    userInput: string, 
+    aiMessageId: string
+  ) => {
+    console.log('开始删除页面:', targetPages.map(p => p + 1))
+    
+    // 按倒序排序，从后往前删除，避免索引混乱
+    const sortedPages = [...targetPages].sort((a, b) => b - a)
+    
+    // 更新AI消息
     setChatMessages(prev => prev.map(msg => 
       msg.id === aiMessageId 
-        ? { ...msg, content: '多页修改功能正在开发中...', isGenerating: false }
+        ? { ...msg, content: `🗑️ 正在删除第${targetPages.map(p => p + 1).join('、')}页...` }
         : msg
     ))
+
+    // 删除指定页面
+    setSlides(prev => {
+      const newSlides = [...prev]
+      sortedPages.forEach(pageIndex => {
+        if (pageIndex >= 0 && pageIndex < newSlides.length) {
+          newSlides.splice(pageIndex, 1)
+        }
+      })
+      return newSlides
+    })
+
+    // 保存删除操作到数据库
+    if (projectId) {
+      try {
+        await fetch(`/api/ppt-tasks/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'delete_slides',
+            slideIndices: sortedPages,
+            reason: userInput
+          }),
+        });
+        console.log('页面删除操作已保存到数据库');
+      } catch (error) {
+        console.error('保存删除操作失败:', error);
+      }
+    }
+
+    // 更新成功消息
+    const successMessage = `✅ **页面删除完成！**
+
+**删除页面：** 第${targetPages.map(p => p + 1).join('、')}页
+**删除原因：** ${userInput}
+**剩余页面：** ${slides.length - targetPages.length}页
+
+页面已成功删除，页码已自动调整。`
+    
+    setChatMessages(prev => prev.map(msg => 
+      msg.id === aiMessageId 
+        ? { ...msg, content: successMessage, isGenerating: false }
+        : msg
+    ))
+
+    // 保存成功消息到数据库
+    if (projectId) {
+      try {
+        await fetch(`/api/ppt-tasks/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add_chat_message',
+            messageType: 'ai',
+            content: successMessage
+          }),
+        });
+      } catch (error) {
+        console.error('保存成功消息失败:', error);
+      }
+    }
+
+    toast.success(`成功删除${targetPages.length}页内容！`)
+  }
+
+  // 重新生成多个页面
+  const handleRegenerateMultiplePages = async (
+    targetPages: number[], 
+    analysis: any, 
+    userInput: string, 
+    aiMessageId: string
+  ) => {
+    console.log('开始重新生成多个页面:', targetPages.map(p => p + 1))
+    
+    // 更新AI消息
+    setChatMessages(prev => prev.map(msg => 
+      msg.id === aiMessageId 
+        ? { ...msg, content: `🔄 正在重新生成第${targetPages.map(p => p + 1).join('、')}页...` }
+        : msg
+    ))
+
+    // 并行处理多个页面的重新生成
+    const regenerationPromises = targetPages.map(async (slideIndex) => {
+      const currentSlide = slides[slideIndex]
+      if (!currentSlide) {
+        throw new Error(`未找到第${slideIndex + 1}页幻灯片`)
+      }
+
+      console.log(`开始重新生成第${slideIndex + 1}页: ${currentSlide.title}`)
+      
+      // 更新单页生成状态
+      setSlides(prev => prev.map((slide, index) => 
+        index === slideIndex 
+          ? { 
+              ...slide, 
+              isGenerating: true, 
+              generationProgress: '准备重新生成...',
+              viewMode: slide.userSelectedViewMode === undefined ? 'thinking' : slide.viewMode
+            } 
+          : slide
+      ))
+
+      try {
+        // 构建增强的幻灯片信息
+        const enhancedSlideInfo = {
+          ...currentSlide,
+          modificationRequirements: {
+            userInput,
+            analysisResult: analysis,
+            specificChanges: analysis.extractedRequirements.specificChanges,
+            stylePreferences: analysis.extractedRequirements.stylePreferences,
+            isMultiPageModification: true
+          }
+        }
+
+        // 获取前一页信息作为风格参考
+        let previousSlideInfo = ''
+        if (slideIndex > 0) {
+          const prevSlide = slides[slideIndex - 1]
+          if (prevSlide && prevSlide.htmlCode && !prevSlide.htmlCode.includes('生成失败')) {
+            previousSlideInfo = `前一页设计参考：${prevSlide.title}\n请保持与前一页的设计风格一致性`
+          }
+        }
+
+        // 第一步：重新思考设计
+        setSlides(prev => prev.map((slide, index) => 
+          index === slideIndex 
+            ? { ...slide, generationProgress: '第1步：重新思考设计方案...' }
+            : slide
+        ))
+
+        const thinkingResponse = await fetch('/api/generate-ppt-thinking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slide: enhancedSlideInfo,
+            slideIndex,
+            totalSlides: slides.length,
+            theme: 'auto',
+            model,
+            provider,
+            previousSlideInfo,
+            modificationContext: {
+              userRequest: userInput,
+              analysisResult: analysis,
+              isRegeneration: true,
+              isMultiPageModification: true
+            }
+          })
+        })
+
+        if (!thinkingResponse.ok) {
+          throw new Error(`第${slideIndex + 1}页思考生成失败: ${thinkingResponse.status}`)
+        }
+
+        const thinkingReader = thinkingResponse.body?.getReader()
+        if (!thinkingReader) {
+          throw new Error(`第${slideIndex + 1}页无法读取思考响应流`)
+        }
+
+        let thinkingContent = ""
+        
+        try {
+          while (true) {
+            const { done, value } = await thinkingReader.read()
+            if (done) break
+            
+            const chunk = new TextDecoder().decode(value)
+            const lines = chunk.split('\n').filter(line => line.trim())
+            
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line)
+                if (data.type === 'content' && data.content) {
+                  thinkingContent += data.content
+                  
+                  // 实时更新思考内容
+                  setSlides(prev => prev.map((slide, index) => 
+                    index === slideIndex 
+                      ? { 
+                          ...slide, 
+                          generationProgress: `第1步：思考中... (${thinkingContent.length}字符)`,
+                          realtimeThinkingContent: thinkingContent,
+                          thinkingContent: thinkingContent
+                        } 
+                      : slide
+                  ))
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        } finally {
+          thinkingReader.cancel()
+        }
+
+        console.log(`第${slideIndex + 1}页思考阶段完成，思考内容长度: ${thinkingContent.length}`)
+
+        // 第二步：生成HTML代码
+        setSlides(prev => prev.map((slide, index) => 
+          index === slideIndex 
+            ? { ...slide, generationProgress: '第2步：基于新思考生成HTML代码...' }
+            : slide
+        ))
+
+        const htmlResponse = await fetch('/api/generate-ppt-html', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            slide: enhancedSlideInfo,
+            slideIndex,
+            totalSlides: slides.length,
+            theme: 'auto',
+            model,
+            provider,
+            previousSlideInfo,
+            thinkingContent,
+            modificationContext: {
+              userRequest: userInput,
+              analysisResult: analysis,
+              isRegeneration: true,
+              isMultiPageModification: true
+            }
+          })
+        })
+
+        if (!htmlResponse.ok) {
+          throw new Error(`第${slideIndex + 1}页HTML生成失败: ${htmlResponse.status}`)
+        }
+
+        const htmlReader = htmlResponse.body?.getReader()
+        if (!htmlReader) {
+          throw new Error(`第${slideIndex + 1}页无法读取HTML响应流`)
+        }
+
+        let htmlContent = ""
+        
+        try {
+          while (true) {
+            const { done, value } = await htmlReader.read()
+            if (done) break
+            
+            const chunk = new TextDecoder().decode(value)
+            const lines = chunk.split('\n').filter(line => line.trim())
+            
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line)
+                if (data.type === 'content' && data.content) {
+                  htmlContent += data.content
+                  
+                  // 节流更新HTML内容
+                  setSlides(prev => prev.map((slide, index) => 
+                    index === slideIndex 
+                      ? { 
+                          ...slide, 
+                          htmlCode: htmlContent,
+                          generationProgress: `第2步：生成中... (${Math.floor(htmlContent.length / 1024)}KB)`
+                        } 
+                      : slide
+                  ))
+                }
+              } catch (e) {
+                // 忽略解析错误
+              }
+            }
+          }
+        } finally {
+          htmlReader.cancel()
+        }
+
+        // 清理和验证HTML
+        let finalHtmlCode = htmlContent.replace(/```html\s*/g, '').replace(/```\s*/g, '').trim()
+        
+        // 检查HTML完整性
+        const isHTMLComplete = finalHtmlCode.includes('<!DOCTYPE html>') && 
+                              finalHtmlCode.includes('</html>') &&
+                              finalHtmlCode.trim().endsWith('</html>')
+        
+        if (!isHTMLComplete && finalHtmlCode.includes('<!DOCTYPE html>')) {
+          if (!finalHtmlCode.includes('</body>')) {
+            finalHtmlCode += '\n</body>'
+          }
+          if (!finalHtmlCode.includes('</html>')) {
+            finalHtmlCode += '\n</html>'
+          }
+        }
+
+        console.log(`第${slideIndex + 1}页重新生成完成，HTML长度: ${finalHtmlCode.length}`)
+        
+        // 完成状态
+        setSlides(prev => prev.map((slide, index) => 
+          index === slideIndex 
+            ? { 
+                ...slide, 
+                htmlCode: finalHtmlCode,
+                isGenerating: false,
+                generationProgress: '重新生成完成',
+                thinkingContent: thinkingContent,
+                realtimeThinkingContent: thinkingContent
+              } 
+            : slide
+        ))
+
+        // 保存到数据库
+        if (projectId) {
+          try {
+            await fetch(`/api/ppt-tasks/${projectId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'save_slide',
+                slideIndex,
+                slideData: {
+                  title: currentSlide.title,
+                  content: currentSlide.content,
+                  htmlCode: finalHtmlCode,
+                  thinkingContent: thinkingContent,
+                  status: 'regenerated_multi'
+                }
+              }),
+            });
+            console.log(`第${slideIndex + 1}页重新生成结果已保存到数据库`);
+          } catch (error) {
+            console.error(`保存第${slideIndex + 1}页重新生成结果失败:`, error);
+          }
+        }
+
+        return { slideIndex, success: true }
+
+      } catch (error) {
+        console.error(`第${slideIndex + 1}页重新生成失败:`, error)
+        
+        // 更新失败状态
+        setSlides(prev => prev.map((slide, index) => 
+          index === slideIndex 
+            ? { 
+                ...slide, 
+                isGenerating: false, 
+                generationProgress: '重新生成失败'
+              } 
+            : slide
+        ))
+
+        return { slideIndex, success: false, error }
+      }
+    })
+
+    // 等待所有页面处理完成
+    const results = await Promise.allSettled(regenerationPromises)
+    
+    // 统计结果
+    const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length
+    const failCount = results.length - successCount
+    
+    // 更新最终消息
+    const finalMessage = `✅ **多页重新生成完成！**
+
+**修改需求：** ${userInput}
+**处理页面：** 第${targetPages.map(p => p + 1).join('、')}页
+**成功：** ${successCount}页
+**失败：** ${failCount}页
+
+**具体变更：**
+${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${change}`).join('\n')}
+
+您可以在预览中查看修改效果。如需进一步调整，请继续描述您的需求。`
+    
+    setChatMessages(prev => prev.map(msg => 
+      msg.id === aiMessageId 
+        ? { ...msg, content: finalMessage, isGenerating: false }
+        : msg
+    ))
+    
+    // 保存成功消息到数据库
+    if (projectId) {
+      try {
+        await fetch(`/api/ppt-tasks/${projectId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'add_chat_message',
+            messageType: 'ai',
+            content: finalMessage
+          }),
+        });
+      } catch (error) {
+        console.error('保存成功消息失败:', error);
+      }
+    }
+
+    toast.success(`多页重新生成完成！成功${successCount}页，失败${failCount}页`)
   }
 
   // 占位符函数 - 全局修改
@@ -3105,7 +3612,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       
       toast.success('PDF生成完成！')
 
-        } catch (error) {
+    } catch (error) {
       console.error('生成PDF时出错:', error)
       toast.error('PDF生成失败，请重试')
     }
@@ -3320,7 +3827,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             if (Math.abs(diff) > 50) { // 最小滑动距离
                 if (diff > 0) {
                     nextSlide(); // 向左滑动，下一页
-      } else {
+                } else {
                     previousSlide(); // 向右滑动，上一页
                 }
             }
@@ -3353,11 +3860,11 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       // 调用分享API
       const response = await fetch('/api/ppt-share', {
         method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, isPublic: true })
       })
 
-          if (!response.ok) {
+      if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || '分享失败')
       }
@@ -3408,7 +3915,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
         toast.info(`分享链接: ${data.shareUrl}`)
       }
       
-        } catch (error) {
+    } catch (error) {
       console.error('分享PPT失败:', error)
       toast.error(error instanceof Error ? error.message : '分享失败')
     }
@@ -3907,7 +4414,24 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                   variant={isElementSelectMode ? "secondary" : "ghost"}
                   size="sm"
                   className="text-gray-400 hover:text-white hover:bg-white/10"
-                  onClick={() => setIsElementSelectMode(!isElementSelectMode)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('元素选择按钮被点击，当前状态:', isElementSelectMode);
+                    const newState = !isElementSelectMode;
+                    console.log('即将设置新状态:', newState);
+                    setIsElementSelectMode(newState);
+                    
+                    // 如果关闭选择模式，清理相关状态
+                    if (!newState) {
+                      setHasSelectedElementContext(false);
+                      setSelectedElementContext("");
+                      setSelectedSlideId(null);
+                      setSelectedSlideIndex(null);
+                      setSelectedElementInfo(null);
+                      console.log('已清理元素选择相关状态');
+                    }
+                  }}
                   title={isElementSelectMode ? "退出元素选择模式" : "进入元素选择模式"}
                 >
                   <MousePointer2 className="w-4 h-4 mr-1" />
@@ -4033,14 +4557,6 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                                 srcDoc={slide.htmlCode}
                                 className="border-0"
                                 title={`Slide ${index + 1}`}
-                                ref={(iframe) => {
-                                  if (iframe && isElementSelectMode) {
-                                    // 延迟设置元素选择监听器，确保iframe已加载
-                                    setTimeout(() => {
-                                      setupElementSelection(slide.id, index, iframe);
-                                    }, 1000);
-                                  }
-                                }}
                                 style={{
                                   width: '1280px',
                                   height: '720px',

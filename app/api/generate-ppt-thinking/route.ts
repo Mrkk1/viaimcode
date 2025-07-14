@@ -2,7 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo } = await request.json()
+    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, modificationContext } = await request.json()
+
+    console.log('思考生成API - 接收到的参数:')
+    console.log('- slide.title:', slide.title)
+    console.log('- slideIndex:', slideIndex)
+    console.log('- model:', model)
+    console.log('- provider:', provider)
+    console.log('- modificationContext:', modificationContext ? '存在' : '不存在')
+    if (modificationContext) {
+      console.log('- modificationContext.userRequest:', modificationContext.userRequest)
+      console.log('- modificationContext.analysisResult:', modificationContext.analysisResult ? '存在' : '不存在')
+      if (modificationContext.analysisResult) {
+        console.log('- 修改范围:', modificationContext.analysisResult.intent?.scope)
+        console.log('- 修改类型:', modificationContext.analysisResult.intent?.modificationType)
+        console.log('- 具体变更要求:', modificationContext.analysisResult.extractedRequirements?.specificChanges)
+      }
+    }
 
     if (!slide || !model || !provider) {
       return NextResponse.json(
@@ -157,20 +173,32 @@ IMPORTANT:
 - 设计风格: 现代、专业、国际化
 - 主题: ${theme}
 
-**分析要求:**
-请按照系统提示中的维度进行全面、详细的设计分析。每个维度都要提供具体、可执行的设计策略和决策。
 
 **特别注意:**
 - 这是设计思考阶段，只需要分析和规划，不要生成任何HTML代码
-- 分析要具体到Tailwind CSS类名的选择策略
-- 考虑在投影设备上的显示效果和可读性
-- 确保设计符合商务演示的专业标准
 - 所有设计元素必须是静态的，不使用CSS动画、过渡效果或JavaScript动画
 
 ${previousSlideInfo ? `**前页风格参考:**
 ${previousSlideInfo}
 
 请特别分析如何保持与前页的设计一致性。` : ''}
+
+${modificationContext ? `**🔥 重要：用户修改需求 🔥**
+用户的具体修改要求：${modificationContext.userRequest}
+
+**智能分析结果：**
+- 修改范围：${modificationContext.analysisResult?.intent?.scope || '未知'}
+- 修改类型：${modificationContext.analysisResult?.intent?.modificationType || '未知'}
+- 置信度：${modificationContext.analysisResult?.intent?.confidence ? Math.round(modificationContext.analysisResult.intent.confidence * 100) + '%' : '未知'}
+- 目标页面：${modificationContext.analysisResult?.intent?.targetPages?.map((p: number) => `第${p + 1}页`).join(', ') || '未知'}
+
+**具体变更要求：**
+${modificationContext.analysisResult?.extractedRequirements?.specificChanges?.map((change: string) => `• ${change}`).join('\n') || '无'}
+
+**建议的执行方式：**
+${modificationContext.analysisResult?.suggestedAction?.description || '无'}
+
+**⚠️ 在设计思考中，请务必重点关注和响应上述修改需求！**` : ''}
 
 请开始详细的设计分析：`
           
