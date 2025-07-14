@@ -593,7 +593,7 @@ export function PPTGenerationView({
       };
     } else {
       // 当关闭选择模式时，立即清理所有iframe的事件监听器
-      console.log('关闭选择模式，开始清理所有事件监听器');
+      // console.log('关闭选择模式，开始清理所有事件监听器');
       slides.forEach((slide, index) => {
         const iframe = document.querySelector(`iframe[title="Slide ${index + 1}"]`) as HTMLIFrameElement;
         if (iframe) {
@@ -624,7 +624,7 @@ export function PPTGenerationView({
           }
         }
       });
-      console.log('清理完成');
+      // console.log('清理完成');
     }
   }, [isElementSelectMode, slides, setupElementSelection]);
 
@@ -632,7 +632,7 @@ export function PPTGenerationView({
   useEffect(() => {
     // 如果有初始数据，说明是从后端加载的已存在项目，不需要重新生成
     if (initialData) {
-      console.log('从后端加载已存在项目，跳过自动生成')
+      // console.log('从后端加载已存在项目，跳过自动生成')
       return
     }
     
@@ -1551,7 +1551,7 @@ export function PPTGenerationView({
           // 如果有项目ID，保存幻灯片到数据库
           if (currentProjectId) {
             try {
-              await fetch(`/api/ppt-tasks/${currentProjectId}`, {
+              const response = await fetch(`/api/ppt-tasks/${currentProjectId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1566,6 +1566,12 @@ export function PPTGenerationView({
                   }
                 }),
               });
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+              }
+              
               console.log(`第${index + 1}页已保存到数据库`);
               
               // 更新生成进度状态
@@ -1577,6 +1583,15 @@ export function PPTGenerationView({
               ))
             } catch (error) {
               console.error(`保存第${index + 1}页失败:`, error);
+              toast.error(`保存第${index + 1}页失败，修改可能在刷新后丢失`);
+              
+              // 更新生成进度状态显示保存失败
+              setSlides(prev => prev.map((s, i) => 
+                i === index ? { 
+                  ...s, 
+                  generationProgress: '生成完成但保存失败'
+                } : s
+              ))
             }
           }
 
@@ -2530,7 +2545,7 @@ ${previousSlideInfo}
       // 更新AI消息状态
       setChatMessages(prev => prev.map(msg => 
         msg.id === aiMessageId 
-          ? { ...msg, content: '🧠 正在智能分析您的修改需求...' }
+          ? { ...msg, content: '正在分析修改需求...' }
           : msg
       ))
       
@@ -2922,24 +2937,31 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
       // 保存到数据库
       if (projectId) {
         try {
-          await fetch(`/api/ppt-tasks/${projectId}`, {
+          const response = await fetch(`/api/ppt-tasks/${projectId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'save_slide',
               slideIndex,
-              slideData: {
-                title: currentSlide.title,
-                content: currentSlide.content,
-                htmlCode: finalHtmlCode,
-                thinkingContent: thinkingContent,
-                status: 'regenerated'
-              }
+                              slideData: {
+                  title: currentSlide.title,
+                  content: currentSlide.content,
+                  htmlCode: finalHtmlCode,
+                  thinkingContent: thinkingContent,
+                  status: 'completed'
+                }
             }),
           });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
+          
           console.log(`第${slideIndex + 1}页重新生成结果已保存到数据库`);
         } catch (error) {
           console.error(`保存第${slideIndex + 1}页重新生成结果失败:`, error);
+          toast.error(`保存第${slideIndex + 1}页失败，修改可能在刷新后丢失`);
         }
       }
 
@@ -3375,7 +3397,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
         // 保存到数据库
         if (projectId) {
           try {
-            await fetch(`/api/ppt-tasks/${projectId}`, {
+            const response = await fetch(`/api/ppt-tasks/${projectId}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -3386,13 +3408,20 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                   content: currentSlide.content,
                   htmlCode: finalHtmlCode,
                   thinkingContent: thinkingContent,
-                  status: 'regenerated_multi'
+                  status: 'completed'
                 }
               }),
             });
+            
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
             console.log(`第${slideIndex + 1}页重新生成结果已保存到数据库`);
           } catch (error) {
             console.error(`保存第${slideIndex + 1}页重新生成结果失败:`, error);
+            toast.error(`保存第${slideIndex + 1}页失败，修改可能在刷新后丢失`);
           }
         }
 
@@ -4065,19 +4094,24 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       // 保存到数据库
       if (projectId) {
         try {
-          await fetch(`/api/ppt-tasks/${projectId}`, {
+          const updateResponse = await fetch(`/api/ppt-tasks/${projectId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               action: 'update_slide',
               slideIndex,
-                htmlCode: htmlContent,
+              htmlCode: htmlContent,
               thinkingContent: `快速修改：${analysis.extractedRequirements.specificChanges.join(', ')}`
             }),
           });
+          
+          if (!updateResponse.ok) {
+            const errorText = await updateResponse.text();
+            throw new Error(`更新幻灯片失败: HTTP ${updateResponse.status}: ${errorText}`);
+          }
 
           // 保存AI消息
-          await fetch(`/api/ppt-tasks/${projectId}`, {
+          const messageResponse = await fetch(`/api/ppt-tasks/${projectId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4086,8 +4120,15 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
               content: `✅ 第${slideIndex + 1}页修改完成！已根据您的要求快速更新选中元素。`
             }),
           });
+          
+          if (!messageResponse.ok) {
+            console.warn('保存AI消息失败:', await messageResponse.text());
+          }
+          
+          console.log(`第${slideIndex + 1}页快速修改已保存到数据库`);
         } catch (error) {
           console.error('保存到数据库失败:', error);
+          toast.error(`保存第${slideIndex + 1}页失败，修改可能在刷新后丢失`);
         }
       }
 
@@ -4429,7 +4470,6 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                       setSelectedSlideId(null);
                       setSelectedSlideIndex(null);
                       setSelectedElementInfo(null);
-                      console.log('已清理元素选择相关状态');
                     }
                   }}
                   title={isElementSelectMode ? "退出元素选择模式" : "进入元素选择模式"}

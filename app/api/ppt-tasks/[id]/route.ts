@@ -88,6 +88,18 @@ export async function PATCH(
         }
         break;
 
+      case 'update_slide':
+        // 更新幻灯片内容（用于快速修改）
+        if (slideIndex !== undefined && body.htmlCode !== undefined) {
+          await pptDb.updateSlideContent(id, slideIndex, {
+            htmlCode: body.htmlCode,
+            thinkingContent: body.thinkingContent,
+            status: 'completed',
+            progress: '✅ 修改完成'
+          });
+        }
+        break;
+
       case 'add_chat_message':
         // 添加聊天消息
         console.log('API: 处理add_chat_message请求', {

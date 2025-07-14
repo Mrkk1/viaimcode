@@ -104,15 +104,15 @@ function convertTaskDataToInitialData(taskData: PPTTaskData) {
 
   // 转换幻灯片
   const slides: PPTSlide[] = taskData.slides.map((slide, index) => {
-    console.log(`幻灯片${index}转换:`, {
-      id: slide.id,
-      title: slide.title,
-      status: slide.status,
-      progress: slide.progress,
-      htmlCode长度: slide.htmlCode?.length || 0,
-      thinkingContent长度: slide.thinkingContent?.length || 0,
-      thinkingContent内容: slide.thinkingContent ? slide.thinkingContent.substring(0, 100) + '...' : '无'
-    });
+    // console.log(`幻灯片${index}转换:`, {
+    //   id: slide.id,
+    //   title: slide.title,
+    //   status: slide.status,
+    //   progress: slide.progress,
+    //   htmlCode长度: slide.htmlCode?.length || 0,
+    //   thinkingContent长度: slide.thinkingContent?.length || 0,
+    //   thinkingContent内容: slide.thinkingContent ? slide.thinkingContent.substring(0, 100) + '...' : '无'
+    // });
     
     return {
       id: slide.id,
@@ -128,8 +128,8 @@ function convertTaskDataToInitialData(taskData: PPTTaskData) {
     };
   })
 
-  console.log('转换后的幻灯片:', slides)
-  console.log('原始幻灯片数据:', taskData.slides)
+  // console.log('转换后的幻灯片:', slides)
+  // console.log('原始幻灯片数据:', taskData.slides)
 
   // 转换聊天记录
   const chatMessages: ChatMessage[] = taskData.chatMessages.map((msg, index) => {
@@ -153,8 +153,8 @@ function convertTaskDataToInitialData(taskData: PPTTaskData) {
     };
   })
 
-  console.log('转换后的聊天记录:', chatMessages)
-  console.log('原始聊天记录:', taskData.chatMessages)
+  // console.log('转换后的聊天记录:', chatMessages)
+  // console.log('原始聊天记录:', taskData.chatMessages)
 
   return {
     projectId: taskData.task.id,
