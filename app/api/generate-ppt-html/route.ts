@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, thinkingContent } = await request.json()
+    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, thinkingContent, modificationContext } = await request.json()
 
     // 添加调试日志
     console.log('HTML生成API - 接收到的参数:')
@@ -12,6 +12,9 @@ export async function POST(request: NextRequest) {
     console.log('- provider:', provider)
     console.log('- thinkingContent长度:', thinkingContent?.length || 0)
     console.log('- thinkingContent预览:', thinkingContent?.substring(0, 200) || '无')
+    console.log('- modificationContext:', modificationContext ? '存在' : '不存在')
+    console.log('- isDirectModification:', modificationContext?.isDirectModification || false)
+    console.log('- existingHtmlCode:', slide?.existingHtmlCode ? '存在' : '不存在')
 
     if (!slide || !model || !provider) {
       console.error('HTML生成API - 缺少必需参数')
@@ -172,7 +175,7 @@ HTML STRUCTURE REQUIREMENTS:
    - 主内容区：可用高度约560px（720-80标题-40页脚-40边距）
    - CRITICAL: 内容简洁性原则：
      * 每页最多3-4个要点，避免信息过载
-     * 每个要点控制在1-2句话内，突出核心信息
+     * 每个要点控制在1句话内，突出核心信息
      * 使用关键词和短语，避免长段落
      * 优先使用图表、图标等视觉元素代替文字
    - 多区域布局：使用精确的高度分配，如h-2/3和h-1/3
@@ -242,6 +245,9 @@ CRITICAL OUTPUT REQUIREMENT:
 - Generate ONLY the complete HTML code following the above template structure
 - Start with <!DOCTYPE html> and end with </html>
 - No explanations, comments, or additional text
+- DO NOT wrap the output in code blocks (no '''html or ''' markers)
+- DO NOT include any markdown formatting or code block syntax
+- Output raw HTML code directly without any wrapper syntax
 - MUST use the flexbox layout structure and height allocation shown above
 - Body and containers MUST be exactly 1280x720px
 - Use .main-content with flex flex-col gap-4 for vertical sections
@@ -256,7 +262,14 @@ CRITICAL OUTPUT REQUIREMENT:
 - CRITICAL: Content must be EXTREMELY CONCISE - maximum 3-4 key points per slide
 - CRITICAL: Each text element should be brief and impactful - avoid verbose descriptions
 
-Generate the complete HTML code now:`
+DIRECT MODIFICATION MODE (when existingHtmlCode is provided):
+- PRESERVE the overall layout and structure of the existing HTML
+- ONLY modify the specific elements mentioned in the modification requirements
+- Keep the same color scheme, font styles, and visual design unless specifically requested to change
+- Maintain the same container structure and CSS classes
+- Focus on targeted changes rather than complete redesign
+- If modifying text content, preserve the formatting and styling of surrounding elements
+- If modifying specific elements (like selected text), only change that element while keeping everything else intact`
 
     // 创建流式响应
     const stream = new ReadableStream({
@@ -288,7 +301,7 @@ Generate the complete HTML code now:`
         try {
           let response;
           
-          const userPrompt = `基于以下设计分析，生成完整的HTML代码：
+          const userPrompt = `${modificationContext?.isDirectModification ? '基于现有HTML代码进行修改' : '基于以下设计分析，生成完整的HTML代码'}：
 
 **幻灯片信息:**
 - 标题: ${slide.title}
@@ -296,7 +309,42 @@ Generate the complete HTML code now:`
 - 关键要点: ${slide.keyPoints ? slide.keyPoints.join(', ') : '无'}
 - 页码: 第${slideIndex + 1}页，共${totalSlides}页
 
-${thinkingContent ? `**🎯 设计分析结果（重要 - 必须遵循）:**
+${modificationContext?.isDirectModification && slide.existingHtmlCode ? `**🔄 现有HTML代码（需要修改）:**
+\`\`\`html
+${slide.existingHtmlCode}
+\`\`\`
+
+**📝 修改要求:**
+${slide.modificationRequirements ? `
+- 用户输入: ${slide.modificationRequirements.userInput}
+- 具体修改: ${slide.modificationRequirements.specificChanges?.join(', ') || '无'}
+- 选中元素: ${slide.modificationRequirements.selectedElement || '无'}
+- 分析结果: ${JSON.stringify(slide.modificationRequirements.analysisResult?.intent || {}, null, 2)}
+
+${slide.modificationRequirements.selectedElementInfo ? `**🎯 选中元素的详细信息:**
+- 元素标签: ${slide.modificationRequirements.selectedElementInfo.tagName}
+- DOM路径: ${slide.modificationRequirements.selectedElementInfo.domPath}
+- CSS选择器: ${slide.modificationRequirements.selectedElementInfo.cssSelector}
+- XPath: ${slide.modificationRequirements.selectedElementInfo.xpath}
+- 原始文本: "${slide.modificationRequirements.selectedElementInfo.originalText}"
+- 原始HTML: \`${slide.modificationRequirements.selectedElementInfo.originalHTML}\`
+- 元素属性: ${JSON.stringify(slide.modificationRequirements.selectedElementInfo.attributes, null, 2)}
+
+**🔧 精确修改指令:**
+- 请在现有HTML代码中精确定位到上述选中的元素
+- 只修改这个特定元素的内容，保持其他所有元素完全不变
+- 保持该元素的标签名、CSS类名、样式属性等结构信息
+- 如果是文本修改，只更改文本内容；如果是样式修改，只更改相应的样式属性
+- 确保修改后的元素在整体布局中保持和谐一致` : ''}
+
+**⚠️ 重要说明:**
+- 请基于上述现有HTML代码进行修改
+- 只修改用户要求的部分，保持其他部分不变
+- 保持原有的布局结构、颜色方案和设计风格
+- 确保修改后的代码仍然符合1280x720px的尺寸要求
+` : '无具体修改要求'}` : ''}
+
+${!modificationContext?.isDirectModification ? `${thinkingContent ? `**🎯 设计分析结果（重要 - 必须遵循）:**
 
 **📋 实现要求:**
 请严格按照上述设计分析中的所有决策来实现HTML代码。分析中提到的颜色、布局、字体、装饰元素等所有设计选择都必须在代码中体现。` : `**🎯 设计要求（无具体分析）:**
@@ -305,7 +353,7 @@ ${thinkingContent ? `**🎯 设计分析结果（重要 - 必须遵循）:**
 - 创建清晰的视觉层次和适当的字体大小
 - 实现恰当的间距和布局原则
 - 确保在演示环境中的优秀可读性
-- 遵循现代商务演示的设计趋势`}
+- 遵循现代商务演示的设计趋势`}` : ''}
 
 **技术要求:**
 - 生成完整的HTML5文档（从<!DOCTYPE html>到</html>）
@@ -334,12 +382,12 @@ ${thinkingContent ? `**🎯 设计分析结果（重要 - 必须遵循）:**
 - 每个要点用1-2句话表达，避免长段落
 - 使用关键词、短语和数字，提高可读性
 - 优先使用视觉元素（图表、图标、数据）代替大量文字
-- 删除冗余信息，只保留最重要的内容
+- 删除冗余信息，只保留最精简的内容
 
 **内容组织策略**:
 - 标题：简洁明了，一句话概括主题
-- 要点：使用项目符号，每项不超过15个字
-- 描述：如需详细说明，控制在20字以内
+- 要点：使用项目符号，每项不超过10个字
+- 描述：如需详细说明，控制在15字以内
 - 数据：优先使用图表展示，减少文字说明
 ${thinkingContent ? '- 严格遵循设计分析中的所有决策和尺寸约束' : '- 创建专业美观的静态设计，确保内容完整显示'}
 
@@ -348,7 +396,14 @@ ${previousSlideInfo}
 
 请确保与前页设计的严格一致性。` : ''}
 
-请生成完整的HTML代码：`
+请生成完整的HTML代码：
+
+**重要输出格式要求：**
+- 直接输出HTML代码，不要使用任何代码块标记
+- 不要包含 \`\`\`html 或 \`\`\` 这样的markdown格式
+- 从 <!DOCTYPE html> 开始，到 </html> 结束
+- 不要添加任何解释文字或注释
+- 确保输出的是纯HTML代码，可以直接在浏览器中渲染`
           
           if (provider === 'deepseek') {
             response = await fetch('https://api.deepseek.com/v1/chat/completions', {
