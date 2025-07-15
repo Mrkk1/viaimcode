@@ -2144,7 +2144,7 @@ ${userInput}
       // 更新最终AI消息
       setChatMessages(prev => prev.map(msg => 
         msg.id === aiMessageId 
-          ? { ...msg, content: '✅ PPT重新生成完成！已根据您的新需求重新设计了整个演示文稿。', isGenerating: false }
+          ? { ...msg, content: 'PPT重新生成完成！已根据您的新需求重新设计了整个演示文稿。', isGenerating: false }
           : msg
       ))
       
@@ -2157,7 +2157,7 @@ ${userInput}
             body: JSON.stringify({
               action: 'add_chat_message',
               messageType: 'ai',
-              content: '✅ PPT重新生成完成！已根据您的新需求重新设计了整个演示文稿。'
+              content: 'PPT重新生成完成！已根据您的新需求重新设计了整个演示文稿。'
             }),
           });
         } catch (error) {
@@ -2498,7 +2498,7 @@ ${previousSlideInfo}
         }
 
         // 更新单页生成状态为完成
-        const slideCompleteContent = `✅ 第${index + 1}页「${slide.title}」重新生成完成`
+        const slideCompleteContent = `第${index + 1}页「${slide.title}」重新生成完成`
         setChatMessages(prev => prev.map(msg =>
           msg.id === singleSlideMsgId
             ? { ...msg, content: slideCompleteContent, isGenerating: false }
@@ -2626,14 +2626,50 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
     }
   }
 
+  // 检测是否为删除整个页面的操作
+  const isDeletePageOperation = (analysis: any, userInput: string): boolean => {
+    // 如果修改类型是内容修改，即使包含"删除"关键词，也不是删除整个页面
+    if (analysis.intent?.modificationType === 'content') {
+      return false;
+    }
+    
+    // 只有当修改类型是结构修改(structure)时，才判断是否为删除页面
+    if (analysis.intent?.modificationType !== 'structure') {
+      return false;
+    }
+    
+    const deletePageKeywords = ['删除', '移除', '去掉', '去除', '删掉', '干掉', '清除', '取消'];
+    
+    // 检查是否是删除整个页面的表达
+    const pageDeletePatterns = [
+      /删除第?\s*\d+\s*页$/,
+      /移除第?\s*\d+\s*页$/,
+      /去掉第?\s*\d+\s*页$/,
+      /去除第?\s*\d+\s*页$/,
+      /删掉第?\s*\d+\s*页$/
+    ];
+    
+    // 检查用户输入是否匹配删除整页的模式
+    const hasDeletePagePattern = pageDeletePatterns.some(pattern => 
+      pattern.test(userInput.trim())
+    );
+    
+    // 检查suggestedAction的description中是否明确说明是删除页面操作
+    const hasDeletePageInAction = analysis.suggestedAction?.description?.includes('删除第') && 
+                                 analysis.suggestedAction?.description?.includes('页') &&
+                                 !analysis.suggestedAction?.description?.includes('内容');
+    
+    return hasDeletePagePattern || hasDeletePageInAction;
+  };
+
   // 执行修改策略
   const executeModificationStrategy = async (analysis: any, userInput: string, aiMessageId: string) => {
     try {
       switch (analysis.intent.scope) {
         case 'single':
           if (analysis.intent.targetPages.length === 1) {
-            // 检查是否是删除操作
-            if (analysis.extractedRequirements.specificChanges.some((change: string) => change.includes('删除'))) {
+            // 检查是否是删除整个页面的操作
+            if (isDeletePageOperation(analysis, userInput)) {
               // 单页删除操作
               await handleDeletePages(
                 analysis.intent.targetPages,
@@ -2966,7 +3002,7 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
       }
 
       // 更新AI消息为成功状态
-      const successMessage = `✅ **第${slideIndex + 1}页重新生成完成！**
+      const successMessage = `**第${slideIndex + 1}页重新生成完成！**
 
 **修改内容：** ${userInput}
 **处理方式：** ${analysis.suggestedAction.description}
@@ -3053,7 +3089,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       // 根据分析结果确定操作类型
       const actionType = analysis.suggestedAction.actionType
       
-      if (actionType === 'regenerate_multiple_pages' && analysis.extractedRequirements.specificChanges.some((change: string) => change.includes('删除'))) {
+      if (actionType === 'regenerate_multiple_pages' && isDeletePageOperation(analysis, userInput)) {
         // 删除页面操作
         await handleDeletePages(targetPages, analysis, userInput, aiMessageId)
       } else {
@@ -3120,7 +3156,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
     }
 
     // 更新成功消息
-    const successMessage = `✅ **页面删除完成！**
+    const successMessage = `**页面删除完成！**
 
 **删除页面：** 第${targetPages.map(p => p + 1).join('、')}页
 **删除原因：** ${userInput}
@@ -3453,7 +3489,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
     const failCount = results.length - successCount
     
     // 更新最终消息
-    const finalMessage = `✅ **多页重新生成完成！**
+    const finalMessage = `**多页重新生成完成！**
 
 **修改需求：** ${userInput}
 **处理页面：** 第${targetPages.map(p => p + 1).join('、')}页
@@ -4087,7 +4123,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       // 更新成功消息
       setChatMessages(prev => prev.map(msg => 
         msg.id === aiMessageId 
-          ? { ...msg, content: `✅ 第${slideIndex + 1}页修改完成！已根据您的要求快速更新选中元素。`, isGenerating: false }
+          ? { ...msg, content: `第${slideIndex + 1}页修改完成！已根据您的要求快速更新选中元素。`, isGenerating: false }
           : msg
       ))
 
@@ -4117,7 +4153,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             body: JSON.stringify({
               action: 'add_chat_message',
               messageType: 'ai',
-              content: `✅ 第${slideIndex + 1}页修改完成！已根据您的要求快速更新选中元素。`
+              content: `第${slideIndex + 1}页修改完成！已根据您的要求快速更新选中元素。`
             }),
           });
           

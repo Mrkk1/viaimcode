@@ -1,0 +1,211 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Database and API Patterns
+
+## Database Schema Constraints
+
+### PPT Slides Table
+Located in [lib/ppt-db.ts](mdc:lib/ppt-db.ts), the `ppt_slides` table has strict constraints:
+
+```sql
+status ENUM('pending', 'thinking', 'generating', 'completed', 'failed')
+```
+
+**Critical**: Never use custom status values like `'regenerated'` or `'regenerated_multi'`
+
+### Project Status Flow
+1. `pending` → Initial state
+2. `thinking` → AI thinking phase
+3. `generating` → HTML generation phase  
+4. `completed` → Successfully generated
+5. `failed` → Generation failed
+
+## API Action Patterns
+
+### Main API Route: [app/api/ppt-tasks/[id]/route.ts](mdc:app/api/ppt-tasks/[id]/route.ts)
+
+#### Core Actions
+```typescript
+switch (body.action) {
+  case 'save_slide':
+    // Save complete slide data
+    await pptDb.saveSlide(id, slideIndex, slideData);
+    break;
+    
+  case 'update_slide':
+    // Update existing slide content (fast path)
+    await pptDb.updateSlideContent(id, slideIndex, {
+      htmlCode: body.htmlCode,
+      thinkingContent: body.thinkingContent,
+      status: 'completed'
+    });
+    break;
+    
+  case 'delete_slides':
+    // Delete multiple slides and reindex
+    for (const slideIndex of body.slideIndices) {
+      await pptDb.deleteSlideByIndex(id, slideIndex);
+    }
+    break;
+    
+  case 'add_chat_message':
+    // Add message to chat history
+    await pptDb.addChatMessage(id, body.messageType, body.content);
+    break;
+    
+  case 'complete_project':
+    // Mark project as completed
+    await pptDb.updateProjectStatus(id, 'completed', 100);
+    break;
+}
+```
+
+## Database Operation Patterns
+
+### Slide Management
+The [lib/ppt-db.ts](mdc:lib/ppt-db.ts) file contains key methods:
+
+#### `saveSlide(projectId, slideIndex, slideData)`
+- Saves complete slide including HTML, thinking content, and status
+- Used for initial slide creation and full regeneration
+- Handles both INSERT and UPDATE operations
+
+#### `updateSlideContent(projectId, slideIndex, contentData)`
+- Updates only specific fields of existing slide
+- Used for fast content modifications
+- Preserves unchanged slide data
+
+#### `deleteSlideByIndex(projectId, slideIndex)`
+- Deletes slide at specific index
+- Automatically reindexes remaining slides
+- Uses database transactions for consistency
+
+### Chat Message Persistence
+- All chat messages are stored in database
+- Both user and AI messages are persisted
+- Message history is loaded on project reload
+
+## Error Handling Patterns
+
+### Database Constraint Violations
+Common patterns to avoid:
+```typescript
+// ❌ Wrong - Invalid status value
+await pptDb.updateSlideContent(id, index, {
+  status: 'regenerated'  // Not in ENUM
+});
+
+// ✅ Correct - Valid status value
+await pptDb.updateSlideContent(id, index, {
+  status: 'completed'    // Valid ENUM value
+});
+```
+
+### API Response Validation
+Always check response status in frontend:
+```typescript
+const response = await fetch(`/api/ppt-tasks/${projectId}`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ action: 'update_slide', ... })
+});
+
+if (!response.ok) {
+  const errorText = await response.text();
+  console.error('API Error:', errorText);
+  throw new Error(`HTTP ${response.status}: ${errorText}`);
+}
+```
+
+## Data Flow Patterns
+
+### Slide Generation Flow
+1. **Frontend**: User triggers generation
+2. **API**: Receives request with action type
+3. **Database**: Creates/updates slide record with `pending` status
+4. **AI Processing**: Updates status to `thinking` → `generating`
+5. **Completion**: Updates status to `completed` with final HTML
+6. **Frontend**: Receives updated slide data
+
+### Modification Flow
+1. **Frontend**: User requests modification
+2. **Analysis**: AI analyzes modification intent
+3. **API**: Routes to appropriate handler based on analysis
+4. **Database**: Updates slide with new content
+5. **Frontend**: Displays updated slide
+
+### Error Recovery Flow
+1. **Error Detection**: API or database operation fails
+2. **Status Update**: Set slide status to `failed`
+3. **Error Logging**: Log detailed error information
+4. **User Feedback**: Show user-friendly error message
+5. **Retry Logic**: Allow user to retry operation
+
+## Performance Patterns
+
+### Batch Operations
+When handling multiple slides:
+```typescript
+// Use transactions for consistency
+const connection = await this.pool.getConnection();
+await connection.beginTransaction();
+
+try {
+  for (const slideIndex of slideIndices) {
+    await connection.execute(
+      'DELETE FROM ppt_slides WHERE projectId = ? AND slideIndex = ?',
+      [projectId, slideIndex]
+    );
+  }
+  await connection.commit();
+} catch (error) {
+  await connection.rollback();
+  throw error;
+}
+```
+
+### Concurrent Updates
+- Use proper database transactions
+- Handle race conditions in slide updates
+- Implement optimistic locking where needed
+
+## Common Database Issues
+
+### Index Reordering
+When deleting slides, maintain proper slide indexing:
+```sql
+-- After deleting slide at index 2
+UPDATE ppt_slides 
+SET slideIndex = slideIndex - 1 
+WHERE projectId = ? AND slideIndex > 2;
+```
+
+### Project State Consistency
+- Always update project status when slides change
+- Keep slide count synchronized with actual slide records
+- Handle partial failures gracefully
+
+### Connection Management
+- Use connection pooling for performance
+- Always release connections after use
+- Handle connection timeouts appropriately
+
+## Testing Database Operations
+
+### Unit Tests
+- Test each database method independently
+- Use test database with same schema
+- Mock external dependencies
+
+### Integration Tests
+- Test API endpoints with real database
+- Verify transaction rollback on errors
+- Test concurrent access patterns
+
+### Data Integrity Tests
+- Verify ENUM constraints are enforced
+- Test foreign key relationships
+- Validate data consistency after operations

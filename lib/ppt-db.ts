@@ -691,6 +691,34 @@ export class PPTDatabase {
     }
   }
 
+  // 删除指定索引的幻灯片
+  async deleteSlideByIndex(projectId: string, slideIndex: number): Promise<void> {
+    const connection = await this.pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+      
+      // 删除指定索引的幻灯片
+      await connection.execute(
+        'DELETE FROM ppt_slides WHERE projectId = ? AND slideIndex = ?',
+        [projectId, slideIndex]
+      );
+      
+      // 重新排序后续幻灯片的索引（将所有大于删除索引的幻灯片索引减1）
+      await connection.execute(
+        'UPDATE ppt_slides SET slideIndex = slideIndex - 1 WHERE projectId = ? AND slideIndex > ?',
+        [projectId, slideIndex]
+      );
+      
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   // 保存幻灯片（简化版，用于前端生成）
   async saveSlide(projectId: string, slideIndex: number, slideData: {
     title: string;

@@ -1,0 +1,154 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# AI Analysis and Modification Patterns
+
+## Smart Modification Detection
+
+### Analysis API
+The [app/api/analyze-modification-intent/route.ts](mdc:app/api/analyze-modification-intent/route.ts) endpoint analyzes user requests to determine:
+- Modification scope (`single`, `multiple`, `global`, `add_new`)
+- Modification type (`content`, `structure`, `style`)
+- Target pages and specific changes required
+
+### Critical Logic: `isDeletePageOperation()`
+Located in [components/ppt-generation-view.tsx](mdc:components/ppt-generation-view.tsx), this function prevents incorrect deletions:
+
+```typescript
+const isDeletePageOperation = (analysis: any, userInput: string): boolean => {
+  // If modification type is content, never delete entire page
+  if (analysis.intent?.modificationType === 'content') {
+    return false;
+  }
+  
+  // Only structure modifications can delete pages
+  if (analysis.intent?.modificationType !== 'structure') {
+    return false;
+  }
+  
+  // Check for page deletion patterns
+  const pageDeletePatterns = [
+    /删除第?\s*\d+\s*页$/,
+    /移除第?\s*\d+\s*页$/,
+    // ... other patterns
+  ];
+  
+  return pageDeletePatterns.some(pattern => pattern.test(userInput.trim()));
+};
+```
+
+## Modification Flow Types
+
+### 1. Content Modification (preserves page structure)
+- **Trigger**: User wants to change text, styling, or elements within a slide
+- **Keywords**: 修改内容, 改变颜色, 调整文本, 更新元素
+- **Action**: Uses `regenerateSinglePageDirectly()` for fast updates
+- **Preserves**: Page count, slide structure, layout
+
+### 2. Structure Modification (changes page structure)
+- **Trigger**: User wants to add/remove entire slides
+- **Keywords**: 删除第X页, 移除第X页, 添加新页面
+- **Action**: Uses `handleDeletePages()` or similar structural changes
+- **Changes**: Page count, slide indexes, overall structure
+
+### 3. Element Selection Context
+When user has selected a specific element:
+- Priority given to content modification over structure
+- Uses detailed element information from `selectedElementInfo`
+- Applies changes directly to selected element
+- Preserves surrounding content
+
+## Function Execution Patterns
+
+### executeModificationStrategy()
+Main dispatcher function that routes to appropriate handlers:
+
+```typescript
+switch (analysis.intent.scope) {
+  case 'single':
+    if (isDeletePageOperation(analysis, userInput)) {
+      await handleDeletePages(...)
+    } else if (hasSelectedElementContext) {
+      await regenerateSinglePageDirectly(...)  // Fast path
+    } else {
+      await regenerateSinglePageWithAnalysis(...)  // Full regeneration
+    }
+    break;
+  // ... other cases
+}
+```
+
+### Key Functions by Use Case
+
+#### Fast Content Updates
+- `regenerateSinglePageDirectly()` - Skips thinking phase, direct HTML modification
+- Used when: Element selected + content modification
+- Preserves: Original layout and structure
+
+#### Full Slide Regeneration
+- `regenerateSinglePageWithAnalysis()` - Complete thinking + HTML generation
+- Used when: No element selected or major changes needed
+- Regenerates: Both thinking content and HTML
+
+#### Multiple Page Changes
+- `handleRegenerateMultiplePages()` - Parallel processing of multiple slides
+- Used when: Analysis targets multiple specific pages
+- Maintains: Consistent styling across pages
+
+## Error Handling Patterns
+
+### Database Constraint Errors
+Common error: "Data truncated for column 'status'"
+- **Cause**: Invalid enum values in database
+- **Solution**: Use only valid status values from database schema
+- **Prevention**: Always validate status before database operations
+
+### API Response Handling
+```typescript
+const response = await fetch(`/api/ppt-tasks/${projectId}`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ... })
+});
+
+if (!response.ok) {
+  const errorText = await response.text();
+  throw new Error(`HTTP ${response.status}: ${errorText}`);
+}
+```
+
+## Testing and Debugging
+
+### Key Test Cases
+1. **Content vs Structure**: "修改文字" vs "删除第二页"
+2. **Element Selection**: Select element → modify → verify persistence
+3. **Page Refresh**: Make change → refresh → verify persistence
+4. **Error Recovery**: Invalid requests → proper error messages
+
+### Debug Patterns
+- Log analysis results to understand AI decision making
+- Check modification type before executing operations
+- Verify database status values match schema
+- Test with both Chinese and English input patterns
+
+## Best Practices
+
+### When Adding New Modification Types
+1. Update analysis API to recognize new patterns
+2. Add appropriate routing in `executeModificationStrategy()`
+3. Ensure database operations support new modification type
+4. Test persistence across page refreshes
+
+### When Handling User Input
+1. Always run through AI analysis first
+2. Respect modification type distinctions
+3. Provide clear feedback about what will happen
+4. Handle edge cases gracefully
+
+### Performance Considerations
+- Use `regenerateSinglePageDirectly()` for simple changes
+- Reserve full regeneration for complex modifications
+- Implement proper error boundaries
+- Provide real-time feedback during long operations

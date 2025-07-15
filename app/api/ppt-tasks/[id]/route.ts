@@ -118,6 +118,21 @@ export async function PATCH(
         }
         break;
 
+      case 'delete_slides':
+        // 删除指定幻灯片
+        if (body.slideIndices && Array.isArray(body.slideIndices)) {
+          // 按倒序删除，避免索引问题
+          const sortedIndices = [...body.slideIndices].sort((a, b) => b - a);
+          for (const slideIndex of sortedIndices) {
+            await pptDb.deleteSlideByIndex(id, slideIndex);
+          }
+          
+          // 重新计算剩余幻灯片数量
+          const remainingSlides = await pptDb.getSlides(id);
+          await pptDb.updateProjectSlideCount(id, remainingSlides.length, remainingSlides.length);
+        }
+        break;
+
       case 'complete_project':
         // 完成项目
         await pptDb.updateProjectStatus(id, 'completed', 100);
