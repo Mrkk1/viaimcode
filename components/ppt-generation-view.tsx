@@ -3564,12 +3564,15 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
     setChatMessages([])
   }
 
-  const downloadPPT = async () => {
+  const downloadPDF = async () => {
     if (slides.length === 0) return
 
+    // 创建一个持久的加载提示
+    const loadingToastId = toast.loading('正在启动PDF生成...')
+
     try {
-      // 显示加载提示
-      toast.info('正在生成PDF，请稍候...')
+      // 更新进度提示
+      toast.loading(`正在处理 ${slides.length} 张幻灯片...`, { id: loadingToastId })
       
       // 创建PDF文档 (自定义尺寸，完全匹配PPT的1280x720)
       const pdf = new jsPDF({
@@ -3662,7 +3665,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
           pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight)
 
           // 更新进度
-          toast.info(`正在生成PDF... (${i + 1}/${slides.length})`)
+          toast.loading(`正在生成PDF... (${i + 1}/${slides.length})`, { id: loadingToastId })
 
         } catch (error) {
           console.error(`生成第${i + 1}页PDF时出错:`, error)
@@ -3675,11 +3678,11 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
       const filename = `${outline?.title || 'generated-ppt'}.pdf`
       pdf.save(filename)
       
-      toast.success('PDF生成完成！')
+      toast.success('PDF生成完成！', { id: loadingToastId })
 
     } catch (error) {
       console.error('生成PDF时出错:', error)
-      toast.error('PDF生成失败，请重试')
+      toast.error('PDF生成失败，请重试', { id: loadingToastId })
     }
   }
 
@@ -3741,6 +3744,95 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
         console.warn(`未找到${slideId}页的DOM元素`)
       }
     }, 100) // 增加延迟确保DOM完全更新
+  }
+
+  const downloadPPTX = async () => {
+    if (slides.length === 0) {
+      toast.error('没有幻灯片可以下载')
+      return
+    }
+
+    // 创建一个持久的加载提示
+    const loadingToastId = toast.loading('正在启动PPTX生成...')
+    let progressInterval: NodeJS.Timeout | null = null
+    
+    try {
+      // 准备发送给服务端的数据
+      const requestData = {
+        slides: slides.map(slide => ({
+          id: slide.id,
+          title: slide.title,
+          content: slide.content,
+          htmlCode: slide.htmlCode
+        })),
+        title: outline?.title || 'Generated Presentation'
+      }
+
+      // 更新进度提示
+      toast.loading(`正在处理 ${slides.length} 张幻灯片...`, { id: loadingToastId })
+
+      // 创建一个进度更新定时器
+      progressInterval = setInterval(() => {
+        const randomMessages = [
+          '正在渲染幻灯片...',
+          '正在生成高质量截图...',
+          '正在创建PPTX文件...',
+          '正在优化图片质量...',
+          '即将完成...'
+        ]
+        const randomMessage = randomMessages[Math.floor(Math.random() * randomMessages.length)]
+        toast.loading(randomMessage, { id: loadingToastId })
+      }, 3000) // 每3秒更新一次提示
+
+      // 发送请求到服务端生成PPTX
+      const response = await fetch('/api/generate-pptx', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+      })
+
+      // 清除进度更新定时器
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || '生成PPTX失败')
+      }
+
+      // 更新进度提示
+      toast.loading('正在下载PPTX文件...', { id: loadingToastId })
+
+      // 获取PPTX文件数据
+      const blob = await response.blob()
+      
+      // 创建下载链接
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${outline?.title || 'generated-presentation'}.pptx`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      
+      // 关闭加载提示并显示成功消息
+      toast.success('PPTX文件下载完成！', { id: loadingToastId })
+      
+    } catch (error) {
+      // 确保清除定时器
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
+      
+      console.error('下载PPTX时出错:', error)
+      // 关闭加载提示并显示错误消息
+      toast.error(error instanceof Error ? error.message : '下载PPTX失败', { id: loadingToastId })
+    }
   }
 
   const downloadHTML = () => {
@@ -4529,13 +4621,17 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end"  style={{border: '1px solid white'}}>
-                  <DropdownMenuItem onClick={downloadPPT} >
+                  <DropdownMenuItem onClick={downloadPDF} >
                     <FileText className="w-4 h-4 mr-2" />
                     下载为 PDF
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={downloadHTML}>
                     <Code className="w-4 h-4 mr-2" />
                     下载为 HTML
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadPPTX}>
+                    <Presentation className="w-4 h-4 mr-2" />
+                    下载为 PPTX
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
