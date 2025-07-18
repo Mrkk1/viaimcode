@@ -115,7 +115,28 @@ Make sure the presentation:
                 stream: true,
               }),
             })
-          } else if (provider === 'openai_compatible') {
+          }
+          else if (provider === 'kimi') {
+           
+              response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.MOONSHOT_API_KEY}`,
+                },
+                body: JSON.stringify({
+                  model: model,
+                  messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: prompt }
+                  ],
+                  temperature: 0.7,
+                  max_tokens: 2000,
+                  stream: true,
+                }),
+              })
+            }
+          else if (provider === 'openai_compatible') {
             response = await fetch(`${process.env.OPENAI_COMPATIBLE_BASE_URL}/v1/chat/completions`, {
               method: 'POST',
               headers: {

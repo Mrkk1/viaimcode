@@ -388,7 +388,27 @@ ${previousSlideInfo}
                 stream: true,
               }),
             })
-          } else if (provider === 'openai_compatible') {
+          } 
+          else if (provider === 'kimi') {
+            response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.MOONSHOT_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userPrompt }
+                ],  
+                temperature: 0.3, // 降低温度以获得更一致的代码输出
+                max_tokens: 6000, // 增加token限制以确保完整的HTML生成
+                stream: true,
+              }),
+            })
+          }
+          else if (provider === 'openai_compatible') {
             const baseURL = process.env.OPENAI_COMPATIBLE_BASE_URL || 'https://api.openai.com/v1'
             response = await fetch(`${baseURL}/chat/completions`, {
               method: 'POST',

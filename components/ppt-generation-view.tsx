@@ -1227,8 +1227,8 @@ export function PPTGenerationView({
               slideIndex: index,
               totalSlides: outlineData.outline.slides.length,
               theme: 'auto', // 让AI自动选择最合适的主题
-              model,
-              provider,
+              model: 'kimi-k2-0711-preview',
+              provider: 'kimi',
               previousSlideInfo: previousSlideInfo
             }),
           })
@@ -1341,8 +1341,8 @@ export function PPTGenerationView({
               slideIndex: index,
               totalSlides: outlineData.outline.slides.length,
               theme: 'auto', // 让AI自动选择最合适的主题
-              model,
-              provider,
+              model: 'kimi-k2-0711-preview',
+              provider: 'kimi',
               previousSlideInfo: previousSlideInfo,
               thinkingContent: thinkingContent // 将思考结果传递给HTML生成
             }),
@@ -2310,8 +2310,8 @@ ${previousSlideInfo}
             slideIndex: index,
             totalSlides: newOutline.slides.length,
             theme: 'auto',
-            model,
-            provider,
+            model: 'kimi-k2-0711-preview',
+            provider: 'kimi',
             previousSlideInfo: previousSlideInfo,
             enhancedPrompt: enhancedSlidePrompt,
             isRegeneration: true
@@ -2378,8 +2378,8 @@ ${previousSlideInfo}
             slideIndex: index,
             totalSlides: newOutline.slides.length,
             theme: 'auto',
-            model,
-            provider,
+            model: 'kimi-k2-0711-preview',
+            provider: 'kimi',
             previousSlideInfo: previousSlideInfo,
             thinkingContent: thinkingContent,
             enhancedPrompt: enhancedSlidePrompt,
@@ -2806,8 +2806,8 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
           slideIndex,
           totalSlides: slides.length,
           theme: 'auto',
-          model,
-          provider,
+          model: 'kimi-k2-0711-preview',
+          provider: 'kimi',
           previousSlideInfo,
           modificationContext: {
             userRequest: userInput,
@@ -2880,8 +2880,8 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
           slideIndex,
           totalSlides: slides.length,
           theme: 'auto',
-          model,
-          provider,
+          model: 'kimi-k2-0711-preview',
+          provider: 'kimi',
           previousSlideInfo,
           thinkingContent,
           modificationContext: {
@@ -3264,8 +3264,8 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             slideIndex,
             totalSlides: slides.length,
             theme: 'auto',
-            model,
-            provider,
+            model: 'kimi-k2-0711-preview',
+            provider: 'kimi',
             previousSlideInfo,
             modificationContext: {
               userRequest: userInput,
@@ -3339,8 +3339,8 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             slideIndex,
             totalSlides: slides.length,
             theme: 'auto',
-            model,
-            provider,
+            model: 'kimi-k2-0711-preview',
+            provider: 'kimi',
             previousSlideInfo,
             thinkingContent,
             modificationContext: {
@@ -4048,8 +4048,8 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
           slideIndex,
           totalSlides: slides.length,
           theme: 'auto',
-          model,
-          provider,
+          model: 'kimi-k2-0711-preview',
+          provider: 'kimi',
           thinkingContent: `基于现有HTML代码进行快速修改：${analysis.extractedRequirements.specificChanges.join(', ')}`, // 简化的思考内容
           modificationContext: {
             userRequest: userInput,

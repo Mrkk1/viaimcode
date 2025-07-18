@@ -197,7 +197,66 @@ ${previousSlideInfo}
                 stream: true,
               }),
             })
-          } else if (provider === 'openai_compatible') {
+          } 
+          else if (provider === 'kimi') {
+            response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.MOONSHOT_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: model,
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: `请为演示文稿创建一个专业的幻灯片页面。
+
+**重要：请严格按照以下两个步骤执行**
+第一步：完整的设计思考过程（用<think></think>包围）
+第二步：完整的HTML代码生成
+
+**核心信息:**
+标题: ${slide.title}
+内容描述: ${slide.content}
+关键要点: ${slide.keyPoints.join(', ')}
+
+**设计要求:**
+- 这是第${slideIndex + 1}页，共${totalSlides}页
+- 目标尺寸: 1280px × 720px (标准演示比例)
+- 适用场景: 商务演示、投影展示
+- 设计风格: 专业、现代、国际化
+
+**技术要求:**
+- 使用Tailwind CSS实现所有样式
+- 确保在投影设备上的可读性
+- 包含适当的视觉层次和引导
+- 添加页码和品牌元素
+
+${previousSlideInfo ? `**风格参考信息:**
+${previousSlideInfo}
+
+请特别注意保持与前页的设计一致性，包括：
+- 相同的色彩体系和配色方案
+- 一致的字体大小和层次结构
+- 相同的布局网格和对齐方式
+- 统一的装饰元素和视觉风格
+- 保持整体演示文稿的专业性和连贯性` : '这是演示文稿的第一页或前面页面的风格信息不可用，请创建一个专业、现代的设计风格，为后续页面建立设计基准。'}
+
+**执行要求:**
+1. 首先在<think></think>标签内完成所有8个维度的详细设计分析
+2. 思考过程必须完整结束后，再开始生成HTML代码
+3. 不要在思考过程中混入任何HTML代码
+4. 确保思考过程涵盖系统提示中的所有要求
+
+请严格按照这个顺序执行，确保思考和生成两个阶段完全分离。` }
+                ],
+                temperature: 0.7,
+                max_tokens: 4000,
+                stream: true,
+              }),
+            })
+          } 
+          else if (provider === 'openai_compatible') {
             response = await fetch(`${process.env.OPENAI_COMPATIBLE_BASE_URL}/v1/chat/completions`, {
               method: 'POST',
               headers: {
