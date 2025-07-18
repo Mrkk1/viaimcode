@@ -305,7 +305,7 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
         await pptDb.updateSlideContent(projectId, index, {
           htmlCode: finalHtmlCode,
           status: 'completed',
-          progress: '✅ 生成完成'
+          progress: '生成完成'
         });
 
         // 更新任务进度

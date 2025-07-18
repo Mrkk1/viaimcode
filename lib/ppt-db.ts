@@ -747,7 +747,7 @@ export class PPTDatabase {
           [
             slideData.title, slideData.content, slideData.htmlCode || null, 
             slideData.thinkingContent || null, slideData.status, 
-            slideData.status === 'completed' ? '✅ 生成完成' : 
+            slideData.status === 'completed' ? '生成完成' : 
             slideData.status === 'failed' ? `❌ ${slideData.errorMessage || '生成失败'}` : '生成中...',
             projectId, slideIndex
           ]
@@ -764,7 +764,7 @@ export class PPTDatabase {
             slideId, projectId, slideIndex, slideData.title, slideData.content,
             slideData.htmlCode || null, slideData.thinkingContent || null,
             slideData.status,
-            slideData.status === 'completed' ? '✅ 生成完成' : 
+            slideData.status === 'completed' ? '生成完成' : 
             slideData.status === 'failed' ? `❌ ${slideData.errorMessage || '生成失败'}` : '生成中...'
           ]
         );
