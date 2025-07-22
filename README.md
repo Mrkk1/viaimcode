@@ -282,5 +282,5 @@ pm2 start npm --name "localsite-ai" -- start
 如果这个项目对你有帮助，请给我们一个 ⭐ Star！
 
 ---
-thanks by [未来智能](https://www.viaim.cn/#/home) 
+[讯飞未来智能](https://www.viaim.cn/#/home) 
 
