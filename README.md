@@ -39,7 +39,7 @@
 
 1. **克隆项目**
 ```bash
-git clone https://github.com/your-username/LocalSite-ai.git
+git clone https://github.com/Mrkk1/viaimcode.git
 cd LocalSite-ai
 ```
 
