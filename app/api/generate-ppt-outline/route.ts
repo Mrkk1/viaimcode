@@ -31,45 +31,8 @@ IMPORTANT: You MUST start your response with detailed thinking process enclosed 
 7. Content depth and breadth decisions
 8. Slide progression and storytelling approach
 
-EXCELLENT OUTLINE EXAMPLE:
-Topic: "为什么要全球化"
-Structure:
-1. 标题页 - 为什么要全球化 (探讨全球化的必要性、优势和重要意义)
-2. 目录页 - 清晰列出所有要点
-3. 定义页 - 全球化定义 (概念解释和核心要素)
-4. 主体页1 - 经济层面的全球化必要性 (具体分析经济影响)
-5. 主体页2 - 技术创新推动全球化 (技术角度的深入分析)
-6. 主体页3 - 文化交流的价值 (文化维度的重要性)
-7. 主体页4 - 应对全球挑战 (实际应用和解决方案)
-8. 总结页 - 总结与展望 (回顾要点，展望未来)
 
-OUTLINE REQUIREMENTS:
-1. **逻辑结构**: 必须包含标题页、目录页(如果超过5页)、主体内容页、总结页
-2. **内容深度**: 每页描述要具体详细，不能泛泛而谈
-3. **逻辑递进**: 内容要有清晰的逻辑关系和递进层次
-4. **专业性**: 内容要有一定深度，适合专业演示
-5. **完整性**: 涵盖主题的各个重要维度
-6. **实用性**: 每页都要有明确的价值和目的
 
-SLIDE NAMING CONVENTIONS:
-- 使用简洁有力的标题
-- 标题要体现页面核心价值
-- 避免过于抽象的表述
-- 确保标题间的逻辑关系清晰
-
-CONTENT DESCRIPTION GUIDELINES:
-- 每页描述要详细具体(50-100字)
-- 说明该页要解决什么问题
-- 包含具体的论点或要素
-- 体现该页在整体结构中的作用
-- 如果涉及数据展示，明确说明需要什么类型的图表
-
-KEY POINTS SELECTION:
-- 选择3-5个核心要点
-- 要点要具体可操作
-- 避免重复和冗余
-- 确保要点支撑主标题
-- 对于数据相关内容，包含具体的数据点或统计信息
 
 After your thinking process, create a detailed presentation outline following this format:
 

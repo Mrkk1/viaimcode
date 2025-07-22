@@ -27,42 +27,168 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 主题配置 - 现在仅作为参考，AI会自动选择最合适的风格
+    // 丰富的主题配置库 - 提供多样化的设计风格选择
     const themeConfig = {
+      // 智能自动选择
       auto: {
-        backgroundColor: 'AI will automatically select based on content',
-        primaryColor: 'AI will automatically select based on content',
-        secondaryColor: 'AI will automatically select based on content',
-        accentColor: 'AI will automatically select based on content',
-        cardStyle: 'AI will automatically select based on content'
+        backgroundColor: 'AI will intelligently select the most suitable style',
+        primaryColor: 'AI will analyze content and choose optimal colors',
+        secondaryColor: 'AI will ensure perfect color harmony',
+        accentColor: 'AI will select based on brand and content context',
+        cardStyle: 'AI will choose the most effective visual presentation',
+        description: '基于内容智能选择最佳风格'
       },
+      
+      // 商务专业系列
       modern: {
         backgroundColor: 'bg-gradient-to-br from-blue-50 to-indigo-100',
         primaryColor: 'text-blue-900',
         secondaryColor: 'text-blue-700',
         accentColor: 'bg-blue-600',
-        cardStyle: 'bg-white/80 backdrop-blur-sm shadow-xl border border-blue-200/50'
+        cardStyle: 'bg-white/90 backdrop-blur-sm shadow-xl border border-blue-200/50 rounded-xl',
+        description: '现代简约，适合科技和创新主题'
       },
+      corporate: {
+        backgroundColor: 'bg-gradient-to-br from-gray-50 to-slate-100',
+        primaryColor: 'text-gray-900',
+        secondaryColor: 'text-gray-700',
+        accentColor: 'bg-slate-800',
+        cardStyle: 'bg-white shadow-lg border border-gray-200 rounded-lg',
+        description: '企业商务，正式专业的商业演示'
+      },
+      executive: {
+        backgroundColor: 'bg-gradient-to-br from-slate-100 to-gray-200',
+        primaryColor: 'text-slate-900',
+        secondaryColor: 'text-slate-700',
+        accentColor: 'bg-slate-900',
+        cardStyle: 'bg-white/95 shadow-2xl border border-slate-300 rounded-lg',
+        description: '高管级别，极简高端商务风格'
+      },
+      
+      // 创意设计系列
+      creative: {
+        backgroundColor: 'bg-gradient-to-br from-purple-100 via-pink-50 to-orange-100',
+        primaryColor: 'text-purple-900',
+        secondaryColor: 'text-purple-700',
+        accentColor: 'bg-gradient-to-r from-purple-600 to-pink-600',
+        cardStyle: 'bg-white/85 backdrop-blur-md shadow-2xl border border-purple-200/60 rounded-2xl',
+        description: '创意活泼，适合设计和营销主题'
+      },
+      artistic: {
+        backgroundColor: 'bg-gradient-to-br from-amber-50 via-orange-50 to-red-100',
+        primaryColor: 'text-orange-900',
+        secondaryColor: 'text-orange-800',
+        accentColor: 'bg-gradient-to-r from-orange-500 to-red-500',
+        cardStyle: 'bg-white/90 shadow-xl border-2 border-orange-200 rounded-xl',
+        description: '艺术风格，适合创作和文化主题'
+      },
+      vibrant: {
+        backgroundColor: 'bg-gradient-to-br from-cyan-100 via-blue-100 to-purple-100',
+        primaryColor: 'text-cyan-900',
+        secondaryColor: 'text-blue-800',
+        accentColor: 'bg-gradient-to-r from-cyan-500 to-purple-500',
+        cardStyle: 'bg-white/85 backdrop-blur-sm shadow-xl border border-cyan-200/50 rounded-2xl',
+        description: '活力四射，适合年轻化和互动主题'
+      },
+      
+      // 深色主题系列
       dark: {
         backgroundColor: 'bg-gradient-to-br from-gray-900 to-black',
         primaryColor: 'text-white',
         secondaryColor: 'text-gray-300',
         accentColor: 'bg-purple-600',
-        cardStyle: 'bg-gray-800/80 backdrop-blur-sm shadow-xl border border-gray-700/50'
+        cardStyle: 'bg-gray-800/90 backdrop-blur-sm shadow-2xl border border-gray-700/50 rounded-xl',
+        description: '经典深色，专业且现代'
       },
-      corporate: {
-        backgroundColor: 'bg-gradient-to-br from-gray-50 to-blue-50',
+      cyberpunk: {
+        backgroundColor: 'bg-gradient-to-br from-gray-900 via-purple-900/20 to-black',
+        primaryColor: 'text-cyan-300',
+        secondaryColor: 'text-purple-300',
+        accentColor: 'bg-gradient-to-r from-cyan-500 to-purple-500',
+        cardStyle: 'bg-gray-900/90 backdrop-blur-md shadow-2xl border border-cyan-500/30 rounded-xl',
+        description: '科技未来感，适合技术和创新主题'
+      },
+      midnight: {
+        backgroundColor: 'bg-gradient-to-br from-slate-900 to-blue-900',
+        primaryColor: 'text-blue-100',
+        secondaryColor: 'text-slate-300',
+        accentColor: 'bg-blue-500',
+        cardStyle: 'bg-slate-800/90 backdrop-blur-sm shadow-xl border border-blue-500/30 rounded-lg',
+        description: '午夜蓝调，优雅深沉'
+      },
+      
+      // 学术教育系列
+      academic: {
+        backgroundColor: 'bg-gradient-to-br from-green-50 to-teal-100',
+        primaryColor: 'text-green-900',
+        secondaryColor: 'text-green-800',
+        accentColor: 'bg-green-600',
+        cardStyle: 'bg-white/95 shadow-lg border border-green-200 rounded-lg',
+        description: '学术专业，适合教育和研究主题'
+      },
+      research: {
+        backgroundColor: 'bg-gradient-to-br from-indigo-50 to-blue-100',
+        primaryColor: 'text-indigo-900',
+        secondaryColor: 'text-indigo-800',
+        accentColor: 'bg-indigo-600',
+        cardStyle: 'bg-white/90 shadow-lg border border-indigo-200 rounded-lg',
+        description: '研究导向，严谨科学风格'
+      },
+      
+      // 特色主题系列
+      nature: {
+        backgroundColor: 'bg-gradient-to-br from-green-100 via-emerald-50 to-teal-100',
+        primaryColor: 'text-green-900',
+        secondaryColor: 'text-emerald-800',
+        accentColor: 'bg-gradient-to-r from-green-500 to-emerald-500',
+        cardStyle: 'bg-white/90 shadow-xl border border-green-200/60 rounded-2xl',
+        description: '自然清新，适合环保和健康主题'
+      },
+      luxury: {
+        backgroundColor: 'bg-gradient-to-br from-amber-50 to-yellow-100',
+        primaryColor: 'text-amber-900',
+        secondaryColor: 'text-yellow-800',
+        accentColor: 'bg-gradient-to-r from-amber-600 to-yellow-600',
+        cardStyle: 'bg-white/95 shadow-2xl border-2 border-amber-200 rounded-xl',
+        description: '奢华金色，适合高端品牌展示'
+      },
+      minimal: {
+        backgroundColor: 'bg-white',
         primaryColor: 'text-gray-900',
-        secondaryColor: 'text-gray-700',
-        accentColor: 'bg-gray-800',
-        cardStyle: 'bg-white shadow-lg border border-gray-200'
+        secondaryColor: 'text-gray-600',
+        accentColor: 'bg-gray-900',
+        cardStyle: 'bg-gray-50 shadow-md border border-gray-200 rounded-lg',
+        description: '极简主义，纯净简洁'
+      },
+      warm: {
+        backgroundColor: 'bg-gradient-to-br from-orange-100 to-red-100',
+        primaryColor: 'text-red-900',
+        secondaryColor: 'text-orange-800',
+        accentColor: 'bg-gradient-to-r from-orange-500 to-red-500',
+        cardStyle: 'bg-white/90 shadow-xl border border-orange-200 rounded-xl',
+        description: '温暖色调，亲和友好'
+      },
+      cool: {
+        backgroundColor: 'bg-gradient-to-br from-blue-100 to-cyan-100',
+        primaryColor: 'text-blue-900',
+        secondaryColor: 'text-cyan-800',
+        accentColor: 'bg-gradient-to-r from-blue-500 to-cyan-500',
+        cardStyle: 'bg-white/90 shadow-xl border border-blue-200 rounded-xl',
+        description: '冷色调，冷静专业'
       }
     }
 
     const currentTheme = themeConfig[theme as keyof typeof themeConfig] || themeConfig.auto
 
-    // 专门用于思考分析的系统提示词
-    const systemPrompt = `You are an expert presentation designer specializing in analyzing and planning professional HTML slides. Your role is to conduct comprehensive design analysis before any code generation.
+    // 专门用于思考分析的系统提示词 - 重点解决配色和布局问题
+    const systemPrompt = `You are an expert presentation designer specializing in analyzing and planning professional HTML slides with PERFECT visual harmony and layout precision.
+
+🎯 CRITICAL DESIGN QUALITY REQUIREMENTS:
+- ZERO tolerance for color clashes or visual discord
+- PERFECT element alignment and spacing consistency
+- PROFESSIONAL color harmony following design principles
+- CLEAR visual hierarchy with proper contrast ratios
+- RESPONSIVE layout that works across all screen sizes
 
 CRITICAL LANGUAGE REQUIREMENT:
 - AUTOMATICALLY DETECT the language of the slide content
@@ -71,34 +197,73 @@ CRITICAL LANGUAGE REQUIREMENT:
 - If the slide content is in other languages, respond in that same language
 - NEVER mix languages - maintain complete consistency throughout your analysis
 
+🎨 COLOR HARMONY EXPERTISE:
+- Apply color theory principles: complementary, analogous, triadic schemes
+- Ensure WCAG AA accessibility standards (4.5:1 contrast ratio minimum)
+- Use professional color palettes with maximum 3-4 colors total
+- Avoid oversaturated or neon colors that cause visual fatigue
+- Create subtle gradients with similar hue families only
+- Test color combinations for colorblind accessibility
+
+📐 LAYOUT PRECISION STANDARDS:
+- Use consistent 8px or 16px grid system for all spacing
+- Maintain proper margins: minimum 40px from slide edges
+- Ensure visual balance with rule of thirds or golden ratio
+- Create clear content hierarchy: title → subtitle → body → details
+- Use consistent alignment (left, center, right) throughout
+- Maintain proper aspect ratios for all visual elements
+
 INTELLIGENT STYLE SELECTION:
-- AUTOMATICALLY ANALYZE the slide content and topic to determine the most suitable visual style
-- Consider factors like: topic formality, target audience, content type, cultural context
-- Choose from: modern/tech (for innovation, technology topics), corporate/professional (for business, formal topics), creative/artistic (for design, creative topics), academic/research (for educational, scientific topics)
-- Justify your style choice based on content analysis
-- Ensure the chosen style enhances content communication effectiveness
+- AUTOMATICALLY ANALYZE the slide content and topic to determine the most suitable visual style from our extensive theme library
+- Available theme categories:
+  * 商务专业系列: modern, corporate, executive - 适合商业演示和正式场合
+  * 创意设计系列: creative, artistic, vibrant - 适合创意展示和营销内容
+  * 深色主题系列: dark, cyberpunk, midnight - 适合技术和现代主题
+  * 学术教育系列: academic, research - 适合教育和科研内容
+  * 特色主题系列: nature, luxury, minimal, warm, cool - 适合特定行业和情感表达
+- Consider factors like: topic formality, target audience, content type, cultural context, emotional tone, brand positioning
+- For each theme, analyze: color psychology, visual hierarchy, readability, professional appropriateness
+- Justify your style choice with specific reasons related to content effectiveness and audience engagement
 
 CRITICAL: This is the THINKING PHASE ONLY. You must ONLY provide detailed design analysis without generating any HTML code.
 
 REQUIRED ANALYSIS STRUCTURE (MUST BE EXTREMELY DETAILED):
 
-1. **语言识别与风格选择** (Language Detection & Style Selection)
+1. **语言识别与主题风格智能选择** (Language Detection & Intelligent Theme Selection)
    - 自动检测幻灯片内容的语言并确认响应语言
-   - 基于内容主题、目标受众、文化背景智能选择最合适的视觉风格
-   - 分析内容的正式程度、专业性、创新性等特征
-   - 确定最佳的设计风格方向（现代科技、商务专业、创意艺术、学术研究等）
+   - 从15种丰富主题中智能选择最合适的视觉风格：
+     * 分析内容性质：商务/创意/技术/学术/特色主题
+     * 评估情感色调：正式/活泼/专业/温暖/冷静
+     * 考虑目标受众：高管/创意人员/技术团队/学者/大众
+     * 分析品牌定位：奢华/简约/现代/传统/创新
+   - 提供1个最佳主题选择，并详细说明配色和布局的专业理由
 
-2. **需求分析** (Requirements Analysis)
-   - 深入分析幻灯片的主题、内容和目标
-   - 确定目标受众类型和演示场景
-   - 理解该页面在整个演示文稿中的作用和重要性
-   - 分析信息传达的核心目标和关键信息
+2. **色彩设计分析** (Color Design Analysis)
+   - 制定专业配色方案，确保色彩和谐：
+     * 主色调选择：基于内容情感和品牌调性
+     * 辅助色搭配：确保对比度和可读性
+     * 强调色运用：突出重点信息，不超过总面积的10%
+     * 背景色处理：保证内容清晰可读，避免干扰
+   - 验证配色方案的可访问性和专业性
+   - 确保在不同设备和环境下的视觉效果
 
-3. **设计策略** (Design Strategy)
-   - 基于内容特点和选定风格确定最适合的视觉表达方式
-   - 选择信息架构和视觉层次策略
-   - 确定核心设计理念（简洁、专业、现代等）
-   - 规划用户的视觉阅读路径
+3. **布局设计规划** (Layout Design Planning)
+   - 制定精确的布局策略：
+     * 网格系统：使用16px基础网格，确保元素对齐
+     * 间距规范：标题间距、段落间距、元素边距的统一标准
+     * 视觉层次：通过大小、颜色、位置建立清晰的信息层级
+     * 内容分区：合理划分信息区块，避免拥挤和混乱
+   - 确保1280×720分辨率下的完美显示效果
+   - 考虑不同内容长度的自适应布局
+
+4. **视觉元素设计** (Visual Elements Design)
+   - 规划视觉元素的使用：
+     * 图标风格：统一的图标系列和尺寸规范
+     * 图形元素：装饰性元素的位置和样式
+     * 分隔线：统一的线条样式和间距
+     * 卡片设计：阴影、圆角、边框的一致性
+   - 确保所有元素服务于内容表达，避免过度装饰
+
 
 
 SLIDE INFORMATION:
@@ -109,23 +274,30 @@ SLIDE INFORMATION:
 - Target Dimensions: 1280px × 720px
 
 THEME CONFIGURATION:
-- Theme Mode: ${theme} (${theme === 'auto' ? 'AI will intelligently select the most appropriate style based on content analysis' : 'Predefined theme'})
+- Selected Theme: ${theme} (${currentTheme.description || 'Custom theme'})
 - Background: ${currentTheme.backgroundColor}
 - Primary Text: ${currentTheme.primaryColor}
 - Secondary Text: ${currentTheme.secondaryColor}
 - Accent Color: ${currentTheme.accentColor}
 - Card Style: ${currentTheme.cardStyle}
 
+AVAILABLE THEME OPTIONS (for reference and intelligent selection):
+${Object.entries(themeConfig).map(([key, config]) => 
+  `- ${key}: ${config.description || 'Theme option'}`
+).join('\n')}
+
 ${previousSlideInfo ? `PREVIOUS SLIDE STYLE REFERENCE:
 ${previousSlideInfo}
 
 请特别注意分析前页的设计特点，确保风格的高度一致性。` : '这是演示文稿的首页或无前页参考，请建立专业的设计基准。'}
 
-IMPORTANT: 
-- 只进行设计分析，不生成任何HTML代码
-- 分析必须详细、具体、可执行
-- 每个维度都要有明确的设计决策和理由
-- 为后续的HTML生成提供清晰的设计指导
+🚨 CRITICAL DESIGN REQUIREMENTS:
+- 必须提供具体的颜色代码和精确的布局尺寸
+- 严格遵循色彩理论，避免任何视觉冲突
+- 确保16px网格对齐，所有间距必须是8的倍数
+- 提供详细的视觉层次规划，确保信息清晰传达
+- 所有设计决策必须有专业理由支撑
+- 为后续的HTML生成提供清晰、精确的设计指导
 - 所有设计方案必须是静态的，不包含动画或过渡效果
 `
 

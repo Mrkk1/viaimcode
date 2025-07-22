@@ -132,6 +132,7 @@ ${previousSlideInfo}
 Ensure strict consistency with the previous slide's design elements.` : ''}
 
 CONTENT SIMPLICITY REQUIREMENTS (CRITICAL):
+!!! 如果有箭头线条等,注意使用绝对定位,防止指针偏移!!!
 1. **内容简洁性原则**:
    - 每页PPT最多包含3-4个核心要点
    - 每个要点用1-2句话表达，避免长段落
@@ -161,8 +162,8 @@ HTML STRUCTURE REQUIREMENTS:
 
 3. **内容组织（简洁性优先）**:
    - CRITICAL: 内容简洁性原则：
-     * 每页最多2个要点，避免信息过载
-     * 每个要点控制在1句话内，突出核心信息
+     * 避免信息过载  
+     * 突出核心信息
      * 使用关键词和短语，避免长段落
      * 优先使用图表、图标等视觉元素代替文字
    - 图表容器：最大高度300px，确保在分配空间内
@@ -193,49 +194,10 @@ ECHARTS INTEGRATION GUIDE (when data visualization is needed):
    - 雷达图: type: 'radar'
 6. **静态配置**: Disable all animations by setting animation: false in chart options
 
-LAYOUT TEMPLATE (MUST FOLLOW THIS STRUCTURE):
-HTML structure must include:
-- body: 1280x720px with overflow:hidden
-- .slide-container: full size with flex column layout  
-- .content-area: full size with 40px padding and flex column
-- .main-content: flex:1 for auto-sizing with margin-bottom:20px
-- .slide-footer: fixed 40px height for page numbers
 
 
 
-EXAMPLE MULTI-SECTION STRUCTURE:
-
-This ensures all content fits within allocated vertical space
-
-CRITICAL OUTPUT REQUIREMENT:
-- Generate ONLY the complete HTML code following the above template structure
-- Start with <!DOCTYPE html> and end with </html>
-- No explanations, comments, or additional text
-- DO NOT wrap the output in code blocks (no '''html or ''' markers)
-- DO NOT include any markdown formatting or code block syntax
-- Output raw HTML code directly without any wrapper syntax
-- MUST use the flexbox layout structure and height allocation shown above
-- Body and containers MUST be exactly 1280x720px
-- Use .main-content with flex flex-col gap-4 for vertical sections
-- Use .slide-footer for page numbers (fixed 40px height)
-- If content involves data, MUST include ECharts visualization within size limits
-- DO NOT use margin-top, use gap spacing instead
-- Use RESPONSIVE font sizes based on section height (see above sizing strategy)
-- Use ADAPTIVE padding based on section size (p-6 for large, p-4 for medium, p-3 for small)
-- CRITICAL: Each section must have FIXED height allocation - no overflow
-- CRITICAL: Font sizes must adapt to the available space within each fixed-height section
-- CRITICAL: Content must be EXTREMELY CONCISE - maximum 3-4 key points per slide
-- CRITICAL: Each text element should be brief and impactful - avoid verbose descriptions
-
-DIRECT MODIFICATION MODE (when existingHtmlCode is provided):
-- PRESERVE the overall layout and structure of the existing HTML
-- ONLY modify the specific elements mentioned in the modification requirements
-- Keep the same color scheme, font styles, and visual design unless specifically requested to change
-- Maintain the same container structure and CSS classes
-- Focus on targeted changes rather than complete redesign
-- If modifying text content, preserve the formatting and styling of surrounding elements
-- If modifying specific elements (like selected text), only change that element while keeping everything else intact`
-
+`
     // 创建流式响应
     const stream = new ReadableStream({
       async start(controller) {
@@ -344,14 +306,13 @@ ${!modificationContext?.isDirectModification ? `${thinkingContent ? `**🎯 设�
 
 **内容简洁性原则**:
 - 每页PPT最多包含3-4个核心要点
-- 每个要点用1-2句话表达，避免长段落
 - 使用关键词、短语和数字，提高可读性
 - 优先使用视觉元素（图表、图标、数据）代替大量文字
 - 删除冗余信息，只保留最精简的内容
 
 **内容组织策略**:
 - 标题：简洁明了，一句话概括主题
-- 要点：使用项目符号，每项不超过10个字
+- 要点：使用项目符号，每项不超过15个字
 - 描述：如需详细说明，控制在15字以内
 - 数据：优先使用图表展示，减少文字说明
 ${thinkingContent ? '- 严格遵循设计分析中的所有决策和尺寸约束' : '- 创建专业美观的静态设计，确保内容完整显示'}

@@ -1083,53 +1083,96 @@ export function PPTGenerationView({
       }))
       setSlides(initialSlides)
 
-      // 串行生成 - 一页一页依次生成，保持风格统一
-      console.log(`开始串行生成${outlineData.outline.slides.length}页幻灯片...`)
+      // 并行生成 - 同时生成所有幻灯片，通过统一的设计指导保持风格一致
+      console.log(`开始并行生成${outlineData.outline.slides.length}页幻灯片...`)
       
       // 维护当前生成状态
       let currentSlides = [...initialSlides]
       
-      // 串行生成所有幻灯片
-      for (let index = 0; index < outlineData.outline.slides.length; index++) {
-        const slide = outlineData.outline.slides[index]
+      // 添加开始生成的消息
+      const parallelStartContent = `开始并行生成${outlineData.outline.slides.length}页幻灯片...`
+      const parallelStartMessage: ChatMessage = {
+        id: generateUniqueId('parallel-start'),
+        type: 'ai',
+        content: parallelStartContent,
+        timestamp: new Date(),
+        isGenerating: true
+      }
+      setChatMessages(prev => [...prev, parallelStartMessage])
+      
+      // 保存开始消息到数据库
+      if (currentProjectId) {
+        try {
+          const response = await fetch(`/api/ppt-tasks/${currentProjectId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'add_chat_message',
+              messageType: 'ai',
+              content: parallelStartContent
+            }),
+          });
+          if (!response.ok) {
+            const responseText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${responseText}`);
+          }
+          console.log('并行生成开始消息保存成功');
+        } catch (error) {
+          console.error('保存并行生成开始消息失败:', error);
+        }
+      }
+      
+      // 生成统一的设计风格指导
+      const generateUnifiedStyleGuide = () => {
+        return `
+**统一设计风格指导:**
+
+**整体主题:**
+- 主题: ${prompt.includes('商业') || prompt.includes('企业') ? '商业专业风格' : prompt.includes('教育') || prompt.includes('学习') ? '教育清新风格' : prompt.includes('科技') ? '科技现代风格' : '通用简洁风格'}
+- 色彩基调: ${prompt.includes('蓝色') ? '蓝色系' : prompt.includes('绿色') ? '绿色系' : prompt.includes('红色') ? '红色系' : '蓝白渐变系'}
+
+**设计规范:**
+1. **色彩体系** - 使用统一的主色调和辅色搭配
+   - 主色: bg-blue-600, text-blue-600, border-blue-500
+   - 辅色: bg-gray-100, bg-white, text-gray-800, text-gray-600
+   - 强调色: bg-yellow-400, text-yellow-600 (用于重点内容)
+
+2. **布局结构** - 保持一致的页面布局模式
+   - 容器: min-h-screen flex flex-col justify-center items-center
+   - 内容区: max-w-6xl mx-auto p-8
+   - 卡片样式: bg-white rounded-xl shadow-lg p-6
+
+3. **字体层次** - 建立清晰的文字层级
+   - 主标题: text-4xl font-bold mb-6
+   - 副标题: text-2xl font-semibold mb-4  
+   - 正文: text-lg text-gray-700 leading-relaxed
+   - 要点: text-base text-gray-600
+
+4. **装饰元素** - 统一的视觉装饰
+   - 圆角: rounded-xl (大元素), rounded-lg (小元素)
+   - 阴影: shadow-lg (主要内容), shadow-md (次要元素)
+   - 间距: space-y-6 (主要间距), space-y-4 (次要间距)
+
+5. **响应式设计** - 确保各设备兼容
+   - 移动端适配: responsive breakpoints
+   - 弹性布局: flex, grid 合理使用
+
+**视觉连贯性要求:**
+- 所有页面应该看起来像同一套演示文稿的连续页面
+- 保持相同的视觉节奏和设计语言
+- 确保色彩、字体、布局的一致性
+`
+      }
+      
+      const unifiedStyleGuide = generateUnifiedStyleGuide()
+      
+      // 并行生成所有幻灯片
+      const slideGenerationPromises = outlineData.outline.slides.map(async (slide: any, index: number) => {
         const startTime = Date.now()
         console.log(`开始生成第${index + 1}页: ${slide.title}`)
         
-        // 添加开始生成单页的消息
+        // 为每个幻灯片添加单独的消息ID
         const singleSlideMsgId = generateUniqueId(`slide-${index}`)
-        const slideStartContent = `开始生成第${index + 1}页：「${slide.title}」`
-        const slideStartMessage: ChatMessage = {
-          id: singleSlideMsgId,
-          type: 'ai',
-          content: slideStartContent,
-          timestamp: new Date(),
-          isGenerating: true
-        }
-        setChatMessages(prev => [...prev, slideStartMessage])
-        
-        // 保存单页生成开始消息到数据库
-        if (currentProjectId) {
-          try {
-            const response = await fetch(`/api/ppt-tasks/${currentProjectId}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                action: 'add_chat_message',
-                messageType: 'ai',
-                content: slideStartContent
-              }),
-            });
-
-            if (!response.ok) {
-              const responseText = await response.text();
-              throw new Error(`HTTP ${response.status}: ${responseText}`);
-            }
-
-            console.log('单页生成开始消息保存成功');
-          } catch (error) {
-            console.error('保存单页生成开始消息失败:', error);
-          }
-        }
         
         // 更新生成状态
         setSlides(prev => prev.map((s, i) => 
@@ -1137,75 +1180,8 @@ export function PPTGenerationView({
         ))
         
         try {
-          // 获取前一页的信息作为风格参考
-          let previousSlideInfo = ''
-          if (index > 0) {
-            const prevSlide = currentSlides[index - 1]
-            if (prevSlide && prevSlide.htmlCode && !prevSlide.htmlCode.includes('生成失败')) {
-              // 详细分析前一页的设计特点
-              const htmlCode = prevSlide.htmlCode
-              
-              // 提取色彩信息
-              const colorClasses = htmlCode.match(/(?:bg-|text-|border-|from-|to-)[\w-]+/g) || []
-              const uniqueColors = [...new Set(colorClasses)].slice(0, 8)
-              
-              // 提取布局信息
-              const layoutClasses = htmlCode.match(/(?:grid|flex|w-|h-|p-|m-|space-|gap-)[\w-]+/g) || []
-              const layoutInfo = [...new Set(layoutClasses)].slice(0, 10)
-              
-              // 提取字体和文本信息
-              const textClasses = htmlCode.match(/(?:text-|font-|leading-)[\w-]+/g) || []
-              const textInfo = [...new Set(textClasses)].slice(0, 8)
-              
-              // 提取装饰元素
-              const decorativeClasses = htmlCode.match(/(?:rounded-|shadow-|backdrop-|opacity-)[\w-]+/g) || []
-              const decorativeInfo = [...new Set(decorativeClasses)].slice(0, 6)
-              
-              // 分析HTML结构
-              const hasGrid = htmlCode.includes('grid')
-              const hasFlex = htmlCode.includes('flex')
-              const hasCard = htmlCode.includes('card') || htmlCode.includes('bg-white') || htmlCode.includes('bg-gray')
-              const hasGradient = htmlCode.includes('gradient')
-              const hasBackdrop = htmlCode.includes('backdrop')
-              
-              previousSlideInfo = `
-**前一页设计分析报告:**
-
-**页面信息:**
-- 标题: "${prevSlide.title}"
-- 设计类型: ${hasCard ? '卡片式布局' : '全屏式布局'}
-- 布局方式: ${hasGrid ? '网格布局' : hasFlex ? '弹性布局' : '流式布局'}
-
-**色彩体系:**
-- 主要色彩类: ${uniqueColors.join(', ')}
-- 是否使用渐变: ${hasGradient ? '是' : '否'}
-- 是否使用背景模糊: ${hasBackdrop ? '是' : '否'}
-
-**布局结构:**
-- 布局相关类: ${layoutInfo.join(', ')}
-- 主要容器特点: ${hasCard ? '使用了卡片容器设计' : '采用全屏直接布局'}
-
-**字体和文本:**
-- 文本样式类: ${textInfo.join(', ')}
-- 文本层次: 已建立清晰的标题-内容-要点层次结构
-
-**装饰元素:**
-- 装饰样式类: ${decorativeInfo.join(', ')}
-
-**设计要求:**
-1. **严格保持色彩一致性** - 使用相同的色彩类和配色方案
-2. **保持布局结构** - 采用相似的容器和网格系统
-3. **统一字体层次** - 使用相同的字体大小和权重系统
-4. **延续装饰风格** - 保持相同的圆角、阴影、透明度等视觉效果
-5. **确保视觉连贯性** - 整体设计应该看起来像同一套演示文稿的连续页面
-
-**特别注意:**
-- 如果前页使用了特定的布局比例，请保持相同比例
-- 如果前页有特殊的装饰元素（如分割线、图标、背景图案），请在新页面中延续
-- 保持相同的内容密度和留白比例
-- 确保页码和品牌元素的位置和样式一致`
-            }
-          }
+          // 使用统一的设计风格指导，而不是依赖前一页
+          const previousSlideInfo = unifiedStyleGuide
           
           // ========== 第一步：思考分析阶段 ==========
           console.log(`第${index + 1}页 - 开始第一步：思考分析`)
@@ -1627,6 +1603,9 @@ export function PPTGenerationView({
             }
           }
 
+          // 成功完成，返回结果
+          return { slideIndex: index, success: true }
+
         } catch (error) {
           const endTime = Date.now()
           console.error(`第${index + 1}页生成失败，耗时: ${endTime - startTime}ms`, error)
@@ -1706,21 +1685,22 @@ export function PPTGenerationView({
             }
           }
 
-          // 可以选择继续生成下一页或停止
-          console.log(`第${index + 1}页生成失败，继续生成下一页...`)
+          // 返回生成结果
+          return { slideIndex: index, success: false, error }
         }
-      }
+      })
 
-      // 串行生成完成
-      console.log('串行生成完成')
+      // 等待所有并行生成完成
+      console.log('等待所有并行生成完成...')
+      const results = await Promise.allSettled(slideGenerationPromises)
       
       // 统计结果
-      const successCount = currentSlides.filter(slide => 
-        slide.htmlCode && !slide.htmlCode.includes('生成失败')
+      const successCount = results.filter(r => 
+        r.status === 'fulfilled' && r.value && r.value.success
       ).length
       const failureCount = outlineData.outline.slides.length - successCount
 
-      console.log(`串行生成完成: ${successCount}页成功, ${failureCount}页失败`)
+      console.log(`并行生成完成: ${successCount}页成功, ${failureCount}页失败`)
 
       // 更新幻灯片生成状态为完成
       setChatMessages(prev => prev.map(msg =>
