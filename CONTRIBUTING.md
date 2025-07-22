@@ -17,7 +17,7 @@
    - 克隆你 Fork 的仓库到本地
 
 ```bash
-git clone https://github.com/你的用户名/LocalSite-ai.git
+git clone https://github.com/你的用户名/viaimcode.git
 cd LocalSite-ai
 ```
 

@@ -1,6 +1,8 @@
 # viaimCode AI
+### 开箱即用的 webcode 项目
+**体验地址**: [https://webcode.weilai.ai](https://webcode.weilai.ai)
 
-**开箱即用 AI驱动的网站和PPT生成平台** | AI-powered Website & PPT Generator
+**AI驱动的网站和PPT生成平台** | AI-powered Website & PPT Generator
 
 一个基于Next.js构建的智能内容生成平台，支持通过AI生成现代化网站和专业PPT演示文稿。
 ![LocalSite AI Banner](./image/screenshot-20250722-150035.png)
@@ -269,7 +271,6 @@ pm2 start npm --name "localsite-ai" -- start
 ## 📄 许可证
 
 本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
-
 ## 🔗 相关链接
 
 - [在线演示](https://webcode.weilai.ai)
@@ -281,5 +282,5 @@ pm2 start npm --name "localsite-ai" -- start
 如果这个项目对你有帮助，请给我们一个 ⭐ Star！
 
 ---
-power by [未来智能](https://www.viaim.cn/#/home) 
+thanks by [未来智能](https://www.viaim.cn/#/home) 
 
