@@ -144,7 +144,7 @@ export function WelcomeView({
             toast.error('Cannot connect to Ollama. Is the server running?');
           } else if (errorMessage.includes('LM Studio')) {
             toast.error('Cannot connect to LM Studio. Is the server running?');
-          } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible') {
+          } else if (selectedProvider === 'deepseek' || selectedProvider === 'openai_compatible' || selectedProvider === 'kimi') {
             toast.error('Make sure the Base URL and API Keys are correct in your .env.local file.');
           } else {
             toast.error('Models could not be loaded. Please try again later.');
@@ -268,10 +268,10 @@ export function WelcomeView({
        PPT
           </Button>
         </div>
-        {isLoggedIn && (
+        {isLoggedIn && selectedMode === 'website' && (
           <>
             {/* Settings Toggle Button */}
-            {/* <div className="w-full mb-4">
+             <div className="w-full mb-4">
               <Button
                 variant="ghost"
                 onClick={() => setShowSettings(!showSettings)}
@@ -283,7 +283,7 @@ export function WelcomeView({
                 </div>
                 <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showSettings ? 'rotate-180' : ''}`} />
               </Button>
-            </div> */}
+            </div>
 
             {/* Collapsible Settings Section */}
             <div className={`w-full space-y-4 overflow-hidden transition-all duration-300 ${showSettings ? 'max-h-[1000px] opacity-100 mb-8' : 'max-h-0 opacity-0'}`}>

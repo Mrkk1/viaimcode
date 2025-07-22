@@ -3,8 +3,8 @@ import { LLMProvider } from '@/lib/providers/config';
 
 export async function GET() {
   try {
-    // Use the default provider from environment variables or DeepSeek as fallback
-    const defaultProvider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.DEEPSEEK;
+    // Use the default provider from environment variables or Kimi as fallback
+    const defaultProvider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.KIMI;
 
     return NextResponse.json({ defaultProvider });
   } catch (error) {

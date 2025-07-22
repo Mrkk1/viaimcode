@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
     if (providerParam && Object.values(LLMProvider).includes(providerParam as LLMProvider)) {
       provider = providerParam as LLMProvider;
     } else {
-      // Use the default provider from environment variables or DeepSeek as fallback
-      provider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.DEEPSEEK;
+      // Use the default provider from environment variables or Kimi as fallback
+      provider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.KIMI;
     }
 
     // Create the provider client

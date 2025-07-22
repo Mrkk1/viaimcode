@@ -95,8 +95,8 @@ ${fragment.content}` : modificationPrompt;
     if (providerParam && Object.values(LLMProvider).includes(providerParam as LLMProvider)) {
       provider = providerParam as LLMProvider;
     } else {
-      // 使用环境变量中的默认提供者或回退到DeepSeek
-      provider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.DEEPSEEK;
+      // 使用环境变量中的默认提供者或回退到Kimi
+      provider = (process.env.DEFAULT_PROVIDER as LLMProvider) || LLMProvider.KIMI;
     }
 
     // 创建提供者客户端

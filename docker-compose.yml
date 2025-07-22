@@ -1,18 +1,87 @@
-version: '3'
-
 services:
-  localsite-ai:
+  # 应用服务
+  app:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: localsite-ai-app
     ports:
       - "3000:3000"
     environment:
-      - HOST=0.0.0.0
-      # Choose the default provider (ollama or lm_studio)
-      - DEFAULT_PROVIDER=lm_studio
-    # volumes:
-    #   - ./:/app
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=localsite_password
+      - DB_NAME=localsite_ai
+      - DEFAULT_PROVIDER=kimi
+      - JWT_SECRET=your_jwt_secret_change_this_in_production
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      # AI服务配置 - 需要在.env.local中配置实际的API密钥
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DEEPSEEK_API_BASE=https://api.deepseek.com/v1
+      - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # 阿里云OSS配置
+      - ALICLOUD_OSS_ENDPOINT=${ALICLOUD_OSS_ENDPOINT:-}
+      - ALICLOUD_ACCESS_KEY_ID=${ALICLOUD_ACCESS_KEY_ID:-}
+      - ALICLOUD_ACCESS_KEY_SECRET=${ALICLOUD_ACCESS_KEY_SECRET:-}
+      - ALICLOUD_OSS_BUCKET=${ALICLOUD_OSS_BUCKET:-}
+      - ALICLOUD_OSS_REGION=${ALICLOUD_OSS_REGION:-oss-cn-shanghai}
+    volumes:
+      - ./public/uploads:/app/public/uploads
+      - ./workspace:/app/workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
     extra_hosts:
-      # Important: Allows access to the host machine
       - "host.docker.internal:host-gateway"
+    networks:
+      - localsite-network
+
+  # 数据库服务
+  db:
+    image: mysql:8.0
+    container_name: localsite-ai-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=localsite_password
+      - MYSQL_DATABASE=localsite_ai
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./localsite_ai.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-plocalsite_password"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+    restart: unless-stopped
+    networks:
+      - localsite-network
+
+  # Redis缓存服务（可选）
+  redis:
+    image: redis:7-alpine
+    container_name: localsite-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - localsite-network
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  localsite-network:
+    driver: bridge

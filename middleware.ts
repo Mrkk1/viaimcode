@@ -42,6 +42,7 @@ export async function middleware(request: NextRequest) {
   const publicApiRoutes = [
     '/api/auth/login',
     '/api/auth/register',
+    '/api/auth/me',  // 添加/api/auth/me到公开路由，让前端能检查登录状态
     '/api/share',
     '/api/featured-websites'
   ];

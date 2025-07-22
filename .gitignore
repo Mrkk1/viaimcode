@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+.yarn/install-state.gz
 
 # testing
 /coverage
@@ -18,11 +19,6 @@
 # misc
 .DS_Store
 *.pem
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # debug
 npm-debug.log*
@@ -30,7 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -39,5 +39,68 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# 项目特定文件
 package-lock.json
 unused-components.md
+
+# 临时文件和缓存
+temp/
+.temp/
+*.tmp
+*.temp
+
+# 日志文件
+*.log
+logs/
+
+# 编辑器和IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 数据库文件
+*.sql.backup
+*.db
+*.sqlite
+*.sqlite3
+
+# 上传文件（保留目录结构但忽略内容）
+public/uploads/*
+!public/uploads/.gitkeep
+workspace/*
+!workspace/.gitkeep
+
+# 安全相关
+.env.backup
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Docker
+.dockerignore
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+
+# 文档构建
+docs/build/
+docs/.docusaurus/

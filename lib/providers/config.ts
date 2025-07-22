@@ -4,6 +4,7 @@ export enum LLMProvider {
   OPENAI_COMPATIBLE = 'openai_compatible',
   OLLAMA = 'ollama',
   LM_STUDIO = 'lm_studio',
+  KIMI = 'kimi',
 }
 
 // Provider configuration interface
@@ -57,6 +58,15 @@ export const PROVIDER_CONFIGS: Record<LLMProvider, ProviderConfig> = {
     apiKeyEnvVar: null, // LM Studio doesn't require an API key
     defaultBaseUrl: 'http://localhost:1234/v1',
     isLocal: true,
+  },
+  [LLMProvider.KIMI]: {
+    id: LLMProvider.KIMI,
+    name: 'Kimi',
+    description: 'AI models from Moonshot (Kimi)',
+    baseUrlEnvVar: 'MOONSHOT_API_BASE',
+    apiKeyEnvVar: 'MOONSHOT_API_KEY',
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    isLocal: false,
   },
 };
 
