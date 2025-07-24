@@ -136,11 +136,15 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
       };
     }
 
-    // 保存大纲
+    // 提取统一背景信息
+    const unifiedBackground = outlineData.outline.unifiedBackground || null;
+    console.log(`任务 ${projectId} - 统一背景信息:`, unifiedBackground ? '已提取' : '未找到');
+
+    // 保存大纲（包含统一背景信息）
     await pptDb.saveOutline(projectId, outlineData.outline.title, outlineData.outline);
     
     // 添加大纲完成消息
-    await pptDb.addChatMessage(projectId, 'ai', `✅ PPT大纲生成完成！\n\n**${outlineData.outline.title}**\n\n共${outlineData.outline.slides.length}页幻灯片：\n${outlineData.outline.slides.map((slide: any, index: number) => `${index + 1}. ${slide.title}`).join('\n')}`);
+    await pptDb.addChatMessage(projectId, 'ai', `✅ PPT大纲生成完成！\n\n**${outlineData.outline.title}**\n\n共${outlineData.outline.slides.length}页幻灯片：\n${outlineData.outline.slides.map((slide: any, index: number) => `${index + 1}. ${slide.title}`).join('\n')}\n\n${unifiedBackground ? `🎨 **统一背景风格**: ${unifiedBackground.theme}\n${unifiedBackground.description}` : ''}`);
 
     // 更新任务状态为生成幻灯片
     await pptDb.updateProjectStatus(projectId, 'generating_slides', 30);
@@ -187,7 +191,8 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
             theme: 'auto',
             model,
             provider,
-            previousSlideInfo
+            previousSlideInfo,
+            unifiedBackground // 传递统一背景信息
           }),
         });
 
@@ -247,7 +252,8 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
             model,
             provider,
             previousSlideInfo,
-            thinkingContent
+            thinkingContent,
+            unifiedBackground // 传递统一背景信息
           }),
         });
 
@@ -329,7 +335,7 @@ async function generatePPTInBackground(projectId: string, prompt: string, model:
 
     // 任务完成
     await pptDb.updateProjectStatus(projectId, 'completed', 100);
-    await pptDb.addChatMessage(projectId, 'ai', `🎉 PPT全部生成完成！\n\n您可以在右侧预览所有幻灯片，或点击下载按钮保存为HTML文件。`);
+    await pptDb.addChatMessage(projectId, 'ai', `🎉 PPT全部生成完成！\n\n您可以在右侧预览所有幻灯片，或点击下载按钮保存为HTML文件。${unifiedBackground ? `\n\n🎨 **统一风格**: 所有幻灯片都采用了"${unifiedBackground.theme}"主题的统一背景设计，确保视觉一致性。` : ''}`);
 
     console.log(`任务 ${projectId} - 全部生成完成`);
 

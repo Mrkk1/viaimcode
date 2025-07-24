@@ -29,6 +29,26 @@ interface PPTSlide {
 
 interface PPTOutline {
   title: string
+  unifiedBackground?: {
+    theme: string
+    description: string
+    htmlTemplate: string
+    contentAreaClass: string
+    styleGuide: {
+      primaryColor: string
+      secondaryColor: string
+      accentColor: string
+      backgroundColor: string
+      contentTextColor?: string
+      headingTextColor?: string
+      contentBackgroundColor?: string
+      fontFamily: string
+      headingFont: string
+      bodyFont: string
+      spacing: string
+      contrastRatio?: string
+    }
+  }
   slides: Array<{
     title: string
     content: string
@@ -908,30 +928,56 @@ export function PPTGenerationView({
       // 解析最终的大纲
       let outlineData: { outline: PPTOutline }
       try {
-        // 尝试多种方式提取JSON
+        // 新的解析方式：分离JSON和HTML模板
         let jsonString = ''
+        let htmlTemplate = ''
         
-        // 方法1: 寻找完整的JSON对象
-        const jsonMatch = outlineContent.match(/\{[\s\S]*\}/)
-        if (jsonMatch) {
-          jsonString = jsonMatch[0]
-        } else {
-          // 方法2: 寻找slides数组开始的位置
-          const slidesMatch = outlineContent.match(/"slides"\s*:\s*\[[\s\S]*\]/)
-          if (slidesMatch) {
-            jsonString = `{"title":"Generated Presentation",${slidesMatch[0]}}`
+        // 检查是否使用了新的分离格式
+        if (outlineContent.includes('===JSON_START===') && outlineContent.includes('===HTML_TEMPLATE_START===')) {
+          // 使用分离格式
+          const jsonStartIndex = outlineContent.indexOf('===JSON_START===') + '===JSON_START==='.length
+          const jsonEndIndex = outlineContent.indexOf('===JSON_END===')
+          const htmlStartIndex = outlineContent.indexOf('===HTML_TEMPLATE_START===') + '===HTML_TEMPLATE_START==='.length
+          const htmlEndIndex = outlineContent.indexOf('===HTML_TEMPLATE_END===')
+          
+          if (jsonEndIndex > jsonStartIndex && htmlEndIndex > htmlStartIndex) {
+            jsonString = outlineContent.substring(jsonStartIndex, jsonEndIndex).trim()
+            htmlTemplate = outlineContent.substring(htmlStartIndex, htmlEndIndex).trim()
+            console.log('使用分离格式解析，JSON长度:', jsonString.length, 'HTML长度:', htmlTemplate.length)
           } else {
-            throw new Error('No JSON structure found in content')
+            throw new Error('分离格式标记不完整')
+          }
+        } else {
+          // 回退到旧的解析方式
+          console.log('回退到旧的JSON解析方式')
+          // 方法1: 寻找完整的JSON对象
+          const jsonMatch = outlineContent.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            jsonString = jsonMatch[0]
+          } else {
+            // 方法2: 寻找slides数组开始的位置
+            const slidesMatch = outlineContent.match(/"slides"\s*:\s*\[[\s\S]*\]/)
+            if (slidesMatch) {
+              jsonString = `{"title":"Generated Presentation",${slidesMatch[0]}}`
+            } else {
+              throw new Error('No JSON structure found in content')
+            }
           }
         }
         
-        // 清理JSON字符串 - 更彻底的清理
+        // 清理JSON字符串 - 修复常见的格式问题
         jsonString = jsonString
           .replace(/```json\s*/g, '')
           .replace(/```\s*/g, '')
           .replace(/^\s*[\r\n]+/gm, '') // 移除空行
           .replace(/,(\s*[}\]])/g, '$1') // 移除多余的逗号
           .replace(/([{,]\s*)(\w+):/g, '$1"$2":') // 确保属性名有引号
+          // 修复错误的转义引号问题 - 这是最常见的问题
+          .replace(/\\"/g, '"') // 移除不必要的转义
+          .replace(/\\'/g, "'") // 移除不必要的转义
+          // 修复CSS属性值的引号问题
+          .replace(/"(\w+)":\s*(\w+px|[0-9]+px|[0-9]+%)/g, '"$1": "$2"') // CSS数值需要引号
+          .replace(/"(\w+)":\s*([a-zA-Z-]+)\s*;/g, '"$1": "$2";') // CSS属性值需要引号
           .trim()
         
         // 尝试修复常见的JSON错误
@@ -942,24 +988,103 @@ export function PPTGenerationView({
             throw new Error('Invalid outline structure: missing or empty slides array')
           }
           
+          // 如果使用分离格式，将HTML模板添加回unifiedBackground
+          if (htmlTemplate && parsedOutline.unifiedBackground) {
+            parsedOutline.unifiedBackground.htmlTemplate = htmlTemplate
+            console.log('已将分离的HTML模板添加到unifiedBackground')
+          }
+          
           outlineData = { outline: parsedOutline }
         } catch (parseError) {
           console.error('JSON解析失败，尝试修复:', parseError)
+          console.error('解析失败的JSON字符串:', jsonString)
           
-          // 尝试修复JSON - 移除最后一个不完整的对象
+                    // 尝试多种修复策略
           let fixedJson = jsonString
-          const lastCommaIndex = jsonString.lastIndexOf(',')
-          if (lastCommaIndex > 0) {
-            const beforeComma = jsonString.substring(0, lastCommaIndex)
-            const afterComma = jsonString.substring(lastCommaIndex + 1)
-            
-            // 如果逗号后面的内容不完整，就移除它
-            if (!afterComma.trim().match(/^\s*\{.*\}\s*$/)) {
-              fixedJson = beforeComma + jsonString.substring(jsonString.lastIndexOf(']'))
+          let parsedOutline = null
+          
+          // 策略1: 修复转义引号问题
+          if (!parsedOutline) {
+            try {
+              // 移除所有不必要的反斜杠转义
+              fixedJson = jsonString
+                .replace(/\\"/g, '"')  // 移除转义的双引号
+                .replace(/\\'/g, "'")  // 移除转义的单引号
+                .replace(/\\\\/g, '\\') // 修复双反斜杠
+              
+              const testParse = JSON.parse(fixedJson)
+              if (testParse.slides && Array.isArray(testParse.slides)) {
+                console.log('策略1修复成功: 移除转义引号')
+                parsedOutline = testParse
+              }
+            } catch (e) {
+              // 策略1失败，尝试策略2
             }
           }
           
-          const parsedOutline = JSON.parse(fixedJson)
+          // 策略2: 移除最后一个不完整的对象
+          if (!parsedOutline) {
+            try {
+              const lastCommaIndex = jsonString.lastIndexOf(',')
+              if (lastCommaIndex > 0) {
+                const beforeComma = jsonString.substring(0, lastCommaIndex)
+                const afterComma = jsonString.substring(lastCommaIndex + 1)
+                
+                // 如果逗号后面的内容不完整，就移除它
+                if (!afterComma.trim().match(/^\s*\{.*\}\s*$/)) {
+                  fixedJson = beforeComma + jsonString.substring(jsonString.lastIndexOf(']'))
+                }
+              }
+              const testParse = JSON.parse(fixedJson)
+              if (testParse.slides && Array.isArray(testParse.slides)) {
+                console.log('策略2修复成功: 移除不完整对象')
+                parsedOutline = testParse
+              }
+            } catch (e) {
+              // 策略2失败，尝试策略3
+            }
+          }
+          
+          // 策略3: 尝试从错误位置截断并修复
+          if (!parsedOutline) {
+            try {
+              const errorMatch = (parseError as Error).message?.match(/position (\d+)/)
+              if (errorMatch) {
+                const errorPos = parseInt(errorMatch[1])
+                // 从错误位置向前查找最近的完整对象结束
+                let truncatePos = errorPos
+                for (let i = errorPos - 1; i >= 0; i--) {
+                  if (jsonString[i] === '}' || jsonString[i] === ']') {
+                    truncatePos = i + 1
+                    break
+                  }
+                }
+                fixedJson = jsonString.substring(0, truncatePos)
+                // 确保JSON结构完整
+                if (!fixedJson.endsWith('}')) {
+                  fixedJson += '}'
+                }
+                const testParse = JSON.parse(fixedJson)
+                if (testParse.slides && Array.isArray(testParse.slides)) {
+                  console.log('策略3修复成功: 从错误位置截断')
+                  parsedOutline = testParse
+                }
+              }
+            } catch (e) {
+              // 策略3也失败了
+            }
+          }
+          
+          // 如果所有策略都失败，抛出错误
+          if (!parsedOutline) {
+            throw new Error(`JSON解析失败: ${String(parseError)}`)
+          }
+          
+          // 如果使用分离格式，将HTML模板添加回unifiedBackground
+          if (htmlTemplate && parsedOutline.unifiedBackground) {
+            parsedOutline.unifiedBackground.htmlTemplate = htmlTemplate
+            console.log('修复后已将分离的HTML模板添加到unifiedBackground')
+          }
           
           if (!parsedOutline.slides || !Array.isArray(parsedOutline.slides) || parsedOutline.slides.length === 0) {
             throw new Error('Invalid outline structure after fix: missing or empty slides array')
@@ -1205,7 +1330,8 @@ export function PPTGenerationView({
               theme: 'auto', // 让AI自动选择最合适的主题
               model: 'kimi-k2-0711-preview',
               provider: 'kimi',
-              previousSlideInfo: previousSlideInfo
+              previousSlideInfo: previousSlideInfo,
+              unifiedBackground: outlineData.outline.unifiedBackground // 传递统一背景信息
             }),
           })
 
@@ -1320,7 +1446,8 @@ export function PPTGenerationView({
               model: 'kimi-k2-0711-preview',
               provider: 'kimi',
               previousSlideInfo: previousSlideInfo,
-              thinkingContent: thinkingContent // 将思考结果传递给HTML生成
+              thinkingContent: thinkingContent, // 将思考结果传递给HTML生成
+              unifiedBackground: outlineData.outline.unifiedBackground // 传递统一背景信息
             }),
           })
 
@@ -2294,7 +2421,8 @@ ${previousSlideInfo}
             provider: 'kimi',
             previousSlideInfo: previousSlideInfo,
             enhancedPrompt: enhancedSlidePrompt,
-            isRegeneration: true
+            isRegeneration: true,
+            unifiedBackground: newOutline.unifiedBackground // 传递统一背景信息
           }),
         })
 
@@ -2362,6 +2490,7 @@ ${previousSlideInfo}
             provider: 'kimi',
             previousSlideInfo: previousSlideInfo,
             thinkingContent: thinkingContent,
+            unifiedBackground: newOutline.unifiedBackground, // 传递统一背景信息
             enhancedPrompt: enhancedSlidePrompt,
             isRegeneration: true
           }),
@@ -2789,6 +2918,7 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
           model: 'kimi-k2-0711-preview',
           provider: 'kimi',
           previousSlideInfo,
+          unifiedBackground: outline?.unifiedBackground, // 传递统一背景信息
           modificationContext: {
             userRequest: userInput,
             analysisResult: analysis,
@@ -2864,6 +2994,7 @@ ${analysis.suggestedAction.needsConfirmation ? '请确认是否继续执行此�
           provider: 'kimi',
           previousSlideInfo,
           thinkingContent,
+          unifiedBackground: outline?.unifiedBackground, // 传递统一背景信息
           modificationContext: {
             userRequest: userInput,
             analysisResult: analysis,
@@ -3247,6 +3378,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             model: 'kimi-k2-0711-preview',
             provider: 'kimi',
             previousSlideInfo,
+            unifiedBackground: outline?.unifiedBackground, // 传递统一背景信息
             modificationContext: {
               userRequest: userInput,
               analysisResult: analysis,
@@ -3323,6 +3455,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             provider: 'kimi',
             previousSlideInfo,
             thinkingContent,
+            unifiedBackground: outline?.unifiedBackground, // 传递统一背景信息
             modificationContext: {
               userRequest: userInput,
               analysisResult: analysis,
@@ -4123,6 +4256,7 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
           model: 'kimi-k2-0711-preview',
           provider: 'kimi',
           thinkingContent: `基于现有HTML代码进行快速修改：${analysis.extractedRequirements.specificChanges.join(', ')}`, // 简化的思考内容
+          unifiedBackground: outline?.unifiedBackground, // 传递统一背景信息
           modificationContext: {
             userRequest: userInput,
             analysisResult: analysis,

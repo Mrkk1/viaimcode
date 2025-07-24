@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(request: NextRequest) {
   try {
-    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, thinkingContent, modificationContext } = await request.json()
+    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, thinkingContent, modificationContext, unifiedBackground } = await request.json()
 
     // 添加调试日志
     console.log('HTML生成API - 接收到的参数:')
@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
     console.log('- provider:', provider)
     console.log('- thinkingContent长度:', thinkingContent?.length || 0)
     console.log('- thinkingContent预览:', thinkingContent?.substring(0, 200) || '无')
+    console.log('- unifiedBackground:', unifiedBackground ? '存在' : '不存在')
     console.log('- modificationContext:', modificationContext ? '存在' : '不存在')
     console.log('- isDirectModification:', modificationContext?.isDirectModification || false)
     console.log('- existingHtmlCode:', slide?.existingHtmlCode ? '存在' : '不存在')
@@ -31,22 +32,8 @@ export async function POST(request: NextRequest) {
       console.log('HTML生成API - 警告：没有思考内容，将使用基础模板')
     }
 
-    // 主题配置 - 现在仅作为参考，AI会自动选择最合适的风格
-    const themeConfig = {
-      auto: {
-        backgroundColor: 'automatically select based on content and thinking analysis',
-        primaryColor: 'automatically select based on content and thinking analysis',
-        secondaryColor: 'automatically select based on content and thinking analysis',
-        accentColor: 'automatically select based on content and thinking analysis',
-        cardStyle: 'automatically select based on content and thinking analysis'
-      },
-    
-    }
-
-    const currentTheme = themeConfig[theme as keyof typeof themeConfig] || themeConfig.auto
-
-    // 专门用于HTML代码生成的系统提示词
-    const systemPrompt = `You are an expert HTML/CSS developer specializing in creating professional presentation slides using Tailwind CSS. Your role is to generate complete, production-ready HTML code based on detailed design analysis.
+    // 专门用于HTML代码生成的系统提示词 - 基于统一背景模板
+    const systemPrompt = `You are an expert HTML/CSS developer specializing in creating professional presentation slide content using a unified background template and Tailwind CSS.
 
 CRITICAL LANGUAGE REQUIREMENT:
 - AUTOMATICALLY DETECT the language of the slide content
@@ -55,41 +42,52 @@ CRITICAL LANGUAGE REQUIREMENT:
 - If the slide content is in other languages, use that same language for all text elements
 - NEVER mix languages in the final HTML output
 
-INTELLIGENT STYLE IMPLEMENTATION:
-- AUTOMATICALLY ANALYZE the slide content and thinking analysis to determine the optimal visual style
-- Implement color schemes, layouts, and design elements that best match the content theme
-- Consider content formality, target audience, and cultural context when choosing visual elements
-- Create modern, professional designs that enhance content communication effectiveness
-- Avoid generic or template-like designs - make each slide unique and contextually appropriate
+UNIFIED BACKGROUND APPROACH WITH Z-AXIS LAYERS:
+- The visual style and background have been PRE-DETERMINED with MULTIPLE Z-AXIS LAYERS
+- The background consists of 5+ visual layers with different z-index values
+- Your role is to generate ONLY the content that goes into the designated content area (z-index: 10)
+- DO NOT modify the background layers, colors, or overall page structure
+- Focus entirely on organizing and presenting the slide content within the provided framework
+- Use the provided style guide for consistent text styling and spacing
+- Ensure content works harmoniously with the multi-layered background design
+
+UNDERSTANDING Z-AXIS BACKGROUND STRUCTURE:
+The unified background template includes multiple layers:
+- Layer 1 (z-index: 1): Main background gradient
+- Layer 2 (z-index: 2): Large geometric decorations (::before pseudo-elements)
+- Layer 3 (z-index: 3): SVG pattern grids
+- Layer 4 (z-index: 4): Medium decorative elements
+- Layer 5 (z-index: 5): Small light effects and accents
+- Content Layer (z-index: 10): YOUR CONTENT GOES HERE
+- Page Number Layer (z-index: 15): Page indicators
 
 CRITICAL: This is the HTML GENERATION PHASE. You must generate ONLY complete HTML code without any additional analysis or explanation.
 
 MANDATORY SIZE REQUIREMENTS (ABSOLUTELY CRITICAL):
 - The slide MUST be exactly 1280px wide × 720px high
-- Use a fixed container with these exact dimensions
+- Content must fit within the designated content area of the unified background
 - Add CSS to ensure the slide never exceeds or falls short of these dimensions
 - Include overflow:hidden to prevent content from spilling outside the boundaries
 - CRITICAL: All content must fit within the visible area - NO content should be cut off or hidden
-- Use safe margins: leave 40-60px padding on all sides (effective content area: 1160×600px)
-- Ensure all text, images, charts fit completely within the boundaries
-- Test content overflow: make sure longest text lines don't exceed container width
-
-
-CRITICAL: Use fixed height sections with responsive font sizing!
+- Use the spacing standards defined in the unified background's style guide
+- Respect the Z-axis hierarchy - content must stay within z-index: 10 layer
 
 TECHNICAL REQUIREMENTS:
-1. **完整HTML5文档结构**: 从<!DOCTYPE html>到</html>的完整文档
-2. **Tailwind CSS集成**: 使用CDN引入Tailwind CSS
-3. **ECharts数据可视化支持**: 
+1. **统一背景集成**: 使用提供的统一背景HTML模板作为基础
+2. **Z轴层次遵循**: 确保内容在正确的Z轴层次（z-index: 10）
+3. **内容区域填充**: 将具体内容插入到指定的内容区域类名中
+4. **样式一致性**: 严格遵循统一背景的样式指南
+5. **层次兼容性**: 确保内容与多层背景和谐共存
+6. **ECharts数据可视化支持**: 
    - 如果内容包含数据、统计、趋势、对比等信息，必须使用ECharts创建相应图表
    - 使用CDN引入ECharts: <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
    - 创建合适的图表类型（柱状图、折线图、饼图、散点图、雷达图等）
-   - 确保图表配色与整体设计风格协调
+   - 确保图表配色与统一背景的样式指南协调
+   - 图表容器必须设置正确的z-index值（不超过10）
    - 提供合理的示例数据来展示图表效果
-4. **精确尺寸**: 严格按照1280px × 720px设计，不允许任何偏差
-5. **固定容器**: 使用固定尺寸容器，不使用响应式单位
-6. **投影优化**: 优化字体大小和对比度以适应投影环境
-7. **专业级质量**: 符合商务演示的专业标准
+7. **精确尺寸**: 严格按照1280px × 720px设计，不允许任何偏差
+8. **投影优化**: 优化字体大小和对比度以适应投影环境
+9. **专业级质量**: 符合商务演示的专业标准
 
 SLIDE SPECIFICATIONS:
 - Title: ${slide.title}
@@ -98,41 +96,63 @@ SLIDE SPECIFICATIONS:
 - Slide ${slideIndex + 1} of ${totalSlides}
 - Target Dimensions: EXACTLY 1280px × 720px (NO EXCEPTIONS)
 
-THEME CONFIGURATION:
-- Theme Mode: ${theme} (${theme === 'auto' ? 'AI will intelligently implement the optimal style based on content analysis and thinking process' : 'Predefined theme'})
-- Background: ${currentTheme.backgroundColor}
-- Primary Text: ${currentTheme.primaryColor}
-- Secondary Text: ${currentTheme.secondaryColor}
-- Accent Color: ${currentTheme.accentColor}
-- Card Style: ${currentTheme.cardStyle}
+${unifiedBackground ? `UNIFIED BACKGROUND TEMPLATE WITH Z-AXIS LAYERS:
+The following unified background template has been provided with multiple visual layers. You must use this as the base and insert your content into the designated content area:
 
-${thinkingContent ? `DESIGN ANALYSIS REFERENCE:
-Based on the following detailed design analysis, implement the HTML code:
+**Background Theme**: ${unifiedBackground.theme}
+**Design Description**: ${unifiedBackground.description}
+**Content Area Class**: ${unifiedBackground.contentAreaClass}
+
+**Style Guide to Follow**:
+${JSON.stringify(unifiedBackground.styleGuide, null, 2)}
+
+**Background HTML Template (Multi-Layer)**:
+${unifiedBackground.htmlTemplate}
+
+CRITICAL Z-AXIS INSTRUCTIONS:
+1. Take the above HTML template as your starting point (contains 5+ background layers)
+2. Locate the element with class "${unifiedBackground.contentAreaClass}" (z-index: 10)
+3. Insert your slide-specific content ONLY into that designated content area
+4. Follow the style guide for all text elements, spacing, and visual hierarchy
+5. DO NOT modify any background layers, decorative elements, or z-index values
+6. Ensure the page number (${slideIndex + 1}/${totalSlides}) is properly displayed
+7. All content must work harmoniously with the multi-layered background design
+8. Content should complement, not compete with, the background layers
+9. Use appropriate transparency and spacing to blend with the layered design` : `FALLBACK MODE (No Unified Background):
+Since no unified background is provided, create a professional slide design that:
+- Automatically detects and matches the language of the slide content
+- Uses appropriate colors, fonts, and layouts based on the content theme
+- Creates clear visual hierarchy with proper font sizes
+- Implements proper spacing and layout principles
+- Ensures excellent readability for presentation environments
+- Follows modern design trends appropriate for the topic and audience
+- Includes multiple background layers for visual depth`}
+
+${thinkingContent ? `CONTENT LAYOUT GUIDANCE:
+Based on the following detailed content layout analysis, implement the HTML code:
 
 ${thinkingContent}
 
 IMPORTANT: 
-- Follow the design decisions and recommendations from the above analysis precisely
-- Pay special attention to the language and style choices made in the thinking process
-- Implement the intelligent color scheme and layout decisions from the analysis
-- The thinking content contains specific design choices that must be implemented in the HTML code
-- Use the language identified in the analysis for all text elements` : `INTELLIGENT DESIGN GUIDANCE:
-Since no specific design analysis is provided, create a contextually appropriate slide design that:
-- Automatically detects and matches the language of the slide content
-- Intelligently selects colors, fonts, and layouts based on the content theme and cultural context
-- Creates clear visual hierarchy with appropriate font sizes for the content type
-- Implements proper spacing and layout principles that enhance content readability
-- Ensures excellent readability for presentation environments
-- Follows modern design trends appropriate for the specific topic and audience
-- Avoids generic templates - create unique, content-specific designs`}
+- Follow the content organization and layout decisions from the above analysis precisely
+- Pay special attention to the space utilization and information hierarchy recommendations
+- Implement the content structure and flow as planned in the analysis
+- Use the layout strategy and readability optimizations from the thinking content
+- Ensure content integrates well with the multi-layered background design` : `CONTENT ORGANIZATION GUIDANCE:
+Since no specific content layout analysis is provided, organize the content effectively:
+- Create clear visual hierarchy with appropriate heading sizes
+- Use proper spacing between content sections
+- Implement logical content flow that guides the reader
+- Ensure excellent readability and professional presentation
+- Balance text and visual elements appropriately
+- Consider the multi-layered background when positioning content`}
 
 ${previousSlideInfo ? `STYLE CONSISTENCY REQUIREMENTS:
 ${previousSlideInfo}
 
-Ensure strict consistency with the previous slide's design elements.` : ''}
+Ensure strict consistency with the previous slide's content organization and presentation style while respecting the unified background layers.` : ''}
 
 CONTENT SIMPLICITY REQUIREMENTS (CRITICAL):
-!!! 如果有箭头线条等,注意使用绝对定位,防止指针偏移!!!
 1. **内容简洁性原则**:
    - 每页PPT最多包含3-4个核心要点
    - 每个要点用1-2句话表达，避免长段落
@@ -146,81 +166,87 @@ CONTENT SIMPLICITY REQUIREMENTS (CRITICAL):
    - 描述：如需详细说明，控制在20字以内
    - 数据：优先使用图表展示，减少文字说明
 
-HTML STRUCTURE REQUIREMENTS:
-1. **文档头部**:
-   - 完整的DOCTYPE和meta标签
-   - Tailwind CSS CDN引入
-   - 自定义样式定义（必须包含固定1280x720尺寸和flexbox布局）
-   - 页面标题设置
+3. **Z轴层次适配与对比度优化**:
+   - 确保内容不与背景装饰层冲突
+   - 使用适当的透明度和间距
+   - 内容应该"浮"在背景层之上
+   - **CRITICAL对比度要求**：
+     * 严格使用样式指南中的contentTextColor和headingTextColor
+     * 如果背景较浅，使用深色文字（深蓝、深灰、黑色）
+     * 如果背景较深，使用浅色文字（白色、浅灰）
+     * 必要时使用contentBackgroundColor为内容区域添加半透明背景
+     * 确保对比度比例达到WCAG AA标准（≥4.5:1）
+   - 保持内容的清晰度和可读性
 
-2. **主体结构（CRITICAL - 使用flexbox防止遮挡）**:
-   - body: 1280x720px，overflow:hidden
-   - .slide-container: 1280x720px，display:flex，flex-direction:column
-   - .content-area: width:100%，height:100%，padding:40px，display:flex，flex-direction:column
-   - .main-content: flex:1，overflow:hidden，margin-bottom:20px
-   - .slide-footer: height:40px，固定在底部
+HTML IMPLEMENTATION APPROACH:
+${unifiedBackground ? `
+1. **基于多层背景**:
+   - 使用提供的多层背景HTML模板作为完整的页面结构
+   - 在指定的内容区域（${unifiedBackground.contentAreaClass}，z-index: 10）中插入具体内容
+   - 严格遵循样式指南中定义的颜色、字体、间距标准
+   - 确保内容与多层背景设计完美融合而不冲突
 
-3. **内容组织（简洁性优先）**:
-   - CRITICAL: 内容简洁性原则：
-     * 避免信息过载  
-     * 突出核心信息
-     * 使用关键词和短语，避免长段落
-     * 优先使用图表、图标等视觉元素代替文字
-   - 图表容器：最大高度300px，确保在分配空间内
-
-4. **数据可视化集成（尺寸控制）**:
-   - 图表容器：width:500px max，height:300px max
-   - ECharts grid配置：适当的left、right、top、bottom边距
-   - 字体大小：图表内文字使用较小字号（fontSize:10-12）
-   - 确保图表完全在容器内显示
-
-5. **页面元素（固定位置）**:
-   - 页码指示器：使用.slide-footer固定在底部40px高度区域
-   - 避免使用absolute定位可能被内容遮挡的元素
-   - 静态视觉元素（禁用所有动画）
-
-
+2. **内容插入策略**:
+   - 保持所有背景层的结构和样式完全不变
+   - 只修改内容区域内的HTML内容
+   - 使用样式指南中定义的CSS类名和样式属性
+   - 确保页码和其他固定元素正确显示
+   - 内容应该与背景层形成和谐的视觉关系
+` : `
+1. **完整页面创建**:
+   - 创建完整的HTML5文档结构
+   - 包含Tailwind CSS CDN引入
+   - 设计具有多层次的专业背景和布局
+   - 确保1280x720px固定尺寸
+   - 实现Z轴层次感
+`}
 
 ECHARTS INTEGRATION GUIDE (when data visualization is needed):
 1. **CDN引入**: Use script tag to include ECharts CDN
-2. **图表容器**: Create div element with id and fixed dimensions
+2. **图表容器**: Create div element with id and fixed dimensions, z-index ≤ 10
 3. **初始化代码**: Use window.onload to initialize chart with echarts.init()
 4. **图表配置**: Configure title, tooltip, xAxis, yAxis, and series data
-5. **图表类型选择**:
-   - 柱状图: type: 'bar'
-   - 折线图: type: 'line'  
-   - 饼图: type: 'pie'
-   - 散点图: type: 'scatter'
-   - 雷达图: type: 'radar'
-6. **静态配置**: Disable all animations by setting animation: false in chart options
+5. **颜色协调**: Use colors from the unified background's style guide
+6. **层次兼容**: Ensure charts work well with the multi-layered background
+7. **静态配置**: Disable all animations by setting animation: false in chart options
 
+OUTPUT FORMAT REQUIREMENT:
+- Generate ONLY the complete HTML code
+- Start with <!DOCTYPE html> and end with </html>
+- Include all necessary dependencies and styling
+- Ensure the code is ready to run directly in a browser
+- DO NOT include any markdown code block markers or explanations
+- Respect the Z-axis layer hierarchy in the unified background
+- Content must integrate seamlessly with the multi-layered design`
 
-
-
-`
     // 创建流式响应
     const stream = new ReadableStream({
       async start(controller) {
         let isClosed = false
+        let isEnding = false
         
         const safeEnqueue = (data: string) => {
-          if (!isClosed) {
+          if (!isClosed && !isEnding && controller.desiredSize !== null) {
             try {
               controller.enqueue(new TextEncoder().encode(data + '\n'))
             } catch (e) {
               console.error('Controller enqueue error:', e)
-              isClosed = true
+              if (!isClosed) {
+                isClosed = true
+              }
             }
           }
         }
 
         const safeClose = () => {
-          if (!isClosed) {
+          if (!isClosed && !isEnding) {
             try {
+              isEnding = true
               controller.close()
               isClosed = true
             } catch (e) {
               console.error('Controller close error:', e)
+              isClosed = true
             }
           }
         }
@@ -228,13 +254,40 @@ ECHARTS INTEGRATION GUIDE (when data visualization is needed):
         try {
           let response;
           
-          const userPrompt = `${modificationContext?.isDirectModification ? '基于现有HTML代码进行修改' : '基于以下设计分析，生成完整的HTML代码'}：
+          const userPrompt = `${modificationContext?.isDirectModification ? '基于现有HTML代码和统一背景进行修改' : '基于统一背景模板生成完整的HTML代码'}：
 
 **幻灯片信息:**
 - 标题: ${slide.title}
 - 内容: ${slide.content}
 - 关键要点: ${slide.keyPoints ? slide.keyPoints.join(', ') : '无'}
 - 页码: 第${slideIndex + 1}页，共${totalSlides}页
+
+${unifiedBackground ? `**🎨 统一背景模板（重要）:**
+- 主题: ${unifiedBackground.theme}
+- 描述: ${unifiedBackground.description}
+- 内容区域类名: ${unifiedBackground.contentAreaClass}
+- 样式指南: ${JSON.stringify(unifiedBackground.styleGuide, null, 2)}
+
+**背景HTML模板:**
+${unifiedBackground.htmlTemplate}
+
+**🔧 实现要求:**
+1. 使用上述背景HTML模板作为完整的页面基础
+2. 在类名为"${unifiedBackground.contentAreaClass}"的元素中插入具体的幻灯片内容
+3. 严格遵循样式指南中定义的颜色、字体、间距标准
+4. **CRITICAL对比度要求**：
+   - 标题文字使用 headingTextColor: ${unifiedBackground.styleGuide.headingTextColor || '深色'}
+   - 正文文字使用 contentTextColor: ${unifiedBackground.styleGuide.contentTextColor || '深色'}
+   - 如需要，为内容区域添加 contentBackgroundColor: ${unifiedBackground.styleGuide.contentBackgroundColor || '半透明白色'}
+   - 确保对比度比例≥4.5:1，满足WCAG AA标准
+5. 保持背景的所有样式和结构不变，只修改内容区域
+6. 确保页码 (${slideIndex + 1}/${totalSlides}) 正确显示
+7. 所有内容必须与背景设计完美融合且清晰可读` : ''}
+
+${thinkingContent ? `**📋 内容布局指导:**
+${thinkingContent}
+
+**重要**: 请严格按照上述内容布局分析来组织和呈现幻灯片内容。` : ''}
 
 ${modificationContext?.isDirectModification && slide.existingHtmlCode ? `**🔄 现有HTML代码（需要修改）:**
 \`\`\`html
@@ -271,38 +324,14 @@ ${slide.modificationRequirements.selectedElementInfo ? `**🎯 选中元素的�
 - 确保修改后的代码仍然符合1280x720px的尺寸要求
 ` : '无具体修改要求'}` : ''}
 
-${!modificationContext?.isDirectModification ? `${thinkingContent ? `**🎯 设计分析结果（重要 - 必须遵循）:**
-
-**📋 实现要求:**
-请严格按照上述设计分析中的所有决策来实现HTML代码。分析中提到的颜色、布局、字体、装饰元素等所有设计选择都必须在代码中体现。` : `**🎯 设计要求（无具体分析）:**
-由于没有提供具体的设计分析，请创建一个专业、现代的幻灯片设计，要求：
-- 有效使用指定的主题色彩
-- 创建清晰的视觉层次和适当的字体大小
-- 实现恰当的间距和布局原则
-- 确保在演示环境中的优秀可读性
-- 遵循现代商务演示的设计趋势`}` : ''}
-
 **技术要求:**
 - 生成完整的HTML5文档（从<!DOCTYPE html>到</html>）
-- 使用Tailwind CSS CDN实现所有样式
+- ${unifiedBackground ? '基于提供的统一背景模板，只修改内容区域' : '使用Tailwind CSS CDN实现所有样式'}
 - 严格按照1280px × 720px尺寸设计
 - 确保投影环境下的可读性
 - 包含页码指示器和必要的装饰元素
 - 不使用任何CSS动画、过渡效果或JavaScript动画
 - **关键要求**：所有内容必须在1280×720px边界内完整显示，不能有任何溢出或被截断
-
-**布局约束:**
-- 使用安全边距：四周至少保留40-60px的padding
-- 内容区域控制在1160×600px以内
-- 图表尺寸不超过500×350px
-- 确保最长的文本行不会超出容器宽度
-
-**重要提醒:**
-- 只生成HTML代码，不要包含任何解释或分析
-- 代码必须完整、可直接运行
-- 使用静态设计元素，避免任何动态效果
-- 测试内容是否完全在可视区域内
-
 
 **内容简洁性原则**:
 - 每页PPT最多包含3-4个核心要点
@@ -315,21 +344,20 @@ ${!modificationContext?.isDirectModification ? `${thinkingContent ? `**🎯 设�
 - 要点：使用项目符号，每项不超过15个字
 - 描述：如需详细说明，控制在15字以内
 - 数据：优先使用图表展示，减少文字说明
-${thinkingContent ? '- 严格遵循设计分析中的所有决策和尺寸约束' : '- 创建专业美观的静态设计，确保内容完整显示'}
 
 ${previousSlideInfo ? `**风格一致性要求:**
 ${previousSlideInfo}
 
 请确保与前页设计的严格一致性。` : ''}
 
-请生成完整的HTML代码：
-
 **重要输出格式要求：**
 - 直接输出HTML代码，不要使用任何代码块标记
 - 不要包含 \`\`\`html 或 \`\`\` 这样的markdown格式
 - 从 <!DOCTYPE html> 开始，到 </html> 结束
 - 不要添加任何解释文字或注释
-- 确保输出的是纯HTML代码，可以直接在浏览器中渲染`
+- 确保输出的是纯HTML代码，可以直接在浏览器中渲染
+
+请生成完整的HTML代码：`
           
           if (provider === 'deepseek') {
             response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -406,6 +434,10 @@ ${previousSlideInfo}
 
           try {
             while (true) {
+              if (isClosed || isEnding) {
+                break
+              }
+              
               const { done, value } = await reader.read()
               
               if (done) break
@@ -418,6 +450,10 @@ ${previousSlideInfo}
               buffer = lines.pop() || '' // 保留最后一个不完整的行
 
               for (const line of lines) {
+                if (isClosed || isEnding) {
+                  break
+                }
+                
                 if (line.trim() === '') continue
                 
                 if (line.startsWith('data: ')) {
@@ -443,19 +479,30 @@ ${previousSlideInfo}
               }
             }
           } finally {
-            reader.releaseLock()
+            try {
+              reader.releaseLock()
+            } catch (e) {
+              console.error('Error releasing reader lock:', e)
+            }
           }
 
         } catch (error) {
           console.error('Error in HTML generation:', error)
-          const errorData = JSON.stringify({ 
-            type: 'error', 
-            content: `HTML生成失败: ${error}` 
-          })
-          safeEnqueue(errorData)
+          if (!isClosed && !isEnding) {
+            const errorData = JSON.stringify({ 
+              type: 'error', 
+              content: `HTML生成失败: ${error}` 
+            })
+            safeEnqueue(errorData)
+          }
         } finally {
           safeClose()
         }
+      },
+      
+      cancel() {
+        // 处理客户端取消请求
+        console.log('Stream cancelled by client')
       }
     })
 
