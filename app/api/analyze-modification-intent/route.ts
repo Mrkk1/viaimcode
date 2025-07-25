@@ -110,9 +110,9 @@ ${recentHistory}
       'Content-Type': 'application/json'
     }
 
-    if (provider === 'deepseek') {
-      apiUrl = 'https://api.deepseek.com/chat/completions'
-      headers['Authorization'] = `Bearer ${process.env.DEEPSEEK_API_KEY}`
+    if (provider === 'kimi' || provider === 'deepseek') {
+      apiUrl = 'https://api.moonshot.cn/v1/chat/completions'
+      headers['Authorization'] = `Bearer ${process.env.MOONSHOT_API_KEY}`
     } else if (provider === 'openai') {
       apiUrl = 'https://api.openai.com/v1/chat/completions'
       headers['Authorization'] = `Bearer ${process.env.OPENAI_API_KEY}`

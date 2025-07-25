@@ -25,10 +25,10 @@ export const PROVIDER_CONFIGS: Record<LLMProvider, ProviderConfig> = {
   [LLMProvider.DEEPSEEK]: {
     id: LLMProvider.DEEPSEEK,
     name: 'DeepSeek',
-    description: 'AI models from DeepSeek',
-    baseUrlEnvVar: 'DEEPSEEK_API_BASE',
-    apiKeyEnvVar: 'DEEPSEEK_API_KEY',
-    defaultBaseUrl: 'https://api.deepseek.com/v1',
+    description: 'AI models from Moonshot (DeepSeek)',
+    baseUrlEnvVar: 'MOONSHOT_API_BASE',
+    apiKeyEnvVar: 'MOONSHOT_API_KEY',
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
     isLocal: false,
   },
   [LLMProvider.OPENAI_COMPATIBLE]: {

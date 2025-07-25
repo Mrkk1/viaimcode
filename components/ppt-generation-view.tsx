@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChevronLeft, Download, FileText, Presentation, Loader2, Send, Code, Eye, Trash2, ChevronDown, ChevronRight, Share, MousePointer2, X } from "lucide-react"
+import { ChevronLeft, Download, FileText, Presentation, Loader2, Send, Code, Eye, Trash2, ChevronDown, ChevronRight, Share, MousePointer2, X, Copy, Check } from "lucide-react"
 import { toast } from "sonner"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -119,6 +119,9 @@ export function PPTGenerationView({
     slideIndex: number;
   } | null>(null)
   
+  // 复制功能相关状态
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+  
   // 添加 ref 来防止重复执行
   const hasInitialized = useRef(false)
   const isMounted = useRef(true)
@@ -129,6 +132,71 @@ export function PPTGenerationView({
       isMounted.current = false
     }
   }, [])
+
+  // 复制消息内容到剪贴板
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      // 处理markdown格式的内容，提取纯文本
+      const plainText = content.replace(/\*\*(.*?)\*\*/g, '$1') // 移除加粗标记
+                             .replace(/\*(.*?)\*/g, '$1')     // 移除斜体标记
+                             .replace(/`(.*?)`/g, '$1')       // 移除行内代码标记
+                             .replace(/```[\s\S]*?```/g, '')  // 移除代码块
+                             .replace(/#+\s/g, '')            // 移除标题标记
+                             .replace(/^\s*[-*+]\s/gm, '• ')  // 转换列表标记
+                             .replace(/^\s*\d+\.\s/gm, '')    // 移除有序列表标记
+                             .trim()
+      
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(plainText)
+        setCopiedMessageId(messageId)
+        toast.success('消息内容已复制到剪贴板')
+        
+        // 3秒后重置复制状态
+        setTimeout(() => {
+          setCopiedMessageId(null)
+        }, 3000)
+      } else {
+        // 回退到传统复制方法
+        const textArea = document.createElement('textarea')
+        textArea.value = plainText
+        textArea.style.position = 'fixed'
+        textArea.style.left = '0'
+        textArea.style.top = '0'
+        textArea.style.width = '2em'
+        textArea.style.height = '2em'
+        textArea.style.padding = '0'
+        textArea.style.border = 'none'
+        textArea.style.outline = 'none'
+        textArea.style.boxShadow = 'none'
+        textArea.style.background = 'transparent'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          const successful = document.execCommand('copy')
+          document.body.removeChild(textArea)
+          
+          if (successful) {
+            setCopiedMessageId(messageId)
+            toast.success('消息内容已复制到剪贴板')
+            setTimeout(() => {
+              setCopiedMessageId(null)
+            }, 3000)
+          } else {
+            throw new Error('复制命令执行失败')
+          }
+        } catch (err) {
+          document.body.removeChild(textArea)
+          console.error('复制失败:', err)
+          toast.error('复制失败，请手动选择文本复制')
+        }
+      }
+    } catch (error) {
+      console.error('复制到剪贴板失败:', error)
+      toast.error('复制失败，请手动选择文本复制')
+    }
+  }
 
   // 生成CSS选择器
   const generateCSSSelector = useCallback((element: HTMLElement): string => {
@@ -4438,12 +4506,30 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
                   <div
                     className={`${
                       previewSize === 'small' ? 'max-w-[85%]' : 'max-w-[80%]'
-                    } rounded-lg px-4 py-2 ${
+                    } rounded-lg px-4 py-2 relative group ${
                       message.type === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-100'
                     }`}
                   >
+                    {/* 复制按钮 */}
+                    <Button
+                      onClick={() => handleCopyMessage(message.id, message.content)}
+                      variant="ghost"
+                      size="sm"
+                      className={`absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 h-6 w-6 p-0 ${
+                        message.type === 'user' 
+                          ? 'hover:bg-blue-500/50 text-blue-100' 
+                          : 'hover:bg-gray-600/50 text-gray-300'
+                      }`}
+                      title="复制消息内容"
+                    >
+                      {copiedMessageId === message.id ? (
+                        <Check className="h-3 w-3 text-green-400" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
                     {/* 改进思考过程的显示样式 */}
                     {message.content.includes('思考过程：') ? (
                       <div className="text-sm">

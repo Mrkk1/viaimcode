@@ -220,26 +220,7 @@ ${modificationContext.analysisResult?.suggestedAction?.description || '无'}
 
 请开始详细的内容布局分析：`
           
-          if (provider === 'deepseek') {
-            response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-              },
-              body: JSON.stringify({
-                model: model,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.5,
-                max_tokens: 3000, // 增加token限制以确保完整的思考内容
-                stream: true,
-              }),
-            })
-          }
-          else if (provider === 'kimi') {
+          if (provider === 'kimi' || provider === 'deepseek') {
             response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
               method: 'POST',
               headers: {

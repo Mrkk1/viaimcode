@@ -14,6 +14,30 @@ export async function POST(request: NextRequest) {
     // 构建系统提示词，专门用于生成PPT大纲和统一背景样式
     const systemPrompt = `You are an expert presentation designer and content strategist. Your task is to analyze the user's content and create a comprehensive, professional PPT outline WITH a unified background design template.
 
+CRITICAL OUTLINE DETECTION REQUIREMENT:
+- FIRST, carefully analyze the user's input to detect if they have already provided a detailed presentation outline
+- Look for patterns like numbered lists, bullet points, slide titles, or structured content that indicates a presentation outline
+- If the user has provided a clear outline structure, USE IT COMPLETELY and do not modify or add to it
+- If the user has provided partial outline content, incorporate it fully and only add missing elements if necessary
+- If the user has provided specific slide titles, content descriptions, or key points, use them exactly as provided
+- The user's outline content takes absolute priority - do not override or replace it with generated content
+
+SPECIFIC OUTLINE DETECTION PATTERNS:
+- **Numbered Lists**: "1. Introduction 2. Main Points 3. Conclusion" or "第一、第二、第三"
+- **Bullet Points**: "- Point 1 - Point 2" or "• 要点1 • 要点2"
+- **Slide Titles**: "Slide 1: Introduction" or "第1页：介绍" or "页面1：概述"
+- **Content Sections**: "内容：..." or "描述：..." or "要点：..."
+- **Structured Content**: Any clearly organized content with titles and descriptions
+- **Presentation Flow**: "开始...然后...最后..." or "First...Then...Finally..."
+
+USER CONTENT PRIORITY RULES:
+1. If user provides complete slide titles → Use them exactly
+2. If user provides slide content descriptions → Use them exactly  
+3. If user provides key points → Use them exactly
+4. If user provides presentation structure → Follow it exactly
+5. If user provides partial outline → Complete it while preserving all user content
+6. If user provides no outline → Generate complete outline from scratch
+
 CRITICAL LANGUAGE REQUIREMENT: 
 - AUTOMATICALLY DETECT the language of the user's input prompt
 - If the user writes in Chinese, respond ENTIRELY in Chinese (titles, content, key points, thinking process)
@@ -24,13 +48,22 @@ CRITICAL LANGUAGE REQUIREMENT:
 IMPORTANT: You MUST start your response with detailed thinking process enclosed in <think></think> tags. This thinking should include:
 1. Language detection and response language confirmation
 2. Analysis of the user's request and main topic
-3. Identification of key themes and logical flow
-4. Data visualization opportunities identification (look for numbers, statistics, trends, comparisons, processes)
-5. Target audience consideration
-6. Presentation structure planning (introduction, body, conclusion)
-7. Content depth and breadth decisions
-8. Slide progression and storytelling approach
-9. **UNIFIED BACKGROUND DESIGN ANALYSIS**: 
+3. **OUTLINE DETECTION ANALYSIS**: 
+   - Whether the user has provided a complete outline structure
+   - Whether the user has provided partial outline content
+   - Whether the user has provided specific slide titles or content
+   - How to incorporate user's outline content into the final structure
+   - **DETAILED ANALYSIS**: List exactly what outline elements the user provided
+   - **CONTENT PRESERVATION PLAN**: How to preserve 100% of user's provided content
+   - **STRUCTURE ADAPTATION**: How to adapt user's format to required JSON structure
+   - **MISSING ELEMENTS**: What additional elements need to be added (if any)
+4. Identification of key themes and logical flow
+5. Data visualization opportunities identification (look for numbers, statistics, trends, comparisons, processes)
+6. Target audience consideration
+7. Presentation structure planning (introduction, body, conclusion)
+8. Content depth and breadth decisions
+9. Slide progression and storytelling approach
+10. **UNIFIED BACKGROUND DESIGN ANALYSIS**: 
    - Determine the most suitable visual theme based on content type (business, creative, academic, technical, etc.)
    - Select appropriate color scheme that matches the topic and audience
    - Design consistent layout framework that works for all slides
@@ -119,10 +152,11 @@ CRITICAL BACKGROUND DESIGN REQUIREMENTS:
 8. **完整性**: 确保所有CSS代码完整，特别是复杂的SVG图案和渐变效果
 
 ENHANCED BACKGROUND DESIGN SPECIFICATIONS:
+
 1. **多层次Z轴设计**:
-   - 使用CSS z-index创建多个视觉层次（至少4-5层）
+   - !!!!!! 使用CSS z-index创建多个视觉层次
    - 最底层：主背景渐变（z-index: 1）
-   - 第二层：大型装饰图案/几何形状（z-index: 2）
+   - 第二层：大型装饰图案/几何形状（z-index: 2）、半透明的随机圆弧、半透明的矩形、半透明的三角形、半透明的菱形、半透明的五边形、半透明的六边形、半透明的七边形、半透明的八边形、半透明的九边形、半透明的十边形、线条装饰中随机出现 随机组合
    - 第三层：中等装饰元素/线条网格（z-index: 3）
    - 第四层：小型装饰点/光效（z-index: 4）
    - 内容层：确保内容在最上层（z-index: 10）
@@ -210,9 +244,10 @@ ENHANCED BACKGROUND DESIGN SPECIFICATIONS:
      * 背光效果（轮廓光和边缘光）
 
 5. **专业配色方案与对比度优化**:
-   - 根据主题选择3-5种协调的颜色
+   - 根据主题选择协调的颜色
    - 使用渐变和透明度创建丰富的色彩层次
    - 不同Z轴层使用不同的透明度：
+    尽量避免使用黄色，黄色在投影环境下很难看清
      * 背景层：较低透明度（0.1-0.3）
      * 中间层：中等透明度（0.3-0.6）
      * 装饰层：较高透明度（0.6-0.8）
@@ -260,17 +295,7 @@ ENHANCED BACKGROUND DESIGN SPECIFICATIONS:
      * 使用backdrop-filter为内容区域添加毛玻璃效果
      * 内容区域的阴影和光效设计
 
-CRITICAL COMPLEXITY REQUIREMENTS (背景必须足够复杂):
-1. **最少元素要求**：背景必须包含至少15-20个不同的视觉元素
-2. **层次丰富度**：每个z-index层必须有3-5个不同的装饰元素
-3. **SVG复杂度**：每个SVG图案必须包含至少10个以上的图形元素
-4. **渐变复杂度**：使用至少4-6层不同的渐变叠加
-5. **伪元素利用**：每个主要div都必须使用::before和::after创建装饰
-6. **CSS效果丰富**：必须使用至少8种不同的CSS效果（阴影、滤镜、变换等）
-7. **几何图形多样**：包含圆形、三角形、多边形、曲线、直线等多种形状
-8. **纹理层次**：添加至少3种不同的纹理效果
-9. **光影效果**：包含主光源、环境光、反射光等多种光效
-10. **材质模拟**：模拟至少2种不同的材质（如金属、玻璃、织物等）
+
 
 BACKGROUND HTML TEMPLATE STRUCTURE:
 - 完整的HTML5文档结构（DOCTYPE, html, head, body）
@@ -303,6 +328,20 @@ CRITICAL Z-AXIS IMPLEMENTATION REQUIREMENTS:
 5. **可读性优化**：为内容区域提供必要的背景遮罩或色块
 6. **性能优化**：避免过度复杂的层次影响性能
 7. **兼容性**：确保在不同浏览器中正常显示
+
+CRITICAL USER OUTLINE PROCESSING REQUIREMENTS:
+- **PRIORITY DETECTION**: First analyze if the user has provided a presentation outline in their input
+- **OUTLINE PATTERNS TO DETECT**:
+  * Numbered lists (1. 2. 3. or 第一、第二、第三)
+  * Bullet points (- * • or -、*、•)
+  * Slide titles (Slide 1:, 第1页:, 页面1:, etc.)
+  * Content descriptions (内容:, 描述:, 要点:, etc.)
+  * Structured content with clear sections
+- **COMPLETE OUTLINE DETECTION**: If user provides a complete outline structure, use it 100% without modification
+- **PARTIAL OUTLINE DETECTION**: If user provides partial outline, incorporate it fully and only add missing elements
+- **CONTENT PRESERVATION**: If user provides specific slide titles, content, or key points, use them exactly as written
+- **NO OVERRIDE**: Never replace or modify user's provided outline content with generated content
+- **STRUCTURE ADAPTATION**: If user provides outline in different format, adapt it to the required JSON structure while preserving all original content
 
 CRITICAL OUTPUT FORMAT REQUIREMENTS:
 - **EXACT FORMAT**: Follow the ===JSON_START=== and ===HTML_TEMPLATE_START=== format exactly
@@ -338,7 +377,38 @@ FINAL OUTPUT FORMAT:
 3. **RICH HTML**: HTML template section contains all the complex styling and layouts
 4. **COMPLETE DESIGN**: The HTML template must include all the complex multi-layer backgrounds, SVG patterns, gradients, and Z-axis effects described above
 
-This separation approach eliminates all JSON parsing issues while allowing for unlimited complexity in the HTML template.`
+This separation approach eliminates all JSON parsing issues while allowing for unlimited complexity in the HTML template.
+
+EXAMPLE OF USER OUTLINE PROCESSING:
+If user provides: "1. 介绍公司背景 2. 产品优势分析 3. 市场前景展望 4. 总结与建议"
+Then the JSON should contain exactly:
+{
+  "title": "演示文稿标题",
+  "slides": [
+    {
+      "title": "介绍公司背景",
+      "content": "详细介绍公司的历史、规模、业务范围等背景信息",
+      "keyPoints": ["公司历史", "业务范围", "企业规模"]
+    },
+    {
+      "title": "产品优势分析", 
+      "content": "深入分析产品的核心优势、技术特点、竞争优势等",
+      "keyPoints": ["技术优势", "成本优势", "服务优势"]
+    },
+    {
+      "title": "市场前景展望",
+      "content": "分析市场发展趋势、机遇挑战、未来规划等",
+      "keyPoints": ["市场趋势", "发展机遇", "未来规划"]
+    },
+    {
+      "title": "总结与建议",
+      "content": "总结核心要点，提出具体建议和行动方案",
+      "keyPoints": ["核心总结", "具体建议", "行动方案"]
+    }
+  ]
+}
+
+The user's original outline structure and content must be preserved 100%.`
 
     // 创建流式响应
     const stream = new ReadableStream({
@@ -375,26 +445,7 @@ This separation approach eliminates all JSON parsing issues while allowing for u
         try {
           let response;
           
-          if (provider === 'deepseek') {
-            response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-              },
-              body: JSON.stringify({
-                model: model,
-                messages: [
-                  { role: 'system', content: systemPrompt },
-                  { role: 'user', content: prompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 8000, // 大幅增加token限制以支持超复杂背景HTML
-                stream: true,
-              }),
-            })
-          }
-          else if (provider === 'kimi') {
+          if (provider === 'kimi' || provider === 'deepseek') {
            
               response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
                 method: 'POST',
@@ -408,7 +459,7 @@ This separation approach eliminates all JSON parsing issues while allowing for u
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: prompt }
                   ],
-                  temperature: 0.7,
+                  temperature: 0.5,
                   max_tokens: 8000, // 大幅增加token限制以支持超复杂背景HTML
                   stream: true,
                 }),
