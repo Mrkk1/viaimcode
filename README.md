@@ -315,7 +315,7 @@ If this project helps you, please give us a ⭐ Star!
 
 <div align="center">
 
-**Made with ❤️ by [讯飞未来智能](https://www.viaim.cn/#/home)**
+**Made with  by [未来智能 | viaim](https://www.viaim.cn/#/home)**
 
 </div> 
 
