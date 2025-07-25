@@ -1,168 +1,175 @@
 # viaimCode AI
-### 开箱即用的 webcode 项目
-**体验地址**: [https://webcode.weilai.ai](https://webcode.weilai.ai)
 
-**AI驱动的网站和PPT生成平台** | AI-powered Website & PPT Generator
+<div align="center">
 
-一个基于Next.js构建的智能内容生成平台，支持通过AI生成现代化网站和专业PPT演示文稿。
+**🌐 Language / 语言**  
+[English](README.md) | [中文](README-zh.md)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.2.4-blueviolet)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
+
+**AI-powered Website & PPT Generator**
+
+*An intelligent content generation platform built with Next.js, supporting AI-generated modern websites and professional PPT presentations.*
+
+**🌟 [Live Demo](https://webcode.weilai.ai) | 📖 [Documentation](docs/) | 🚀 [Quick Start](#-quick-start)**
+
+</div>
+
 ![LocalSite AI Banner](./image/screenshot-20250722-150035.png)
-![LocalSite AI Banner](./image/screenshot-20250722-150337.png)
-![LocalSite AI Banner](./image/screenshot-20250722-150525.png)
 
-## ✨ 功能特点
+## ✨ Features
 
-### 🌐 AI网站生成
-- **智能代码生成**: 基于自然语言描述生成完整的HTML/CSS/JS代码
-- **实时预览**: 支持桌面、平板、手机多设备预览
-- **多种编辑模式**: 支持选中直接编辑、元素对话编辑、Nocode可视化编辑
-- **可视化编辑**: 内置代码编辑器，支持实时修改
-- **版本管理**: 自动保存历史版本，支持回滚和对比
-- **一键部署**: 支持导出和在线分享
+### 🌐 AI Website Generation
+- **Smart Code Generation**: Generate complete HTML/CSS/JS code from natural language descriptions
+- **Real-time Preview**: Support for desktop, tablet, and mobile device previews
+- **Multiple Edit Modes**: Direct selection editing, element dialog editing, and visual no-code editing
+- **Visual Editor**: Built-in code editor with real-time modification support
+- **Version Control**: Automatic history saving with rollback and comparison features
+- **One-click Deployment**: Export and online sharing support
 
-### 📊 AI PPT生成
-- **智能大纲**: AI自动生成演示文稿结构和内容大纲
-- **专业设计**: 现代化PPT模板，支持数据可视化
-- **交互式编辑**: 支持幻灯片内容的智能修改和优化
-- **多格式导出**: 支持PDF、PPTX等格式导出
-- **公开分享**: PPT广场展示和分享功能
+### 📊 AI PPT Generation
+- **Smart Outline**: AI-generated presentation structure and content outlines
+- **Professional Design**: Modern PPT templates with data visualization support
+- **Interactive Editing**: Smart modification and optimization of slide content
+- **Multi-format Export**: Support for PDF, PPTX, and other format exports
+- **Public Sharing**: PPT plaza for showcasing and sharing presentations
 
-### 🔧 技术特性
+### 🔧 Technical Features
+- **Responsive Design**: Fully adapted for mobile and desktop
+- **User System**: Complete user registration, login, and project management
+- **Cloud Storage**: Alibaba Cloud OSS image storage support
+- **Docker Deployment**: One-click containerized deployment
 
-- **响应式设计**: 完全适配移动端和桌面端
-- **用户系统**: 完整的用户注册、登录、项目管理
-- **云存储**: 支持阿里云OSS图片存储
-- **Docker部署**: 一键容器化部署
+## 🚀 Quick Start
 
-## 🚀 快速开始
+### Method 1: Docker Deployment (Recommended)
 
-### 方式一：Docker 部署（推荐）
-
-1. **克隆项目**
+1. **Clone the project**
 ```bash
 git clone https://github.com/Mrkk1/viaimcode.git
 cd LocalSite-ai
 ```
 
-2. **配置环境变量**
-
-    注意: 目前项目必须填写deepseek的key用于生成单个网页、moonshot的key用于生成ppt
+2. **Configure environment variables**
 ```bash
 cp env.example .env.local 
 cp env.example .env
-# 编辑 .env.local .env文件，填入你的配置
+# Edit .env.local and .env files with your configuration
 ```
 
-3. **启动服务**
+> **Note**: Currently, the project requires DeepSeek API key for webpage generation and Moonshot API key for PPT generation.
+
+3. **Start services**
 ```bash
 docker-compose up -d
 ```
 
-4. **初始化数据库**
+4. **Initialize database**
 ```bash
-# 数据库会自动创建，也可以手动导入
+# Database will be created automatically, or import manually
 mysql -u root -p localsite_ai < localsite_ai.sql
 ```
 
-5. **访问应用**
-打开浏览器访问 http://localhost:3000
+5. **Access the application**
+Open your browser and visit http://localhost:3000
 
-### 方式二：本地开发
+### Method 2: Local Development
 
-#### 环境要求
+#### Requirements
 - Node.js 18+
 - MySQL 8.0+
-- npm 或 yarn
+- npm or yarn
 
-#### 安装步骤
+#### Installation Steps
 
-1. **安装依赖**
+1. **Install dependencies**
 ```bash
 npm install
 ```
 
-2. **配置环境变量**
+2. **Configure environment variables**
 ```bash
 cp env.example .env.local
 cp env.example .env
 ```
 
-必需配置项：
+Required configuration:
 ```env
-# 数据库配置
+# Database configuration
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_password
 DB_NAME=localsite_ai
 
-# AI提供商配置（moonshot和deepseek目前都需要配置,在htmlk生成部分采用了deepseekV3,在ppt生成部分使用了moonshotK2）
+# AI provider configuration (both required)
 MOONSHOT_API_KEY=your_moonshot_key
 DEEPSEEK_API_KEY=your_deepseek_key
 ```
 
-3. **初始化数据库**
+3. **Initialize database**
 ```bash
-# 创建数据库
+# Create database
 mysql -u root -p -e "CREATE DATABASE localsite_ai;"
 
-# 导入表结构
+# Import table structure
 mysql -u root -p localsite_ai < localsite_ai.sql
 
-# 或者使用内置脚本
+# Or use built-in script
 npm run init-db
 ```
 
-4. **启动开发服务器**
+4. **Start development server**
 ```bash
 npm run dev
 ```
 
-## 🛠️ 配置说明
+## 🛠️ Configuration
 
-### AI 提供商配置
+### AI Provider Configuration
 
-项目支持多种AI提供商，可以根据需要选择：
-必填项目
-#### Deepseek
+The project supports multiple AI providers. Required configurations:
+
+#### DeepSeek (Required)
 ```env
 DEEPSEEK_API_KEY=sk-your-key-here
-DEEPSEEK_API_BASE=https://api.openai.com/v1
+DEEPSEEK_API_BASE=https://api.deepseek.com/v1
 ```
-#### MOONSHOT
+
+#### Moonshot (Required)
 ```env
 MOONSHOT_API_KEY=sk-your-key-here
-MOONSHOT_API_Base  目前写死了,可以忽略
 ```
---------------
-选填项目
 
+#### Optional Providers
 
-#### OpenAI
+**OpenAI**
 ```env
 OPENAI_API_KEY=sk-your-key-here
 OPENAI_API_BASE=https://api.openai.com/v1
 ```
 
-#### Anthropic Claude
+**Anthropic Claude**
 ```env
 ANTHROPIC_API_KEY=your-key-here
 ```
 
-#### 本地AI (Ollama)
+**Local AI (Ollama)**
 ```env
 OLLAMA_API_BASE=http://localhost:11434
 ```
 
-#### LM Studio
+**LM Studio**
 ```env
 LM_STUDIO_API_BASE=http://localhost:1234/v1
 ```
 
-### 存储配置
+### Storage Configuration
 
-
-
-#### 阿里云OSS（推荐生产环境）
+#### Alibaba Cloud OSS (Recommended for production)
 ```env
 ALICLOUD_ACCESS_KEY_ID=your_key_id
 ALICLOUD_ACCESS_KEY_SECRET=your_key_secret
@@ -170,117 +177,145 @@ ALICLOUD_OSS_BUCKET=your_bucket_name
 ALICLOUD_OSS_REGION=oss-cn-hangzhou
 ```
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 LocalSite-ai/
 ├── app/                    # Next.js App Router
-│   ├── (main)/            # 主应用页面
-│   ├── (share)/           # 分享页面
-│   ├── api/               # API路由
-│   └── globals.css        # 全局样式
-├── components/            # React组件
-│   ├── ui/               # UI基础组件
-│   └── ...               # 业务组件
-├── lib/                  # 工具库
-│   ├── db.ts             # 数据库连接
-│   ├── auth.ts           # 认证逻辑
-│   └── ...               # 其他工具
-├── public/               # 静态资源
-├── scripts/              # 数据库脚本
-├── docker-compose.yml    # Docker配置
-└── package.json          # 项目依赖
+│   ├── (main)/            # Main application pages
+│   ├── (share)/           # Sharing pages
+│   ├── api/               # API routes
+│   └── globals.css        # Global styles
+├── components/            # React components
+│   ├── ui/               # Base UI components
+│   └── ...               # Business components
+├── lib/                  # Utility libraries
+│   ├── db.ts             # Database connection
+│   ├── auth.ts           # Authentication logic
+│   └── ...               # Other utilities
+├── public/               # Static assets
+├── scripts/              # Database scripts
+├── docker-compose.yml    # Docker configuration
+└── package.json          # Project dependencies
 ```
 
-## 🔧 开发指南
+## 🔧 Development Guide
 
-### 添加新的AI提供商
+### Adding New AI Providers
 
-1. 在 `lib/providers/` 中创建新的提供商配置
-2. 更新 `lib/providers/config.ts` 添加配置
-3. 在前端组件中添加选择选项
+1. Create new provider configuration in `lib/providers/`
+2. Update `lib/providers/config.ts` to add configuration
+3. Add selection options in frontend components
 
-### 自定义PPT模板
+### Custom PPT Templates
 
-1. 修改 `app/api/generate-ppt-html/route.ts` 中的模板
-2. 调整CSS样式和布局
-3. 测试不同内容类型的显示效果
+1. Modify templates in `app/api/generate-ppt-html/route.ts`
+2. Adjust CSS styles and layouts
+3. Test display effects for different content types
 
-### 数据库迁移
+### Database Migration
 
-使用 `scripts/` 目录中的SQL文件进行数据库结构更新：
+Use SQL files in the `scripts/` directory for database structure updates:
 
 ```bash
 mysql -u root -p localsite_ai < scripts/your-migration.sql
 ```
 
-## 🚢 部署指南
+## 🚢 Deployment Guide
 
-### Docker 部署
+### Docker Deployment
 
-1. **构建镜像**
+1. **Build image**
 ```bash
 docker build -t localsite-ai .
 ```
 
-2. **使用docker-compose**
+2. **Use docker-compose**
 ```bash
 docker-compose up -d
 ```
 
-### Vercel 部署
+### Vercel Deployment
 
-1. 连接GitHub仓库到Vercel
-2. 配置环境变量
-3. 设置数据库连接（推荐使用PlanetScale或AWS RDS）
+1. Connect GitHub repository to Vercel
+2. Configure environment variables
+3. Set up database connection (recommend PlanetScale or AWS RDS)
 
-### 传统服务器部署
+### Traditional Server Deployment
 
-1. **构建生产版本**
+1. **Build production version**
 ```bash
 npm run build
 ```
 
-2. **启动应用**
+2. **Start application**
 ```bash
 npm start
 ```
 
-3. **使用PM2管理进程**
+3. **Use PM2 for process management**
 ```bash
 pm2 start npm --name "localsite-ai" -- start
 ```
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-欢迎贡献代码！请遵循以下步骤：
+We welcome contributions! Please follow these steps:
 
-1. Fork 本仓库到你的 GitHub 账号
-2. 新建一个功能分支（`git checkout -b feature/你的功能名`）
-3. 完成开发后提交代码（`git commit -m 'feat: 实现 XXX 功能'`）
-4. 将分支推送到你的远程仓库（`git push origin feature/你的功能名`）
-5. 开启 Pull Request
+1. Fork this repository to your GitHub account
+2. Create a feature branch (`git checkout -b feature/your-feature-name`)
+3. Commit your changes (`git commit -m 'feat: implement XXX feature'`)
+4. Push the branch to your remote repository (`git push origin feature/your-feature-name`)
+5. Open a Pull Request
 
-### 开发规范
+### Development Standards
 
-- 使用 TypeScript 进行类型检查
-- 遵循 ESLint 规则
-- 组件使用函数式组件和 Hooks
-- API 路由使用 Next.js App Router 规范
+- Use TypeScript for type checking
+- Follow ESLint rules
+- Use functional components and Hooks
+- Follow Next.js App Router conventions for API routes
 
-## 📄 许可证
+## 🐛 Troubleshooting
 
-本项目采用 MIT 许可证。详见 [LICENSE](LICENSE) 文件。
-## 🔗 相关链接
+### Common Issues
 
-- [在线演示](https://webcode.weilai.ai)
+**Database Connection Error**
+- Check if MySQL service is running
+- Verify database credentials in `.env.local`
+- Ensure database `localsite_ai` exists
 
-- [问题反馈(飞书)](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=108mb75b-4cf3-4621-8eb2-c69eefc43fe2)
+**AI API Errors**
+- Verify API keys are correctly configured
+- Check API rate limits and quotas
+- Ensure network connectivity to AI providers
 
-## ⭐ 支持项目
+**Docker Issues**
+- Make sure Docker and Docker Compose are installed
+- Check port 3000 is not occupied by other services
+- Verify environment variables in docker-compose.yml
 
-如果这个项目对你有帮助，请给我们一个 ⭐ Star！
+For more troubleshooting tips, see [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 🔗 Links
+
+- [Live Demo](https://webcode.weilai.ai)
+- [Documentation](docs/)
+- [Issue Tracker](https://github.com/Mrkk1/viaimcode/issues)
+- [Feedback (Feishu)](https://applink.feishu.cn/client/chat/chatter/add_by_link?link_token=108mb75b-4cf3-4621-8eb2-c69eefc43fe2)
+
+## ⭐ Support the Project
+
+If this project helps you, please give us a ⭐ Star!
 
 ---
-[讯飞未来智能](https://www.viaim.cn/#/home) 
+
+<div align="center">
+
+**Made with ❤️ by [讯飞未来智能](https://www.viaim.cn/#/home)**
+
+</div> 
 
