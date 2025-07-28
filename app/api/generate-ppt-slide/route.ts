@@ -1,8 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { 
+  WEB_SEARCH_TOOL, 
+  supportsWebSearch, 
+  buildSearchPrompt,
+  addWebSearchTool
+} from '../../../lib/web-search'
 
 export async function POST(request: NextRequest) {
+  console.log('request', request)
   try {
-    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo } = await request.json()
+    const { slide, slideIndex, totalSlides, theme, model, provider, previousSlideInfo, enableWebSearch = false } = await request.json()
+
+    console.log('幻灯片生成API - 接收到的参数:')
+    console.log('- slide.title:', slide?.title)
+    console.log('- slideIndex:', slideIndex)
+    console.log('- model:', model)
+    console.log('- provider:', provider)
+    console.log('- enableWebSearch:', enableWebSearch)
+
+    // 检查是否支持联网搜索
+    const canUseWebSearch = enableWebSearch && supportsWebSearch(provider)
+    console.log('联网搜索状态:', { enableWebSearch, provider, canUseWebSearch })
 
     if (!slide || !model || !provider) {
       return NextResponse.json(
@@ -40,6 +58,18 @@ export async function POST(request: NextRequest) {
 
     // 构建专门用于生成幻灯片HTML的系统提示词，支持思考过程和风格连贯性
     const systemPrompt = `You are an expert presentation designer specializing in creating beautiful, professional HTML slides using Tailwind CSS. You have extensive experience in corporate presentations, visual design, and user experience.
+
+${canUseWebSearch ? `
+🌐 INTERNET SEARCH CAPABILITY:
+You have access to real-time internet search through the $web_search tool. Use this capability to:
+- Gather the latest data, statistics, and examples related to the slide content
+- Find authoritative sources and current information
+- Verify facts and get up-to-date industry insights
+- Discover relevant case studies and best practices
+- Obtain current market trends and developments
+
+When creating slide content, actively use search to ensure information is accurate, current, and well-supported by authoritative sources.
+` : ''}
 
 CRITICAL OUTPUT FORMAT - YOU MUST FOLLOW THIS EXACT STRUCTURE:
 

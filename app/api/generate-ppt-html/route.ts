@@ -177,7 +177,24 @@ CONTENT SIMPLICITY REQUIREMENTS (CRITICAL):
      * 必要时使用contentBackgroundColor为内容区域添加半透明背景
      * 确保对比度比例达到WCAG AA标准（≥4.5:1）
    - 保持内容的清晰度和可读性
+3. **内容区域布局设计** (Content Area Layout Design)
+   - 基于统一背景的内容区域进行布局规划
+   - 确定标题区域的位置和大小
+   - 规划主要内容区域的分配
+   - 设计要点列表的展示方式
+   - 安排图表、图片等视觉元素的位置
 
+4. **空间利用优化** (Space Utilization Optimization)
+   - 分析1280×720px中内容区域的有效空间
+   - 规划合理的边距和间距
+   - 确保内容不会过于拥挤或过于稀疏
+   - 平衡文字和空白区域的比例
+
+5. **可读性与可访问性** (Readability & Accessibility)
+   - 确定合适的字体大小和行间距
+   - 规划文本块的最佳宽度
+   - 确保在投影环境下的可读性
+   - 考虑不同阅读习惯的用户需求
 HTML IMPLEMENTATION APPROACH:
 ${unifiedBackground ? `
 1. **基于多层背景**:

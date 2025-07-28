@@ -33,6 +33,13 @@ IMPORTANT: Do NOT use markdown formatting. Do NOT wrap the code in \`\`\`html an
 export interface LLMProviderClient {
   getModels: () => Promise<{ id: string; name: string }[]>;
   generateCode: (prompt: string, model: string, customSystemPrompt?: string | null, maxTokens?: number) => Promise<ReadableStream<Uint8Array>>;
+  generateWithTools?: (
+    messages: any[], 
+    model: string, 
+    tools?: any[], 
+    maxTokens?: number,
+    temperature?: number
+  ) => Promise<ReadableStream<Uint8Array>>;
 }
 
 // Factory function to create a provider client
@@ -107,6 +114,64 @@ class OpenAICompatibleProvider implements LLMProviderClient {
           controller.enqueue(textEncoder.encode(content));
         }
         controller.close();
+      },
+    });
+  }
+
+  async generateWithTools(
+    messages: any[], 
+    model: string, 
+    tools?: any[], 
+    maxTokens?: number,
+    temperature?: number
+  ) {
+    const requestBody: any = {
+      model,
+      messages,
+      max_tokens: maxTokens || undefined,
+      temperature: temperature || 0.7,
+      stream: true,
+    };
+
+    // 只有当tools存在且非空时才添加tools参数
+    if (tools && tools.length > 0) {
+      requestBody.tools = tools;
+    }
+
+    const stream = await this.client.chat.completions.create(requestBody) as any;
+
+    // Create a ReadableStream for the response
+    const textEncoder = new TextEncoder();
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          // Process the stream from OpenAI
+          for await (const chunk of stream) {
+            // 处理工具调用和普通内容
+            const choice = chunk.choices[0];
+            if (!choice) continue;
+
+            // 构建完整的chunk数据用于SSE格式
+            const chunkData = {
+              id: chunk.id,
+              object: chunk.object,
+              created: chunk.created,
+              model: chunk.model,
+              choices: [choice]
+            };
+
+            // 发送SSE格式的数据
+            const sseData = `data: ${JSON.stringify(chunkData)}\n\n`;
+            controller.enqueue(textEncoder.encode(sseData));
+          }
+          
+          // 发送结束标记
+          controller.enqueue(textEncoder.encode('data: [DONE]\n\n'));
+          controller.close();
+        } catch (error) {
+          console.error('Stream processing error:', error);
+          controller.error(error);
+        }
       },
     });
   }

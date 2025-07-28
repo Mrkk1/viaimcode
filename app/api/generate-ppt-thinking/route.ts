@@ -27,10 +27,10 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
+ let timeNow = new Date().toLocaleString()
     // 专门用于内容布局分析的系统提示词 - 不再包含风格选择
     const systemPrompt = `You are an expert presentation content strategist specializing in analyzing and planning the optimal content layout and organization for professional HTML slides.
-
+today is ${timeNow}
 CRITICAL LANGUAGE REQUIREMENT:
 - AUTOMATICALLY DETECT the language of the slide content
 - If the slide content is in Chinese, respond ENTIRELY in Chinese
@@ -171,7 +171,9 @@ ${modificationContext.analysisResult?.suggestedAction?.description || '无'}
         try {
           let response;
           
-          const userPrompt = `请为以下幻灯片进行详细的内容布局分析和规划：
+          const userPrompt = `
+          请对Content: ${slide.content}进行搜索，需要2025年的数据
+          然后请为以下幻灯片进行详细的内容布局分析和规划：
 
 **幻灯片信息:**
 - 标题: ${slide.title}
@@ -219,7 +221,7 @@ ${modificationContext.analysisResult?.suggestedAction?.description || '无'}
 **⚠️ 在内容布局分析中，请务必重点关注和响应上述修改需求！**` : ''}
 
 请开始详细的内容布局分析：`
-          
+
           if (provider === 'kimi' || provider === 'deepseek') {
             response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
               method: 'POST',
@@ -236,6 +238,7 @@ ${modificationContext.analysisResult?.suggestedAction?.description || '无'}
                 temperature: 0.5,
                 max_tokens: 3000, // 增加token限制以确保完整的思考内容
                 stream: true,
+                
               }),
             })
           }

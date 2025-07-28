@@ -90,6 +90,13 @@ export function PPTGenerationView({
   onBack,
   initialData
 }: PPTGenerationViewProps) {
+  // 联网搜索状态
+  const [enableWebSearch, setEnableWebSearch] = useState(true)
+  const [searchStats, setSearchStats] = useState<{ tokensUsed: number; searchCount: number }>({ tokensUsed: 0, searchCount: 0 })
+  const [isSearching, setIsSearching] = useState(false)
+  
+  // 检查是否支持联网搜索
+  const supportsWebSearch = provider === 'kimi' || provider === 'deepseek'
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(initialData?.chatMessages || [])
   const [currentChatInput, setCurrentChatInput] = useState("")
   const [slides, setSlides] = useState<PPTSlide[]>(initialData?.slides || [])
@@ -869,7 +876,7 @@ export function PPTGenerationView({
       const outlineResponse = await fetch('/api/generate-ppt-outline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, model, provider }),
+        body: JSON.stringify({ prompt, model, provider, enableWebSearch }),
       })
       if (!outlineResponse.ok) throw new Error('Failed to generate outline')
       const reader = outlineResponse.body?.getReader()
@@ -891,7 +898,37 @@ export function PPTGenerationView({
         for (const line of lines) {
           try {
             const data = JSON.parse(line)
-            if (data.type === 'content' && data.content) {
+            if (data.type === 'tool_call') {
+              // 处理工具调用状态
+              setIsSearching(true)
+              setChatMessages(prev => prev.map(msg =>
+                msg.id === thinkingMsgId
+                  ? { ...msg, content: `思考过程：\n正在进行联网搜索...` }
+                  : msg
+              ))
+            } else if (data.type === 'search_progress') {
+              // 处理搜索进度
+              setChatMessages(prev => prev.map(msg =>
+                msg.id === thinkingMsgId
+                  ? { ...msg, content: `思考过程：\n${data.content}` }
+                  : msg
+              ))
+            } else if (data.type === 'search_stats') {
+              // 处理搜索统计
+              const tokenMatch = data.content.match(/(\d+) tokens/)
+              if (tokenMatch) {
+                const tokensUsed = parseInt(tokenMatch[1])
+                setSearchStats(prev => ({
+                  tokensUsed: prev.tokensUsed + tokensUsed,
+                  searchCount: prev.searchCount + 1
+                }))
+              }
+              setIsSearching(false)
+            } else if (data.type === 'error') {
+              // 处理API返回的错误
+              console.error('API返回错误:', data.content)
+              throw new Error(`大纲生成失败: ${data.content}`)
+            } else if (data.type === 'content' && data.content) {
               receivedContent += data.content
               // 检查思考标签
               const thinkingStartIndex = receivedContent.indexOf("<think>")
@@ -1399,7 +1436,8 @@ export function PPTGenerationView({
               model: 'kimi-k2-0711-preview',
               provider: 'kimi',
               previousSlideInfo: previousSlideInfo,
-              unifiedBackground: outlineData.outline.unifiedBackground // 传递统一背景信息
+              unifiedBackground: outlineData.outline.unifiedBackground, // 传递统一背景信息
+              enableWebSearch: enableWebSearch // 添加联网搜索参数
             }),
           })
 
@@ -1455,6 +1493,34 @@ export function PPTGenerationView({
                         thinkingContent: thinkingContent
                       } : s
                     ))
+                  } else if (data.type === 'tool_call') {
+                    // 处理工具调用状态
+                    setIsSearching(true)
+                    setSlides(prev => prev.map((s, i) => 
+                      i === index ? { 
+                        ...s, 
+                        generationProgress: `第1步：${data.content}`,
+                      } : s
+                    ))
+                  } else if (data.type === 'search_progress') {
+                    // 处理搜索进度
+                    setSlides(prev => prev.map((s, i) => 
+                      i === index ? { 
+                        ...s, 
+                        generationProgress: `第1步：${data.content}`,
+                      } : s
+                    ))
+                  } else if (data.type === 'search_stats') {
+                    // 处理搜索统计
+                    const tokenMatch = data.content.match(/(\d+) tokens/)
+                    if (tokenMatch) {
+                      const tokensUsed = parseInt(tokenMatch[1])
+                      setSearchStats(prev => ({
+                        tokensUsed: prev.tokensUsed + tokensUsed,
+                        searchCount: prev.searchCount + 1
+                      }))
+                    }
+                    setIsSearching(false)
                   }
                 } catch (e) {
                   console.log(`第${index + 1}页解析思考SSE数据失败:`, e)
@@ -2174,6 +2240,7 @@ ${userInput}
           prompt: enhancedPrompt, 
           model, 
           provider,
+          enableWebSearch,
           isRegeneration: true,
           originalPrompt: prompt,
           historyContext: historyContext
@@ -4777,6 +4844,27 @@ ${analysis.extractedRequirements.specificChanges.map((change: string) => `• ${
             
             </div>
             <div className="flex items-center space-x-2">
+              {/* 联网搜索开关 */}
+              {supportsWebSearch && (
+                <div className="flex items-center space-x-2 px-3 py-1 bg-gray-800 rounded-lg border border-gray-600">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+             
+                    <span className="text-sm text-gray-300">联网搜索</span>
+                  </label>
+                  {isSearching && (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-xs text-blue-400">搜索中</span>
+                    </div>
+                  )}
+                  {searchStats.searchCount > 0 && (
+                    <span className="text-xs text-gray-400">
+                      已搜索{searchStats.searchCount}次 ({searchStats.tokensUsed} tokens)
+                    </span>
+                  )}
+                </div>
+              )}
+              
               {/* 元素选择按钮 */}
               {slides.length > 0 && (
                 <Button

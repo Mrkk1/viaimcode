@@ -44,8 +44,11 @@ export async function middleware(request: NextRequest) {
     '/api/auth/register',
     '/api/auth/me',  // 添加/api/auth/me到公开路由，让前端能检查登录状态
     '/api/share',
-    '/api/featured-websites'
+    '/api/featured-websites',
+    '/api/get-models',  // 允许获取模型列表，用于显示提供商选项
+    '/api/get-default-provider'  // 允许获取默认提供商
   ];
+
 
   // 如果是 API 路由
   if (pathname.startsWith('/api')) {
