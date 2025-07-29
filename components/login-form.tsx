@@ -19,7 +19,10 @@ export default function LoginForm() {
   useEffect(() => {
     if (loginSuccess && redirectTo) {
       toast.success("Login successful");
-      window.location.href = redirectTo;
+      // 添加短暂延迟确保 cookie 设置生效
+      setTimeout(() => {
+        window.location.href = redirectTo;
+      }, 150);
     }
   }, [loginSuccess, redirectTo, router]);
 

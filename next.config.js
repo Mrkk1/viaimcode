@@ -15,9 +15,10 @@ const nextConfig = {
     serverActions: true,
     serverComponents: true,
     typedRoutes: true,
-    // 启用新的 params 行为
-    serverComponentsExternalPackages: ['@prisma/client', 'mysql2', 'canvas']
   },
+  
+  // 将过时的配置移到新位置
+  serverExternalPackages: ['@prisma/client', 'mysql2', 'canvas'],
   
   // 配置图片处理
   images: {

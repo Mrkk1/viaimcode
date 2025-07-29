@@ -379,24 +379,37 @@ IMPORTANT: Apart from the initial <think>...</think> block, do NOT use markdown 
     // 获取用户信息
     const fetchUser = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include',
+          cache: 'no-cache'
+        });
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
+        } else {
+          console.log('用户未登录或登录已过期');
+          setUser(null);
         }
       } catch (error) {
         console.error('获取用户信息失败:', error);
+        setUser(null);
       }
     };
 
-    fetchUser();
+    // 添加短暂延迟，确保从登录页跳转过来时 cookie 已经生效
+    const timer = setTimeout(() => {
+      fetchUser();
+    }, 100);
 
     // Simulate loading time
-    const timer = setTimeout(() => {
+    const loadingTimer = setTimeout(() => {
       setIsLoading(false)
     }, 1250)
 
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(loadingTimer);
+    }
   }, [])
 
   // 加载项目版本历史

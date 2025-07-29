@@ -52,6 +52,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "coffee-script": "^1.12.7",
     "date-fns": "^4.1.0",
     "dom-to-image-more": "^3.6.0",
     "dotenv": "^16.5.0",

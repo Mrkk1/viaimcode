@@ -1,23 +1,31 @@
 import mysql from 'mysql2/promise';
 
-// Check required environment variables
-const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    throw new Error(`Missing required environment variable: ${envVar}`);
+// Check required environment variables (only when actually using the database)
+function checkRequiredEnvVars() {
+  const requiredEnvVars = ['DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+  for (const envVar of requiredEnvVars) {
+    if (!process.env[envVar]) {
+      throw new Error(`Missing required environment variable: ${envVar}`);
+    }
   }
 }
 
-// Database connection configuration (excluding database name)
-const dbConfig = {
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD
-};
+// Get database connection configuration (excluding database name)
+function getDbConfig() {
+  checkRequiredEnvVars();
+  return {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || '3306'),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD
+  };
+}
 
-// Database name
-const DATABASE_NAME = process.env.DB_NAME;
+// Get database name
+function getDatabaseName() {
+  checkRequiredEnvVars();
+  return process.env.DB_NAME!;
+}
 
 // Global connection pool instance
 let poolInstance: mysql.Pool | null = null;
@@ -25,6 +33,9 @@ let poolInstance: mysql.Pool | null = null;
 // Create database and initialize tables
 export async function initDatabase() {
   try {
+    const dbConfig = getDbConfig();
+    const DATABASE_NAME = getDatabaseName();
+    
     // Create connection pool without specifying database
     const pool = mysql.createPool(dbConfig);
     const connection = await pool.getConnection();
@@ -219,6 +230,9 @@ export async function initDatabase() {
 // Get database connection pool (used for database operations in the application)
 export function getPool() {
   if (!poolInstance) {
+    const dbConfig = getDbConfig();
+    const DATABASE_NAME = getDatabaseName();
+    
     poolInstance = mysql.createPool({
       ...dbConfig,
       database: DATABASE_NAME,
