@@ -20,6 +20,12 @@ export function ThinkingIndicator({
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
+  
+  // Animation for the dots
+  const [dots, setDots] = useState("")
+  
+  // Status for finished state
+  const [hasFinished, setHasFinished] = useState(false)
 
   // Automatically scroll to the end of the thinking output
   useEffect(() => {
@@ -27,22 +33,6 @@ export function ThinkingIndicator({
       dropdownRef.current.scrollTop = dropdownRef.current.scrollHeight
     }
   }, [isOpen, thinkingOutput])
-
-  if (!thinkingOutput && !isThinking) return null
-
-  // Format the thinking output for better readability
-  const formattedThinking = thinkingOutput
-    .split('\n')
-    .map((line, index) => <div key={index} className="py-0.5">{line}</div>)
-
-  // Determine dropdown position based on the position prop
-  let dropdownPosition = "left-0 top-full"
-  if (position === "top-right") dropdownPosition = "right-0 top-full"
-  if (position === "bottom-left") dropdownPosition = "left-0 bottom-full"
-  if (position === "bottom-right") dropdownPosition = "right-0 bottom-full"
-
-  // Animation for the dots
-  const [dots, setDots] = useState("")
 
   // Animated dots for "Thinking..." or "Coding..."
   useEffect(() => {
@@ -60,9 +50,6 @@ export function ThinkingIndicator({
     return () => clearInterval(interval)
   }, [isThinking])
 
-  // Status for finished state
-  const [hasFinished, setHasFinished] = useState(false)
-
   useEffect(() => {
     if (isThinking) {
       setHasFinished(false)
@@ -71,6 +58,20 @@ export function ThinkingIndicator({
       setHasFinished(true)
     }
   }, [isThinking, thinkingOutput, hasFinished])
+
+  // Early return after all hooks
+  if (!thinkingOutput && !isThinking) return null
+
+  // Format the thinking output for better readability
+  const formattedThinking = thinkingOutput
+    .split('\n')
+    .map((line, index) => <div key={index} className="py-0.5">{line}</div>)
+
+  // Determine dropdown position based on the position prop
+  let dropdownPosition = "left-0 top-full"
+  if (position === "top-right") dropdownPosition = "right-0 top-full"
+  if (position === "bottom-left") dropdownPosition = "left-0 bottom-full"
+  if (position === "bottom-right") dropdownPosition = "right-0 bottom-full"
 
   // 根据模式确定显示文本和图标
   const getDisplayText = () => {

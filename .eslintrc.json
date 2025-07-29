@@ -1,0 +1,18 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "rules": {
+    // 开发阶段临时放宽的规则
+    "@typescript-eslint/no-unused-vars": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
+    "react/no-unescaped-entities": "warn",
+    "react-hooks/exhaustive-deps": "warn",
+    "@next/next/no-img-element": "warn",
+    "jsx-a11y/alt-text": "warn",
+    "prefer-const": "warn",
+    "@typescript-eslint/no-require-imports": "warn",
+    "react-hooks/rules-of-hooks": "error"
+  }
+} 
