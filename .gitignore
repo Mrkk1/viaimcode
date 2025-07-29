@@ -45,7 +45,6 @@ yarn-error.log*
 next-env.d.ts
 
 # 项目特定文件
-package-lock.json
 unused-components.md
 
 # 临时文件和缓存
