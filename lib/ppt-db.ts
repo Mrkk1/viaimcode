@@ -80,7 +80,14 @@ export interface PPTChatMessage {
 }
 
 export class PPTDatabase {
-  private pool = getPool();
+  private _pool: any = null;
+  
+  private get pool() {
+    if (!this._pool) {
+      this._pool = getPool();
+    }
+    return this._pool;
+  }
 
   // 创建PPT项目
   async createProject(data: {
@@ -916,4 +923,25 @@ export class PPTDatabase {
 }
 
 // 导出单例实例
-export const pptDb = new PPTDatabase(); 
+// 懒加载的 PPTDatabase 实例
+let _pptDb: PPTDatabase | null = null;
+
+function getPptDbInstance(): PPTDatabase {
+  if (!_pptDb) {
+    _pptDb = new PPTDatabase();
+  }
+  return _pptDb;
+}
+
+// 创建一个代理对象，将所有方法调用转发到懒加载的实例
+export const pptDb = new Proxy({} as PPTDatabase, {
+  get(target, prop) {
+    const instance = getPptDbInstance();
+    const value = (instance as any)[prop];
+    
+    if (typeof value === 'function') {
+      return value.bind(instance);
+    }
+    return value;
+  }
+}); 

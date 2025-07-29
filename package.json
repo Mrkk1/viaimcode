@@ -52,7 +52,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
-    "coffee-script": "^1.12.7",
     "date-fns": "^4.1.0",
     "dom-to-image-more": "^3.6.0",
     "dotenv": "^16.5.0",
@@ -105,5 +104,10 @@
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "typescript": "^5"
+  },
+  "overrides": {
+    "ip": "^2.0.1",
+    "brace-expansion": "^2.0.1",
+    "form-data": "^4.0.4"
   }
 }

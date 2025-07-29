@@ -18,7 +18,7 @@ const nextConfig = {
   },
   
   // 将过时的配置移到新位置
-  serverExternalPackages: ['@prisma/client', 'mysql2', 'canvas'],
+  serverExternalPackages: ['@prisma/client', 'mysql2', 'canvas', 'vm2', 'degenerator', 'pac-resolver'],
   
   // 配置图片处理
   images: {
